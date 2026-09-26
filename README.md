@@ -47,9 +47,10 @@ Edge** (Firefox and Safari can't talk to USB devices). Plug the StickS3 in, clos
 click **Connect** and pick the switch. The switch is set up over the USB cable – no Wi-Fi – and recordings and
 typed words stay on the computer.
 
-**Mode** and **Volume** are at the top of the page. Below them is one tab per mode, plus **Switch**; each tab
-has that mode's settings at the top (settings that do nothing with the current choices are hidden) and what it
-uses below. Clicking a mode opens its tab; the tab of the mode in use has a green dot.
+The page has a tab for each mode – SPEAK, CHOOSE, KEYBOARD, IR – and **Settings**, like the modes on the
+switch. The tab of the mode the switch is in has a green dot; any other mode's tab has a **Use** button to switch
+to it. Each mode's tab has that mode's settings at the top, in the same order as on the switch (settings that do
+nothing with the current choices are hidden), and what it uses below.
 
 - **SPEAK:** Play style, Hold for next; the 4 Quick messages. For each: a name, ▶ Play, **Change** (record with the
   computer's microphone or a headset, **type the words** – spoken in the switch's voice – or upload an audio file;
@@ -57,17 +58,17 @@ uses below. Clicking a mode opens its tab; the tab of the mode in use has a gree
 - **CHOOSE:** Choose from, Choosing, Scan speed, Scan rounds; then what it chooses from – the Quick messages, or
   the 4 **topics** of up to 4 messages each (up to 5 seconds per message). Name each topic and message – the names
   become the spoken prompts. With *Choose from: One topic*, *Use this topic* picks it.
-- **KEYBOARD:** the key, Key action, Press sound; a **custom key or shortcut** such as Win+H (dictation); Bluetooth
-  name and *Forget all paired devices*.
+- **KEYBOARD:** the key, Key action, Press sound; a **custom key or shortcut** such as Win+H (dictation); the
+  Bluetooth name.
 - **IR:** IR codes (and the scanning settings when students scan), Press sound; 4 remote-control codes, separate
   from the messages. For each: a name, **Learn / Test / Delete**, and an optional **sound** (made the same three
   ways) that the switch says as it sends the code.
-- **Switch:** switch access (Press must last, Ignore repeats), power and screen, and the switch's **voice**, speed
-  and **loudness** for typed messages and scanning prompts (natural: Emma, Isabella, George, Fable; quick: Cori,
-  Alba, Southern English female, Northern English male – stored on the switch, so every computer uses the same
-  one; changing the voice remakes the prompts). Loudness is the switch's *Recording boost*: it applies to messages
-  recorded on the switch and to ones made on the page. Voice, speed and loudness can also be changed in the
-  message editor.
+- **Settings:** the switch's SETTINGS in the same order – Volume, Press must last, Ignore repeats, Switch wakes
+  screen, Sleep after, Auto power off, Recording boost, Forget BT devices – then the switch's **voice** and speed
+  for typed messages and scanning prompts (natural: Emma, Isabella, George, Fable; quick: Cori, Alba, Southern
+  English female, Northern English male – stored on the switch, so every computer uses the same one; changing the
+  voice remakes the prompts). Recording boost also sets the loudness of messages made on the page. Voice, speed
+  and loudness can also be changed in the message editor.
 - **Names become prompts:** naming a message, topic or IR code makes its short spoken prompt for scanning, in
   the switch's voice (plus a "Back" prompt when students choose topics).
 
@@ -141,7 +142,7 @@ record the Quick messages (SPEAK, hold A) and set *Choose from: Quick messages*.
 Each mode has its own settings – press B until the screen shows **Settings**, then hold A to open them – and the
 **SETTINGS** mode holds the general ones. In any settings: **B** = next setting, **hold A** = change the value,
 **A** = close (or next mode). Changes are saved straight away; settings close by themselves after 30s untouched.
-All of these are on the setup page too, on each mode's tab and the Switch tab.
+All of these are on the setup page too, on each mode's tab and the Settings tab.
 
 | Where | Setting | Choices (default **bold**) | What it does |
 |---|---|---|---|

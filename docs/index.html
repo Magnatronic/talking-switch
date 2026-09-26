@@ -49,8 +49,10 @@ button.link { background: none; border: none; color: var(--accent); padding: 4px
 .dot.lit { background: var(--good); }
 
 /* mode / volume bar */
-.bar { display: grid; gap: 12px 24px; grid-template-columns: 1fr auto; }
-@media (max-width: 620px) { .bar { grid-template-columns: 1fr; } }
+.modeline { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; padding: 10px 12px; margin-bottom: 14px;
+  border-radius: 10px; background: var(--chip); }
+.modeline.inuse { background: var(--accent-soft); }
+.modeline b { font-size: 1.02rem; }
 .seg { display: flex; flex-wrap: wrap; gap: 6px; }
 .label { font-weight: 600; font-size: .9rem; margin-bottom: 4px; }
 
@@ -133,24 +135,12 @@ ol { padding-left: 1.2em; margin: 8px 0 0; }
   </section>
 
   <div id="app" class="hidden">
-    <section class="card bar">
-      <div>
-        <div class="label">What the switch does</div>
-        <div id="modes" class="seg" role="radiogroup" aria-label="Mode"></div>
-        <div id="modeHelp" class="muted small" style="margin-top:6px"></div>
-      </div>
-      <div>
-        <div class="label">Volume</div>
-        <div id="vol" class="seg" role="radiogroup" aria-label="Volume"></div>
-      </div>
-    </section>
-
     <nav class="tabs" role="tablist">
       <button role="tab" data-tab="speak">SPEAK</button>
       <button role="tab" data-tab="choose">CHOOSE</button>
       <button role="tab" data-tab="keyboard">KEYBOARD</button>
       <button role="tab" data-tab="ir">IR</button>
-      <button role="tab" data-tab="switch">Switch</button>
+      <button role="tab" data-tab="settings">Settings</button>
     </nav>
 
     <section id="tab-speak" class="card" role="tabpanel">
@@ -184,11 +174,9 @@ ol { padding-left: 1.2em; margin: 8px 0 0; }
       </div>
       <p class="muted small">For example Win + H starts Windows dictation. The custom key is added to the Key choices above.</p>
       <div class="label" style="margin-top:20px">Bluetooth</div>
-      <p class="small" style="margin:0 0 8px">Keys go over USB when plugged into a computer, otherwise over Bluetooth.
-        The switch appears as <b id="btName"></b> when pairing (<span id="btState"></span>).</p>
-      <button id="forgetBtn" class="danger">Forget all paired devices</button>
-      <p class="muted small">Use this to move the switch to a different computer or tablet. Also remove it in that
-        device's Bluetooth settings.</p>
+      <p class="small" style="margin:0">Keys go over USB when plugged into a computer, otherwise over Bluetooth.
+        The switch appears as <b id="btName"></b> when pairing (<span id="btState"></span>). To pair it with a
+        different computer or tablet, use <i>Forget BT devices</i> on the Settings tab.</p>
     </section>
 
     <section id="tab-ir" class="card" role="tabpanel">
@@ -200,10 +188,14 @@ ol { padding-left: 1.2em; margin: 8px 0 0; }
       <div id="irList" class="slots"></div>
     </section>
 
-    <section id="tab-switch" class="card" role="tabpanel">
-      <div id="set-switch"></div>
+    <section id="tab-settings" class="card" role="tabpanel">
+      <div id="set-settings" class="settings"></div>
+      <div id="voiceGroup"></div>
     </section>
   </div>
+
+  <!-- Which mode the switch is in: shown at the top of each mode's tab -->
+  <div id="modeLine" class="modeline hidden"></div>
 
   <!-- The Quick messages: shown on SPEAK, or on CHOOSE when it chooses from them -->
   <div id="quickWrap" class="hidden">
@@ -244,7 +236,7 @@ const MODE_HELP = {
   'KEYBOARD': 'Each press presses a keyboard key, over USB or Bluetooth.',
   'IR': 'Each press sends the selected remote-control code, and says its sound if it has one.',
 };
-const TABS = ['speak', 'choose', 'keyboard', 'ir', 'switch'];
+const TABS = ['speak', 'choose', 'keyboard', 'ir', 'settings'];
 function tabOfMode(i) { return (info.modes[i] || '').toLowerCase(); }
 
 // ---------------------------------------------------------------- toast
@@ -482,13 +474,6 @@ function render() {
   $('btName').textContent = info.name;
   $('btState').textContent = info.bt ? 'connected now' : 'not connected';
 
-  segment($('modes'), info.modes, info.mode, async (i) => {
-    showTab(tabOfMode(i));
-    await act(() => cmd(`MODE ${i}`));
-    makeMissingPrompts();
-  });
-  $('modeHelp').textContent = MODE_HELP[info.modes[info.mode]] || '';
-  segment($('vol'), Array.from({ length: info.vols }, (_, i) => String(i + 1)), info.vol, (i) => act(() => cmd(`VOL ${i}`)));
   for (const b of document.querySelectorAll('.tabs button')) b.classList.toggle('inuse', b.dataset.tab === tabOfMode(info.mode));
   renderQuick();
   renderTopics();
@@ -497,6 +482,29 @@ function render() {
   renderSettings();
   renderCustomKey();
   placeQuick();
+  placeModeLine();
+}
+
+// Top of each mode's tab: the mode the switch is in, or a button to use this one.
+function placeModeLine() {
+  const line = $('modeLine');
+  const m = info ? info.modes.findIndex((x) => x.toLowerCase() === currentTab) : -1;
+  line.classList.toggle('hidden', m < 0);
+  if (m < 0) return;
+  const cur = info.modes[info.mode];
+  if (m === info.mode) {
+    line.className = 'modeline inuse';
+    line.replaceChildren(el('b', {}, `● The switch is in ${cur} mode`), el('span', { class: 'small' }, MODE_HELP[cur] || ''));
+  } else {
+    line.className = 'modeline';
+    line.replaceChildren(el('span', {}, `The switch is in ${cur} mode.`),
+      el('button', { class: 'primary', onclick: async () => {
+        await act(() => cmd(`MODE ${m}`), `The switch is in ${info.modes[m]} mode`);
+        makeMissingPrompts();
+      } }, `Use ${info.modes[m]}`),
+      el('span', { class: 'small muted' }, MODE_HELP[info.modes[m]] || ''));
+  }
+  $('tab-' + currentTab).prepend(line);
 }
 
 function selectRadio(i, group, current, command, on = 'Selected', off = 'Select') {
@@ -617,7 +625,7 @@ function renderEditor(i) {
   const loud = lst && el('select', { 'aria-label': 'Loudness', onchange: () => setSetting('s_loud', +loud.value) },
     ...lst.choices.map((c, k) => el('option', { value: k, selected: k === lst.cur }, c)));
   body.push(el('div', { class: 'row small muted' },
-    loud ? el('label', { title: 'Louder, at some cost in clarity. The same setting as on the Switch tab.' }, 'Loudness ', loud) : null,
+    loud ? el('label', { title: 'Louder, at some cost in clarity. The same as Recording boost on the Settings tab.' }, 'Loudness ', loud) : null,
     soundInfo(i).len ? el('button', { class: 'link', onclick: () => listenSaved(i) }, 'Listen to the current sound here') : null,
     soundInfo(i).len ? el('button', { class: 'link', onclick: () => saveWav(i) }, 'Download it (.wav)') : null));
 
@@ -771,7 +779,7 @@ function renderIr() {
 }
 
 // ---------------------------------------------------------------- settings
-// Each mode's tab shows its own settings at the top; the Switch tab has the
+// Each mode's tab shows its own settings at the top; the Settings tab has the
 // rest. Settings that do nothing with the current choices are hidden.
 const HELP = {
   s_play: 'Tap: a press plays the whole message. Hold to play: plays only while held. Latch: one press starts it, the next stops it.',
@@ -791,7 +799,6 @@ const HELP = {
   s_loud: 'Louder messages, at some cost in clarity – for recordings, typed and uploaded messages.',
 };
 // Clearer names and choices than fit on the switch's small screen
-const NAMES = { s_hold: 'Hold for next', s_loud: 'Loudness' };
 const CHOICES = { s_choose: ['Quick messages', 'One topic', 'Student picks a topic'] };
 
 const pressTwice = () => setCur('s_access') === 0;
@@ -818,7 +825,7 @@ function settingRow(name, choices, cur, onPick, help) {
 function switchSetting(k) {
   const st = info.settings.find((x) => x.key === k);
   if (!st) return null;
-  return settingRow(NAMES[k] || st.name, CHOICES[k] || st.choices, st.cur, (i) => setSetting(k, i), HELP[k]);
+  return settingRow(st.name, CHOICES[k] || st.choices, st.cur, (i) => setSetting(k, i), HELP[k]);
 }
 
 function renderSettings() {
@@ -834,11 +841,18 @@ function renderSettings() {
   ];
   $('chooseIntro').textContent = CHOOSE_INTRO[setCur('s_choose')] || '';
 
-  const group = (title, ...rows) => el('div', { class: 'group' }, el('h2', {}, title), ...rows.filter(Boolean));
-  $('set-switch').replaceChildren(
-    group('Switch access', switchSetting('s_accept'), switchSetting('s_lockout')),
-    group('Power and screen', switchSetting('s_sleep'), switchSetting('s_autooff'), switchSetting('s_wake')),
-    renderVoiceSetting());
+  // the switch's SETTINGS, in the same order as on the switch
+  const forget = el('button', { class: 'danger', onclick: () => {
+    if (confirm('Forget every paired computer and tablet? You will need to pair again.'))
+      act(() => cmd('FORGET'), 'Paired devices forgotten');
+  } }, 'Forget all');
+  $('set-settings').replaceChildren(
+    settingRow('Volume', Array.from({ length: info.vols }, (_, i) => String(i + 1)), info.vol,
+      (i) => act(() => cmd(`VOL ${i}`)), 'How loud messages play. 4 is the loudest the switch can go.'),
+    ...['s_accept', 's_lockout', 's_wake', 's_sleep', 's_autooff', 's_loud'].map(switchSetting).filter(Boolean),
+    el('div', { class: 'setting' }, el('div', { class: 'name' }, 'Forget BT devices'), el('div', {}, forget),
+      el('div', { class: 'help' }, 'To pair the switch with a different computer or tablet. Also remove it in that device’s Bluetooth settings.')));
+  $('voiceGroup').replaceChildren(renderVoiceSetting());
 }
 
 // The Quick messages live on SPEAK, and move to CHOOSE while it's open and choosing from them.
@@ -1040,7 +1054,7 @@ async function remakeAllPrompts() {
   toast('Prompts updated');
 }
 
-// Voice and speed pickers (the Switch tab and the message editor use the same ones)
+// Voice and speed pickers (the Settings tab and the message editor use the same ones)
 function voiceSelect() {
   const group = (engine, label) => el('optgroup', { label },
     ...VOICES.filter((v) => v.engine === engine).map((v) => el('option', { value: v.id, selected: v.id === savedVoice() }, v.name)));
@@ -1056,14 +1070,13 @@ function speedSelect() {
 
 function renderVoiceSetting() {
   const listen = el('button', { disabled: !ttsAvailable(), onclick: () => previewVoice() }, '▶ Hear it');
-  return el('div', { class: 'group' }, el('h2', {}, 'Voice and loudness'),
+  return el('div', { class: 'group' }, el('h2', {}, 'Voice for typed messages and prompts'),
     el('div', { class: 'setting' }, el('div', { class: 'name' }, 'Voice'), el('div', { class: 'row' }, voiceSelect(), listen),
       el('div', { class: 'help' }, ttsAvailable()
         ? 'Used for typed messages and scanning prompts on this switch. Changing it remakes the prompts; typed messages keep their voice until you type them again.'
         : 'Typed speech works when this page is opened from its web address.')),
     settingRow('Speed', SPEEDS.map(([, n]) => n), SPEEDS.findIndex(([v]) => v === savedSpeed()),
-      (i) => setVoice(savedVoice(), SPEEDS[i][0])),
-    switchSetting('s_loud'));
+      (i) => setVoice(savedVoice(), SPEEDS[i][0])));
 }
 
 async function previewVoice() {
@@ -1165,15 +1178,12 @@ function showTab(name) {
   for (const b of document.querySelectorAll('.tabs button')) b.setAttribute('aria-selected', String(b.dataset.tab === name));
   for (const t of TABS) $('tab-' + t).classList.toggle('hidden', t !== name);
   placeQuick();
+  placeModeLine();
 }
 for (const b of document.querySelectorAll('.tabs button')) b.addEventListener('click', () => showTab(b.dataset.tab));
 showTab('speak');
 
 // ---------------------------------------------------------------- wiring
-$('forgetBtn').addEventListener('click', () => {
-  if (confirm('Forget every paired computer and tablet? You will need to pair again.'))
-    act(() => cmd('FORGET'), 'Paired devices forgotten');
-});
 $('connectBtn').addEventListener('click', () => (port ? disconnect() : connect()));
 
 if (!('serial' in navigator)) {
