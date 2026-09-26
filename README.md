@@ -42,7 +42,8 @@ click **Connect** and pick the switch. The switch is set up over the USB cable �
 typed words stay on the computer.
 
 - **Messages tab:** 4 messages. For each: a name, ▶ Play, **Change** (record with the computer's microphone or a
-  headset, **type the words** and pick a voice – Cori, Alba, Southern English female, Northern English male – or
+  headset, **type the words** and pick a voice – natural: Emma, Isabella, George, Fable; quick: Cori, Alba, Southern
+  English female, Northern English male – or
   upload an audio file; then listen and save) and Delete. Silence is trimmed and the level evened out.
 - **IR remote tab:** 4 remote-control codes, separate from the messages. For each: a name, **Learn / Test / Delete**,
   and an optional **sound** (made the same three ways) that the switch says as it sends the code.
@@ -50,10 +51,12 @@ typed words stay on the computer.
 - **Settings tab:** everything from the SETTINGS menu, with explanations; Bluetooth name and *Forget all paired devices*.
 - **Mode and volume** are at the top of the page.
 
-**Typed speech** uses [Piper](https://github.com/rhasspy/piper) voices running in the browser. The engine and
-voices are served by the same GitHub Pages site (`docs/tts/`, about 270MB, fetched by `python tools/fetch_tts.py`),
-so IT only needs to allow the one `github.io` address. The first use of each voice downloads ~80MB; after that it's
-cached and works offline. Opening `docs/index.html` straight from disk still does everything except typed speech.
+**Typed speech** runs in the browser with two engines. **Kokoro** (the default) sounds much more natural and
+takes a few seconds per phrase; **Piper** is almost instant but flatter. Both, and their voices, are served by the
+same GitHub Pages site (`docs/tts/`, about 390MB, fetched by `python tools/fetch_tts.py`), so IT only needs to allow
+the one `github.io` address. The first use downloads about 115MB for Kokoro (all its voices) or ~80MB per Piper
+voice; after that it's cached and works offline. Opening `docs/index.html` straight from disk still does everything
+except typed speech.
 
 ### Publishing on GitHub Pages
 

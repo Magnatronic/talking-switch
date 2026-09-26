@@ -187,9 +187,11 @@ ol { padding-left: 1.2em; margin: 8px 0 0; }
   </div>
 </main>
 <footer class="wrap muted small">
-  Typed speech runs on this computer using <a href="https://github.com/rhasspy/piper">Piper</a> (MIT),
+  Typed speech runs on this computer using <a href="https://huggingface.co/hexgrad/Kokoro-82M">Kokoro</a> (Apache-2.0,
+  via <a href="https://github.com/hexgrad/kokoro">kokoro-js</a> and Transformers.js) and
+  <a href="https://github.com/rhasspy/piper">Piper</a> (MIT),
   <a href="https://github.com/espeak-ng/espeak-ng">eSpeak NG</a> (GPL-3.0) and
-  <a href="https://onnxruntime.ai/">ONNX Runtime Web</a> (MIT). Voices:
+  <a href="https://onnxruntime.ai/">ONNX Runtime Web</a> (MIT). Piper voices:
   Cori – public domain recordings from <a href="https://librivox.org">LibriVox</a>, model by Bryce Beattie;
   Alba – <a href="https://datashare.ed.ac.uk/handle/10283/3270">University of Edinburgh</a>, CC BY 4.0;
   Southern English female and Northern English male – <a href="http://www.openslr.org/83/">OpenSLR 83</a>, CC BY-SA 4.0.
@@ -498,8 +500,10 @@ function renderEditor(i) {
   } else if (editHow === 'type') {
     const text = el('textarea', { placeholder: 'Type the words to say…', value: typed, maxLength: 200,
       'aria-label': 'Words to say', oninput: () => (typed = text.value) });
+    const group = (engine, label) => el('optgroup', { label },
+      ...VOICES.filter((v) => v.engine === engine).map((v) => el('option', { value: v.id, selected: v.id === savedVoice() }, v.name)));
     const voice = el('select', { 'aria-label': 'Voice', onchange: () => store('voice', voice.value) },
-      ...VOICES.map((v) => el('option', { value: v.id, selected: v.id === (store('voice') || VOICES[0].id) }, v.name)));
+      group('kokoro', 'Natural – takes a few seconds'), group('piper', 'Quick – less natural'));
     const speed = el('select', { 'aria-label': 'Speed', onchange: () => store('speed', speed.value) },
       ...[['0.8', 'Slow'], ['0.9', 'A bit slow'], ['1', 'Normal'], ['1.15', 'Fast']]
         .map(([v, n]) => el('option', { value: v, selected: v === (store('speed') || '1') }, n)));
@@ -513,7 +517,8 @@ function renderEditor(i) {
           ttsBusy ? 'Making…' : 'Make speech')),
       el('div', { id: 'ttsProgress', class: 'hidden' },
         el('span', { id: 'ttsProgressText', class: 'small muted' }),
-        el('div', { class: 'progress' }, el('div', { id: 'ttsProgressBar' }))));
+        el('div', { class: 'progress' }, el('div', { id: 'ttsProgressBar' }))),
+      ttsBusy ? el('span', { class: 'small muted' }, 'Making the speech – natural voices take a few seconds…') : null);
     }
   } else {
     const file = el('input', { type: 'file', accept: 'audio/*', class: 'hidden',
@@ -794,13 +799,24 @@ function stopRecording() {
 }
 
 // ---------------------------------------------------------------- typed speech
+// Kokoro (natural, a few seconds per phrase) is the default; Piper is quicker
+// but flatter. Each engine is its own module in tts/.
 const VOICES = [
-  { id: 'en_GB-cori-medium', name: 'Cori – English, female' },
-  { id: 'en_GB-alba-medium', name: 'Alba – Scottish, female' },
-  { id: 'en_GB-southern_english_female-low', name: 'Southern English, female' },
-  { id: 'en_GB-northern_english_male-medium', name: 'Northern English, male' },
+  { id: 'bf_emma', engine: 'kokoro', name: 'Emma – English, female' },
+  { id: 'bf_isabella', engine: 'kokoro', name: 'Isabella – English, female' },
+  { id: 'bm_george', engine: 'kokoro', name: 'George – English, male' },
+  { id: 'bm_fable', engine: 'kokoro', name: 'Fable – English, male' },
+  { id: 'en_GB-cori-medium', engine: 'piper', name: 'Cori – English, female' },
+  { id: 'en_GB-alba-medium', engine: 'piper', name: 'Alba – Scottish, female' },
+  { id: 'en_GB-southern_english_female-low', engine: 'piper', name: 'Southern English, female' },
+  { id: 'en_GB-northern_english_male-medium', engine: 'piper', name: 'Northern English, male' },
 ];
-let ttsMod = null;
+const ENGINES = { kokoro: './tts/kokoro.js', piper: './tts/tts.js' };
+const engineMods = {};
+function savedVoice() {
+  const v = store('voice');
+  return VOICES.some((x) => x.id === v) ? v : VOICES[0].id;
+}
 function ttsAvailable() { return location.protocol !== 'file:'; }
 
 function showTtsProgress(what, loaded, total) {
@@ -820,8 +836,9 @@ async function makeSpeech(slot, text, voice, speed) {
   pending = null;
   render();
   try {
-    ttsMod ||= await import('./tts/tts.js');
-    const { samples, sampleRate } = await ttsMod.synthesize(text, voice, speed, showTtsProgress);
+    const engine = (VOICES.find((v) => v.id === voice) || VOICES[0]).engine;
+    engineMods[engine] ||= await import(ENGINES[engine]);
+    const { samples, sampleRate } = await engineMods[engine].synthesize(text, voice, speed, showTtsProgress);
     const audio = new AudioBuffer({ length: samples.length, sampleRate, numberOfChannels: 1 });
     audio.copyToChannel(samples, 0);
     ttsBusy = false;

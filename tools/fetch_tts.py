@@ -37,6 +37,25 @@ for name, path in [
     FILES[f"voices/{name}.MODEL_CARD.txt"] = VOICES + path + "MODEL_CARD"
 
 
+# Kokoro (Apache-2.0) - the default, more natural engine. kokoro.js redirects
+# the HuggingFace addresses kokoro-js asks for to these copies.
+KOKORO_JS = "https://cdn.jsdelivr.net/npm/kokoro-js@1.2.1/"
+TRANSFORMERS = "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.5.1/dist/"
+KOKORO_MODEL = ("https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX/resolve/"
+                "1939ad2a8e416c0acfeecc08a694d14ef25f2231/")
+FILES.update({
+    "kokoro/kokoro.web.js": KOKORO_JS + "dist/kokoro.web.js",
+    "kokoro/ort-wasm-simd-threaded.jsep.mjs": TRANSFORMERS + "ort-wasm-simd-threaded.jsep.mjs",
+    "kokoro/ort-wasm-simd-threaded.jsep.wasm": TRANSFORMERS + "ort-wasm-simd-threaded.jsep.wasm",
+    "kokoro/model/config.json": KOKORO_MODEL + "config.json",
+    "kokoro/model/tokenizer.json": KOKORO_MODEL + "tokenizer.json",
+    "kokoro/model/tokenizer_config.json": KOKORO_MODEL + "tokenizer_config.json",
+    "kokoro/model/onnx/model_quantized.onnx": KOKORO_MODEL + "onnx/model_quantized.onnx",
+})
+for v in ["bf_emma", "bf_isabella", "bm_george", "bm_fable"]:
+    FILES[f"kokoro/model/voices/{v}.bin"] = KOKORO_JS + f"voices/{v}.bin"
+
+
 def main():
     for rel, url in FILES.items():
         dest = ROOT / rel
