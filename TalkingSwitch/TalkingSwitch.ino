@@ -5,12 +5,13 @@
 //    SPEAK     Plays the selected Quick message (BIGmack style). Play style:
 //              Tap / Hold to play / Latch. With Tap, keep holding the
 //              switch to move on to the next Quick message.
-//    CHOOSE    Choice-making by scanning through Topics: the switch offers
-//              messages one at a time (LED colour, name on screen, a quiet
-//              spoken prompt) and the student picks one, which then plays.
-//                Topics chosen by: Staff - offers the messages in the topic
-//                  staff selected; Student - offers the topics first, then
-//                  that topic's messages plus "Back".
+//    CHOOSE    Choice-making by scanning: the switch offers messages one at
+//              a time (LED colour, name on screen, a quiet spoken prompt)
+//              and the student picks one, which then plays.
+//                Choose from: Quick messages - the 4 Quick messages;
+//                  A topic - the messages in the topic staff selected;
+//                  Topics - the topics first, then that topic's messages
+//                  plus "Back".
 //                Choosing: Press twice - a press starts, the next chooses;
 //                  Hold & release - hold to step through, let go to choose.
 //    KEYBOARD  Acts as a USB or Bluetooth keyboard key, e.g. Space/Enter
@@ -107,10 +108,10 @@ static const int      NUM_SLOTS   = 4;     // IR codes (and the 4 item colours)
 // Sound numbers (the setup page uses the same ones):
 //   0-3 Quick messages, 4-19 topic messages (topic t, item k = 4 + t*4 + k),
 //   20-23 IR codes' sounds, 24-39 topic message prompts, 40-43 topic prompts,
-//   44-47 IR code prompts, 48 the "Back" prompt
+//   44-47 IR code prompts, 48 the "Back" prompt, 49-52 Quick message prompts
 static const int SND_TOPIC = NUM_QUICK, SND_IR = SND_TOPIC + NUM_TOPICS * PER_TOPIC, SND_PMSG = SND_IR + NUM_SLOTS,
                  SND_PTOPIC = SND_PMSG + NUM_TOPICS * PER_TOPIC, SND_PIR = SND_PTOPIC + NUM_TOPICS,
-                 SND_PBACK = SND_PIR + NUM_SLOTS, NUM_SOUNDS = SND_PBACK + 1;
+                 SND_PBACK = SND_PIR + NUM_SLOTS, SND_PQUICK = SND_PBACK + 1, NUM_SOUNDS = SND_PQUICK + NUM_QUICK;
 // Name numbers: 0-3 Quick, 4-19 topic messages, 20-23 IR codes (as sounds), 24-27 topics
 static const int NAME_TOPIC = SND_PMSG, NUM_NAMES = NAME_TOPIC + NUM_TOPICS;
 static const uint8_t  MIC_PGA     = 8;     // mic analogue gain, 3dB steps (0-10). Lower if loud voices distort
@@ -170,7 +171,7 @@ static const int NUM_KEYS = sizeof(KEYS) / sizeof(KEYS[0]);
 //  and remembered after power-off. Each has a fixed list of choices.
 // ---------------------------------------------------------------------
 enum SettingId : uint8_t {
-  S_VOLUME, S_PLAY, S_HOLD, S_TOPICS, S_IR_CHOOSE, S_ACCESS, S_SCAN_SPEED, S_SCAN_ROUNDS,
+  S_VOLUME, S_PLAY, S_HOLD, S_CHOOSE_FROM, S_IR_CHOOSE, S_ACCESS, S_SCAN_SPEED, S_SCAN_ROUNDS,
   S_KEY_ACTION, S_PRESS_SOUND,
   S_ACCEPT, S_LOCKOUT, S_WAKE, S_SLEEP, S_AUTOOFF, S_LOUD, S_FORGET,
   S_COUNT
@@ -192,8 +193,9 @@ static const Setting SETTINGS[S_COUNT] = {
   {"Play style",          "s_play",    3, 0, {0, 1, 2}, {"Tap", "Hold to play", "Latch"}, G_SPEAK},
   // SPEAK, Tap: keep holding the switch this long to move to the next Quick message
   {"Hold for next msg",   "s_hold",    5, 2, {0, 1000, 1500, 2000, 3000}, {"Off", "1 s", "1.5 s", "2 s", "3 s"}, G_SPEAK},
-  // CHOOSE: who picks the topic - staff (B button), or the student by scanning
-  {"Topics chosen by",    "s_groups",  2, 0, {0, 1}, {"Staff", "Student"}, G_CHOOSE},
+  // CHOOSE: what the student chooses from - the Quick messages; the topic staff
+  // selected (B button); or the topics first, then a topic's messages
+  {"Choose from",         "s_choose",  3, 0, {0, 1, 2}, {"Quick msgs", "A topic", "Topics"}, G_CHOOSE},
   // IR: send the selected code; the same, repeating while held; or the student chooses by scanning
   {"IR codes",            "s_irmode",  3, 0, {0, 1, 2}, {"Staff pick", "Repeat held", "Student scans"}, G_IR},
   // scanning: press to start, press to choose; or hold to step, let go to choose
@@ -314,7 +316,7 @@ const uint8_t* scanColour(const ScanItem& it) {
   switch (it.kind) {
     case SK_GROUP:
     case SK_IR: return SLOT_RGB[it.idx];
-    case SK_MSG: return SLOT_RGB[(it.idx - SND_TOPIC) % PER_TOPIC];
+    case SK_MSG: return SLOT_RGB[it.idx < SND_TOPIC ? it.idx : (it.idx - SND_TOPIC) % PER_TOPIC];
     default: return WHITE;  // Back
   }
 }
@@ -947,6 +949,15 @@ void drawMain(lgfx::LovyanGFX& c) {
         drawCentered(c, holdToChoose() ? "Let go to choose" : "Press to choose", 94, &fonts::FreeSansBold9pt7b, TFT_YELLOW);
         break;
       }
+      if (chooseQuick()) {
+        int n = 0;
+        for (int i = 0; i < NUM_QUICK; i++) n += slotLen[i] ? 1 : 0;
+        drawFit(c, "Quick messages", 52, TFT_WHITE);
+        drawCentered(c, String(n) + (n == 1 ? " message" : " messages") + (holdToChoose() ? " - hold to start" : " - press to start"),
+                     84, &fonts::FreeSans9pt7b, n ? TFT_GREEN : TFT_ORANGE);
+        drawCentered(c, "Choosing from the Quick messages", 104, &fonts::Font2, hint);
+        break;
+      }
       if (topicsByStudent() && !scanInGroup) {
         int n = 0;
         for (int t = 0; t < NUM_TOPICS; t++) n += topicUsed(t);
@@ -1057,15 +1068,15 @@ void drawSettings(lgfx::LovyanGFX& c) {
 // What the buttons do on this screen (the same words everywhere).
 String buttonGuide() {
   if (settingsView()) {
-   if (settingIdx == S_FORGET) return "B next  hold A forget  A " + String(inSettings() ? "mode" : "close");
-   return "B next  hold A change  A " + String(inSettings() ? "mode" : "close");
+    if (settingIdx == S_FORGET) return "B next  hold A forget  A " + String(inSettings() ? "mode" : "close");
+    return "B next  hold A change  A " + String(inSettings() ? "mode" : "close");
   }
   if (gateShown) return "B first  hold A open  A mode";
   switch (mode) {
-   case M_SPEAK: return "B next  hold A record  A mode";
-   case M_CHOOSE: return "B next topic  A mode";
-   case M_KEYBOARD: return "B next key  A mode";
-   case M_IR: return "B next code  hold A learn  A mode";
+    case M_SPEAK: return "B next  hold A record  A mode";
+    case M_CHOOSE: return chooseQuick() ? "B settings  A mode" : "B next topic  A mode";
+    case M_KEYBOARD: return "B next key  A mode";
+    case M_IR: return "B next code  hold A learn  A mode";
   }
   return "A mode";
 }
@@ -1244,7 +1255,8 @@ void managePower(uint32_t now) {
 // ---------------------------------------------------------------------
 static const uint8_t PROMPT_VOLUME = 150;  // channel volume for prompts (255 = as loud as messages)
 
-bool topicsByStudent() { return setting(S_TOPICS) == 1; }
+bool chooseQuick() { return setting(S_CHOOSE_FROM) == 0; }
+bool topicsByStudent() { return setting(S_CHOOSE_FROM) == 2; }
 bool holdToChoose() { return setting(S_ACCESS) == 1; }
 bool irScanning() { return setting(S_IR_CHOOSE) == 2; }
 bool irRepeat() { return setting(S_IR_CHOOSE) == 1; }
@@ -1265,10 +1277,13 @@ void playPrompt(const ScanItem& it) {
   int p;
   switch (it.kind) {
     case SK_GROUP: p = SND_PTOPIC + it.idx; break;
-    case SK_MSG:   p = SND_PMSG + (it.idx - SND_TOPIC); break;
+    case SK_MSG:   p = it.idx < SND_TOPIC ? SND_PQUICK + it.idx : SND_PMSG + (it.idx - SND_TOPIC); break;
     case SK_BACK:  p = SND_PBACK; break;
     default:       p = slotLen[SND_PIR + it.idx] ? SND_PIR + it.idx : irSound(it.idx);  // IR code's own sound is short
   }
+  // no prompt made yet (e.g. set up on the stick): the message itself, quietly - the
+  // next offer cuts it off, so a long one just gives its first few words
+  if (!slotLen[p] && it.kind == SK_MSG && slotLen[it.idx]) p = it.idx;
   if (!slotLen[p]) { M5.Speaker.tone(it.kind == SK_BACK ? 600 : 1200, 60); return; }
   M5.Speaker.setChannelVolume(1, PROMPT_VOLUME);
   M5.Speaker.playRaw(slotBuf[p], slotLen[p], SAMPLE_RATE, false, 1, 1, true);
@@ -1279,6 +1294,10 @@ void buildScanList() {
   scanCount = 0;
   if (studentMode() == M_IR) {
     for (int i = 0; i < NUM_SLOTS; i++) if (irLen[i]) scanItems[scanCount++] = {SK_IR, (uint8_t)i};
+    return;
+  }
+  if (chooseQuick()) {
+    for (int i = 0; i < NUM_QUICK; i++) if (slotLen[i]) scanItems[scanCount++] = {SK_MSG, (uint8_t)i};
     return;
   }
   int topics = 0;
@@ -1337,6 +1356,7 @@ void choose(ScanItem it) {
       break;
     case SK_MSG:
       if (topicsByStudent()) scanInGroup = false;  // next time, start from the topics
+      if (it.idx < SND_TOPIC) { slot = it.idx; saveSettings(); }  // a Quick message: SPEAK uses it too
       ledIdle();
       playSlot(it.idx);
       break;
@@ -1495,7 +1515,7 @@ void pollStudentSwitch() {
 void settingChanged(int i) {
   if (i == S_KEY_ACTION) releaseKey();
   if (i == S_PLAY) stopPlay();
-  if (i == S_TOPICS || i == S_ACCESS || i == S_IR_CHOOSE) { stopScan(); scanInGroup = false; }
+  if (i == S_CHOOSE_FROM || i == S_ACCESS || i == S_IR_CHOOSE) { stopScan(); scanInGroup = false; }
   if (i == S_VOLUME) { M5.Speaker.setVolume(volume()); M5.Speaker.tone(1000, 100); }
 }
 
@@ -1534,7 +1554,7 @@ void nextItem() {
     gateShown = false;
     switch (mode) {
       case M_SPEAK: stopPlay(); slot = 0; slotCue(slot); break;
-      case M_CHOOSE: group = 0; scanInGroup = false; topicCue(group); break;
+      case M_CHOOSE: scanInGroup = false; if (!chooseQuick()) { group = 0; topicCue(group); } break;
       case M_KEYBOARD: releaseKey(); keyIdx = 0; break;
       case M_IR: irSlot = 0; slotCue(irSound(irSlot)); break;
     }
@@ -1546,7 +1566,8 @@ void nextItem() {
         break;
       case M_CHOOSE:
         scanInGroup = false;
-        if (group == NUM_TOPICS - 1) gateShown = true; else topicCue(++group);
+        if (group == NUM_TOPICS - 1 || chooseQuick()) gateShown = true;  // Quick: no topics to step through
+        else topicCue(++group);
         break;
       case M_KEYBOARD:
         releaseKey();
@@ -1632,8 +1653,8 @@ String jsonStr(const String& v) {
 
 void sendInfo() {
   auto yes = [](bool b) { return String(b ? "true" : "false"); };
-  auto msg = [&](int i) {  // a message / sound: length, name, and whether it has a prompt
-    return "{\"len\":" + String(slotLen[i]) + ",\"name\":" + jsonStr(slotName[i]) + "}";
+  auto msg = [&](int i) {  // a Quick message: length, name, and whether it has a prompt
+    return "{\"len\":" + String(slotLen[i]) + ",\"pr\":" + yes(slotLen[SND_PQUICK + i]) + ",\"name\":" + jsonStr(slotName[i]) + "}";
   };
   String j = "@INFO {\"name\":" + jsonStr(bleName);
   j += ",\"rate\":" + String(SAMPLE_RATE) + ",\"maxSec\":" + String(MAX_SECONDS) + ",\"promptSec\":" + String(PROMPT_SECONDS);

@@ -143,13 +143,15 @@ ol { padding-left: 1.2em; margin: 8px 0 0; }
 
     <section id="tab-quick" class="card" role="tabpanel">
       <p class="muted small" style="margin-top:0">4 quick messages for <b>SPEAK</b> mode: the switch plays the
-        <b>selected</b> one. Click <b>Change</b> to record, type or upload a message.</p>
+        <b>selected</b> one. Click <b>Change</b> to record, type or upload a message. CHOOSE mode can also scan them
+        (“Choose from: Quick msgs”).</p>
+      <div id="quickScan" class="preview hidden" style="margin-bottom:10px"></div>
       <div id="quickList" class="slots"></div>
     </section>
 
     <section id="tab-topics" class="card" role="tabpanel">
-      <p class="muted small" style="margin-top:0">4 topics of up to 4 messages for <b>CHOOSE</b> mode, where the student
-        picks a message by scanning. Name each topic and message – the names are spoken as the prompts.</p>
+      <p class="muted small" style="margin-top:0">4 topics of up to 4 messages for <b>CHOOSE</b> mode (“Choose from: A
+        topic” or “Topics”), where the student picks a message by scanning. Name each topic and message – the names are spoken as the prompts.</p>
       <div id="msgScan" class="preview hidden" style="margin-bottom:10px"></div>
       <div id="msgList" class="slots"></div>
     </section>
@@ -224,7 +226,7 @@ let typed = '';           // words typed in the editor
 
 const MODE_HELP = {
   'SPEAK': 'Plays the selected Quick message each time the switch is pressed.',
-  'CHOOSE': 'The student chooses a message from the Topics by scanning – see the CHOOSE settings.',
+  'CHOOSE': 'The student chooses a message by scanning – from the Quick messages or the Topics (see the CHOOSE settings).',
   'KEYBOARD': 'Acts as a keyboard key (set it on the Keyboard tab).',
   'IR': 'Sends the selected remote-control code, and says its sound if it has one (IR remote tab).',
 };
@@ -434,13 +436,14 @@ function segment(box, labels, current, onPick) {
 
 // Numbers shared with the switch.
 //   Sounds: 0-3 Quick, 4-19 topic messages (topic t, item k = 4 + t*4 + k), 20-23 IR codes' sounds,
-//           24-39 topic message prompts, 40-43 topic prompts, 44-47 IR prompts, 48 "Back".
+//           24-39 topic message prompts, 40-43 topic prompts, 44-47 IR prompts, 48 "Back",
+//           49-52 Quick message prompts.
 //   Names:  0-3 Quick, 4-19 topic messages, 20-23 IR codes, 24-27 topics (BACK only has a prompt).
 const PER = 4, TOPIC0 = 4, IRS = 20, TOPICN = 24, BACK = 48;
 function topicMsg(t, k) { return TOPIC0 + t * PER + k; }
-function promptOf(n) {  // -1: Quick messages have no prompt (they're never scanned)
+function promptOf(n) {
   if (n === BACK) return BACK;
-  if (n < TOPIC0) return -1;
+  if (n < TOPIC0) return 49 + n;
   return n < IRS ? 24 + (n - TOPIC0) : n < TOPICN ? 44 + (n - IRS) : 40 + (n - TOPICN);
 }
 function soundInfo(n) {
@@ -492,7 +495,7 @@ const openTopics = new Set();  // topic sections shown open
 function renderTopics() {
   if (!renderTopics.started) { openTopics.add(info.topic); renderTopics.started = true; }
   if (editing !== null && editing >= TOPIC0 && editing < IRS) openTopics.add(Math.floor((editing - TOPIC0) / PER));
-  const staffTopics = setCur('s_groups') === 0;
+  const staffTopics = setCur('s_choose') === 1;
   $('msgList').replaceChildren(...info.topics.map((tp, t) => {
     const open = openTopics.has(t);
     const count = tp.msgs.filter((m) => m.len).length;
@@ -527,7 +530,7 @@ function messageRow(i, s, quick) {
       el('span', { class: 'num' }, String((quick ? i : (i - TOPIC0) % PER) + 1)),
       name,
       el('span', { class: 'status' + (s.len ? ' has' : '') }, s.len ? secs(s.len) : 'No message'),
-      quick ? null : promptBadge(s),
+      quick && setCur('s_choose') !== 0 ? null : promptBadge(s),
       el('button', { disabled: !s.len, onclick: () => act(() => cmd(`PLAY ${i}`)), title: 'Play it on the switch' }, '▶ Play'),
       el('button', { class: open ? 'on' : '', onclick: () => toggleEditor(i) }, open ? 'Close' : 'Change'),
       el('button', { class: 'danger', disabled: !s.len, onclick: () => {
@@ -640,7 +643,6 @@ function promptBadge(item) {
 
 async function renameItem(n, value) {
   await act(() => cmd(`NAME ${n} ${value.replace(/[\r\n]/g, ' ')}`), 'Name saved');
-  if (promptOf(n) < 0) return;                                     // Quick messages: no prompt
   if (!value.trim()) await act(() => cmd(`DEL ${promptOf(n)}`));  // no name: no prompt
   else makePrompt(n);
 }
@@ -671,11 +673,12 @@ function makePrompt(n) {
 // Names that should have a prompt: [name number, has one already]
 function promptItems() {
   const list = [
+    ...info.quick.map((x, i) => [i, x]),
     ...info.topics.flatMap((tp, t) => tp.msgs.map((x, k) => [topicMsg(t, k), x])),
     ...info.topics.map((x, t) => [TOPICN + t, x]),
     ...info.irs.map((x, i) => [IRS + i, x]),
   ].filter(([, x]) => x.name).map(([n, x]) => [n, x.pr]);
-  if (setCur('s_groups') === 1) list.push([BACK, info.back.pr]);
+  if (setCur('s_choose') === 2) list.push([BACK, info.back.pr]);
   return list;
 }
 
@@ -700,6 +703,7 @@ function renderScanNotes() {
       missing ? el('button', { onclick: () => makeMissingPrompts() }, `Make ${missing} missing prompt${missing > 1 ? 's' : ''}`) : null,
     ].filter(Boolean));
   };
+  note('quickScan', setCur('s_choose') === 0, 'CHOOSE uses these: each message’s name is spoken quietly as it’s offered.', info.quick);
   note('msgScan', true, 'When scanning, each topic’s and message’s name is spoken quietly as it’s offered.',
     [...info.topics, ...info.topics.flatMap((tp) => tp.msgs)]);
   note('irScan', irScanning(), 'Students choose IR codes by scanning: each code’s name is spoken quietly as it’s offered.', info.irs);
@@ -749,7 +753,7 @@ function renderIr() {
 const HELP = {
   vol: 'How loud messages play. 4 is the loudest the switch can go.',
   s_play: 'Tap: a press plays the whole message. Hold to play: plays only while the switch is held. Latch: one press starts it, the next stops it.',
-  s_groups: 'Staff: the student chooses from the topic you select (Topics tab, or B on the switch). Student: the switch offers the topics first, then that topic’s messages and “Back”.',
+  s_choose: 'Quick msgs: the student chooses one of the Quick messages. A topic: they choose from the topic you select (Topics tab, or B on the switch). Topics: the switch offers the topics first, then that topic’s messages and “Back”.',
   s_access: 'Press twice: a press starts the offers, the next press chooses. Hold & release: hold to step through them, let go to choose.',
   s_scanspd: 'How long each choice is offered before moving on. Go at the student’s pace.',
   s_scanrnd: 'With Press twice: how many times round the choices before it stops by itself.',
