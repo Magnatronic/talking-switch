@@ -28,6 +28,9 @@ Open `TalkingSwitch/TalkingSwitch.ino` (Arduino needs the sketch folder and
 `.ino` to share a name). The `partitions.csv` in that folder replaces the
 partition layout automatically (2MB for the firmware, ~5.9MB for recordings). Keep it next to the `.ino`.
 
+`build_opt.h` (also next to the `.ino`) names the USB device **"Talking Switch"** by **Magnatronic**, so it shows
+up under that name when connecting from the setup page (instead of the board's default "ESP32S3_DEV").
+
 **Changing the partition layout wipes the recordings and learned IR codes** on the stick at the next upload
 (names and settings are kept) – record them again afterwards.
 
