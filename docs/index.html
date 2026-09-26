@@ -62,6 +62,9 @@ button.link { background: none; border: none; color: var(--accent); padding: 4px
 .slots { display: flex; flex-direction: column; gap: 8px; }
 .slot { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
 .slot.selected { border-color: var(--accent); background: var(--accent-soft); }
+.group-box { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+.group-box.selected { border-color: var(--accent); }
+.group-box .slot { background: var(--card); }
 .slot-main { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .slot-main .num { font-weight: 700; width: 1.6em; text-align: center; }
 .slot-main .name { flex: 1 1 160px; min-width: 120px; }
@@ -128,10 +131,6 @@ ol { padding-left: 1.2em; margin: 8px 0 0; }
         <div id="modes" class="seg" role="radiogroup" aria-label="Mode"></div>
         <div id="modeHelp" class="muted small" style="margin-top:6px"></div>
       </div>
-      <div>
-        <div class="label">Volume</div>
-        <div id="vols" class="seg" role="radiogroup" aria-label="Volume"></div>
-      </div>
     </section>
 
     <nav class="tabs" role="tablist">
@@ -142,8 +141,9 @@ ol { padding-left: 1.2em; margin: 8px 0 0; }
     </nav>
 
     <section id="tab-messages" class="card" role="tabpanel">
-      <p class="muted small" style="margin-top:0">In <b>SPEAK</b> mode the switch plays the <b>selected</b> message. Click
-        <b>Change</b> to record, type or upload one.</p>
+      <p class="muted small" style="margin-top:0">16 messages in 4 groups. <b>SPEAK</b> plays the <b>selected</b> message;
+        <b>CHOOSE</b> lets the student pick one by scanning. Click <b>Change</b> to record, type or upload a message.
+        Names are spoken as the prompts when scanning.</p>
       <div id="msgScan" class="preview hidden" style="margin-bottom:10px"></div>
       <div id="msgList" class="slots"></div>
     </section>
@@ -218,6 +218,7 @@ let typed = '';           // words typed in the editor
 
 const MODE_HELP = {
   'SPEAK': 'Plays the selected message (Messages tab) each time the switch is pressed.',
+  'CHOOSE': 'The student chooses a message by scanning – see “Groups chosen by” and “Choosing” on the Settings tab.',
   'KEYBOARD': 'Acts as a keyboard key (set it on the Keyboard tab).',
   'IR': 'Sends the selected remote-control code, and says its sound if it has one (IR remote tab).',
 };
@@ -425,11 +426,19 @@ function segment(box, labels, current, onPick) {
   }, label)));
 }
 
-// Sound numbers: 0-3 are the messages, 4-7 the IR codes' own sounds.
-const IRS = 4;
-// Scanning prompts: sound numbers 8-11 (messages) and 12-15 (IR codes).
-function promptOf(snd) { return snd < IRS ? 8 + snd : 12 + (snd - IRS); }
-function soundInfo(snd) { return snd < IRS ? info.slots[snd] : info.irs[snd - IRS]; }
+// Numbers shared with the switch.
+//   Sounds: 0-15 messages (group g, item k = g*4+k), 16-19 IR codes' sounds,
+//           20-35 message prompts, 36-39 group prompts, 40-43 IR prompts, 44 "Back".
+//   Names:  0-15 messages, 16-19 IR codes, 20-23 groups (and BACK below for its prompt).
+const PER = 4, IRS = 16, GROUPN = 20, BACK = 44;
+function promptOf(n) {
+  if (n === BACK) return BACK;
+  return n < IRS ? 20 + n : n < GROUPN ? 40 + (n - IRS) : 36 + (n - GROUPN);
+}
+function soundInfo(n) { return n < IRS ? info.slots[n] : n < GROUPN ? info.irs[n - IRS] : info.groups[n - GROUPN]; }
+function setCur(key) { const st = info.settings.find((x) => x.key === key); return st ? st.cur : 0; }
+function chooseMode() { return info.modes[info.mode] === 'CHOOSE'; }
+function irScanning() { return setCur('s_irchoose') === 1; }
 function secs(n) { return (n / info.rate).toFixed(1) + ' s'; }
 
 // ---------------------------------------------------------------- render
@@ -441,47 +450,73 @@ function render() {
   $('btName1').textContent = $('btName2').textContent = info.name;
   $('btState').textContent = info.bt ? 'connected now' : 'not connected';
 
-  segment($('modes'), info.modes, info.mode, (i) => act(() => cmd(`MODE ${i}`)));
+  segment($('modes'), info.modes, info.mode, async (i) => {
+    await act(() => cmd(`MODE ${i}`));
+    makeMissingPrompts();
+  });
   $('modeHelp').textContent = MODE_HELP[info.modes[info.mode]] || '';
-  segment($('vols'), Array.from({ length: info.vols }, (_, i) => String(i + 1)), info.vol, (i) => act(() => cmd(`VOL ${i}`)));
   segment($('keys'), info.keys, info.key, (i) => act(() => cmd(`KEY ${i}`)));
   renderMessages();
   renderIr();
-  renderScanNote('msgScan', info.slots, 'message');
-  renderScanNote('irScan', info.irs, 'IR code');
+  renderScanNotes();
   renderSettings();
   renderCustomKey();
 }
 
-function selectRadio(i, group, current, command) {
+function selectRadio(i, group, current, command, on = 'Selected', off = 'Select') {
   return el('label', { class: 'sel', title: 'The switch uses the selected one' },
     el('input', { type: 'radio', name: group, checked: i === current, onchange: () => act(() => cmd(`${command} ${i}`)) }),
-    i === current ? 'Selected' : 'Select');
+    i === current ? on : off);
 }
 
 // ---------------------------------------------------------------- messages tab
+const openGroups = new Set();  // group sections shown open on the Messages tab
+
 function renderMessages() {
-  $('msgList').replaceChildren(...info.slots.map((s, i) => {
+  if (!renderMessages.started) { openGroups.add(Math.floor(info.slot / PER)); renderMessages.started = true; }
+  if (editing !== null && editing < IRS) openGroups.add(Math.floor(editing / PER));
+  const staffGroups = setCur('s_groups') === 0;
+  $('msgList').replaceChildren(...info.groups.map((g, gi) => {
+    const open = openGroups.has(gi);
+    const msgs = info.slots.slice(gi * PER, gi * PER + PER);
+    const count = msgs.filter((m) => m.len).length;
     const name = el('input', {
-      type: 'text', class: 'name', maxLength: 24, value: s.name, placeholder: `Name, e.g. "Bubbles"`,
-      'aria-label': `Name for slot ${i + 1}`,
-      onchange: () => renameItem(i, name.value),
+      type: 'text', class: 'name', maxLength: 24, value: g.name, placeholder: `Name, e.g. "Food"`,
+      'aria-label': `Name for group ${gi + 1}`, onchange: () => renameItem(GROUPN + gi, name.value),
     });
-    const open = editing === i;
-    return el('div', { class: 'slot' + (i === info.slot ? ' selected' : '') },
+    return el('div', { class: 'group-box' + (chooseMode() && staffGroups && gi === info.group ? ' selected' : '') },
       el('div', { class: 'slot-main' },
-        el('span', { class: 'num' }, String(i + 1)),
+        el('button', { class: 'link', 'aria-expanded': String(open),
+          onclick: () => { if (open) openGroups.delete(gi); else openGroups.add(gi); render(); } },
+          (open ? '▾' : '▸') + ` Group ${gi + 1}`),
         name,
-        el('span', { class: 'status' + (s.len ? ' has' : '') }, s.len ? secs(s.len) : 'No message'),
-        scanOn() ? promptBadge(s) : null,
-        el('button', { disabled: !s.len, onclick: () => act(() => cmd(`PLAY ${i}`)), title: 'Play it on the switch' }, '▶ Play'),
-        el('button', { class: open ? 'on' : '', onclick: () => toggleEditor(i) }, open ? 'Close' : 'Change'),
-        el('button', { class: 'danger', disabled: !s.len, onclick: () => {
-          if (confirm(`Delete the message in slot ${i + 1}?`)) act(() => cmd(`DEL ${i}`), 'Message deleted');
-        } }, 'Delete'),
-        selectRadio(i, 'msgSel', info.slot, 'SLOT')),
-      open ? renderEditor(i) : null);
+        el('span', { class: 'status' + (count ? ' has' : '') }, `${count} of ${PER}`),
+        chooseMode() ? promptBadge(g) : null,
+        staffGroups ? selectRadio(gi, 'grpSel', info.group, 'GROUP', 'Used in CHOOSE', 'Use in CHOOSE') : null),
+      open ? el('div', { class: 'slots', style: 'margin-top:8px' }, ...msgs.map((m, k) => messageRow(gi * PER + k, m))) : null);
   }));
+}
+
+function messageRow(i, s) {
+  const name = el('input', {
+    type: 'text', class: 'name', maxLength: 24, value: s.name, placeholder: `Name, e.g. "Drink"`,
+    'aria-label': `Name for message ${i % PER + 1} in group ${Math.floor(i / PER) + 1}`,
+    onchange: () => renameItem(i, name.value),
+  });
+  const open = editing === i;
+  return el('div', { class: 'slot' + (i === info.slot ? ' selected' : '') },
+    el('div', { class: 'slot-main' },
+      el('span', { class: 'num' }, String(i % PER + 1)),
+      name,
+      el('span', { class: 'status' + (s.len ? ' has' : '') }, s.len ? secs(s.len) : 'No message'),
+      chooseMode() ? promptBadge(s) : null,
+      el('button', { disabled: !s.len, onclick: () => act(() => cmd(`PLAY ${i}`)), title: 'Play it on the switch' }, '▶ Play'),
+      el('button', { class: open ? 'on' : '', onclick: () => toggleEditor(i) }, open ? 'Close' : 'Change'),
+      el('button', { class: 'danger', disabled: !s.len, onclick: () => {
+        if (confirm(`Delete "${s.name || 'this message'}"?`)) act(() => cmd(`DEL ${i}`), 'Message deleted');
+      } }, 'Delete'),
+      selectRadio(i, 'msgSel', info.slot, 'SLOT', 'Selected for SPEAK', 'Select')),
+    open ? renderEditor(i) : null);
 }
 
 function toggleEditor(i) {
@@ -566,7 +601,7 @@ async function listenSaved(i) {
 async function saveWav(i) {
   try {
     const pcm = await download(i);
-    const fallback = i < IRS ? `message-${i + 1}` : `ir-code-${i - IRS + 1}`;
+    const fallback = i < IRS ? `message-${Math.floor(i / PER) + 1}-${i % PER + 1}` : `ir-code-${i - IRS + 1}`;
     const name = (soundInfo(i).name || fallback).replace(/[^\w\- ]+/g, '').trim() || fallback;
     const a = el('a', { href: URL.createObjectURL(wavBlob(pcm, info.rate)), download: name + '.wav' });
     a.click();
@@ -575,11 +610,8 @@ async function saveWav(i) {
 }
 
 // ---------------------------------------------------------------- scanning prompts
-function scanOn() {
-  const st = info && info.settings.find((x) => x.key === 's_play');
-  return !!st && st.choices[st.cur] === 'Scan';
-}
-
+// Every message, group and IR code with a name gets a short spoken prompt of
+// that name (used when scanning), plus "Back" when students choose groups.
 function promptBadge(item) {
   if (!item.name && !item.len && !item.ir) return null;  // empty: nothing to say
   if (!item.name) return el('span', { class: 'small muted', title: 'Give it a name to get a spoken prompt' }, 'no prompt');
@@ -587,18 +619,18 @@ function promptBadge(item) {
     item.pr ? 'prompt ✓' : 'no prompt');
 }
 
-async function renameItem(snd, value) {
-  await act(() => cmd(`NAME ${snd} ${value.replace(/[\r\n]/g, ' ')}`), 'Name saved');
-  if (!value.trim()) await act(() => cmd(`DEL ${promptOf(snd)}`));  // no name: no prompt
-  else makePrompt(snd);
+async function renameItem(n, value) {
+  await act(() => cmd(`NAME ${n} ${value.replace(/[\r\n]/g, ' ')}`), 'Name saved');
+  if (!value.trim()) await act(() => cmd(`DEL ${promptOf(n)}`));  // no name: no prompt
+  else makePrompt(n);
 }
 
-// Speaks an item's name with the chosen voice and stores it as its scanning
-// prompt. Runs one at a time; quietly does nothing where typed speech can't run.
+// Speaks a name with the switch's voice and stores it as the prompt. Runs one
+// at a time; quietly does nothing where typed speech can't run.
 let promptChain = Promise.resolve();
-function makePrompt(snd) {
+function makePrompt(n) {
   promptChain = promptChain.then(async () => {
-    const name = info && (soundInfo(snd).name || '').trim();
+    const name = info && (n === BACK ? 'Back' : (soundInfo(n).name || '').trim());
     if (!name || !ttsAvailable()) return;
     try {
       const v = VOICES.find((x) => x.id === savedVoice());
@@ -606,8 +638,8 @@ function makePrompt(snd) {
       const { samples, sampleRate } = await engineMods[v.engine].synthesize(name, v.id, +savedSpeed(), showTtsProgress);
       const audio = new AudioBuffer({ length: samples.length, sampleRate, numberOfChannels: 1 });
       audio.copyToChannel(samples, 0);
-      const { pcm } = await toSwitchFormat(audio, 3);
-      await upload(promptOf(snd), pcm);
+      const { pcm } = await toSwitchFormat(audio, info.promptSec);
+      await upload(promptOf(n), pcm);
       await refresh();
     } catch (e) {
       toast(`Couldn't make the prompt for "${name}": ${e.message || e}`, true);
@@ -616,27 +648,41 @@ function makePrompt(snd) {
   return promptChain;
 }
 
+// Names that should have a prompt: [name number, has one already]
+function promptItems() {
+  const list = [
+    ...info.slots.map((x, i) => [i, x]),
+    ...info.groups.map((x, g) => [GROUPN + g, x]),
+    ...info.irs.map((x, i) => [IRS + i, x]),
+  ].filter(([, x]) => x.name).map(([n, x]) => [n, x.pr]);
+  if (setCur('s_groups') === 1) list.push([BACK, info.back.pr]);
+  return list;
+}
+
 async function makeMissingPrompts() {
-  if (!info) return;
-  const todo = [...info.slots.map((x, i) => [x, i]), ...info.irs.map((x, i) => [x, IRS + i])]
-    .filter(([x]) => x.name && !x.pr).map(([, snd]) => snd);
+  if (!info || !ttsAvailable()) return;
+  const todo = promptItems().filter(([, has]) => !has).map(([n]) => n);
   if (!todo.length) return;
   toast(`Making ${todo.length} spoken prompt${todo.length > 1 ? 's' : ''} from the names…`);
-  for (const snd of todo) await makePrompt(snd);
+  for (const n of todo) await makePrompt(n);
   toast('Prompts ready');
 }
 
-function renderScanNote(boxId, items, what) {
-  const box = $(boxId);
-  box.classList.toggle('hidden', !scanOn());
-  if (!scanOn()) return;
-  const missing = items.filter((x) => x.name && !x.pr).length;
-  const unnamed = items.filter((x) => (x.len || x.ir) && !x.name).length;
-  box.replaceChildren(...[
-    el('span', { class: 'small' }, `Scanning is on: each ${what}'s name is spoken quietly as it's offered.` +
-      (unnamed ? ` Name the rest to give them a prompt.` : '')),
-    missing ? el('button', { onclick: () => makeMissingPrompts() }, `Make ${missing} missing prompt${missing > 1 ? 's' : ''}`) : null,
-  ].filter(Boolean));
+function renderScanNotes() {
+  const note = (boxId, show, text, items) => {
+    const box = $(boxId);
+    box.classList.toggle('hidden', !show);
+    if (!show) return;
+    const missing = items.filter((x) => x.name && !x.pr).length;
+    const unnamed = items.filter((x) => (x.len || x.ir) && !x.name).length;
+    box.replaceChildren(...[
+      el('span', { class: 'small' }, text + (unnamed ? ' Name the rest to give them a spoken prompt.' : '')),
+      missing ? el('button', { onclick: () => makeMissingPrompts() }, `Make ${missing} missing prompt${missing > 1 ? 's' : ''}`) : null,
+    ].filter(Boolean));
+  };
+  note('msgScan', chooseMode(), 'CHOOSE mode: each group’s and message’s name is spoken quietly as it’s offered.',
+    [...info.groups, ...info.slots]);
+  note('irScan', irScanning(), 'Students choose IR codes by scanning: each code’s name is spoken quietly as it’s offered.', info.irs);
 }
 
 // ---------------------------------------------------------------- IR tab
@@ -659,7 +705,7 @@ function renderIr() {
         el('span', { class: 'num' }, String(i + 1)),
         name,
         el('span', { class: 'status' + (c.ir ? ' has' : '') }, c.ir ? 'Code saved' : 'No code'),
-        scanOn() ? promptBadge(c) : null,
+        irScanning() ? promptBadge(c) : null,
         el('button', { onclick: () => learnIr(i) }, c.ir ? 'Learn again' : 'Learn'),
         el('button', { disabled: !c.ir, onclick: () => act(() => cmd(`IRSEND ${i}`), 'Sent') }, 'Test'),
         el('button', { class: 'danger', disabled: !c.ir, onclick: () => {
@@ -680,16 +726,15 @@ function renderIr() {
 }
 
 // ---------------------------------------------------------------- settings tab
-const GROUPS = [
-  ['How the switch responds', ['s_play', 's_scanspd', 's_scanrnd', 's_hold', 's_accept', 's_lockout', 's_keyact', 's_psound']],
-  ['Recording on the switch', ['s_loud']],
-  ['Screen and power', ['s_wake', 's_sleep', 's_autooff']],
-];
 const HELP = {
-  s_play: 'Tap: a press plays the whole message. Hold to play: plays only while the switch is held. Latch: one press starts it, the next stops it. Scan: a press starts offering each message (or IR code) in turn with its name spoken quietly; the next press chooses.',
-  s_scanspd: 'Scan: how long each choice is offered before moving on. Go at the student’s pace.',
-  s_scanrnd: 'Scan: how many times round the choices before it stops by itself.',
-  s_hold: 'In SPEAK, holding the switch this long moves to the next message. Turn off for students who can’t let go quickly.',
+  vol: 'How loud messages play. 4 is the loudest the switch can go.',
+  s_play: 'SPEAK mode. Tap: a press plays the whole message. Hold to play: plays only while the switch is held. Latch: one press starts it, the next stops it.',
+  s_groups: 'CHOOSE mode. Staff: the student chooses from the group you select (Messages tab, or B on the switch). Student: the switch offers the groups first, then that group’s messages and “Back”.',
+  s_access: 'CHOOSE and IR scanning. Press twice: a press starts the offers, the next press chooses. Hold & release: hold to step through them, let go to choose.',
+  s_scanspd: 'How long each choice is offered before moving on. Go at the student’s pace.',
+  s_scanrnd: 'Press twice: how many times round the choices before it stops by itself.',
+  s_irchoose: 'IR mode. Staff pick: the switch sends the selected code. Student scans: the student chooses the code, as in CHOOSE.',
+  s_hold: 'SPEAK, Tap: holding the switch this long moves to the next message in its group. Turn off for students who can’t let go quickly.',
   s_accept: 'A press must last this long to count – filters accidental brushes.',
   s_lockout: 'Presses this soon after the last one are ignored – filters tremor and bounces.',
   s_keyact: 'KEYBOARD mode. Latch: one press holds the key down, the next lets it go.',
@@ -701,22 +746,21 @@ const HELP = {
 };
 
 function renderSettings() {
-  const byKey = Object.fromEntries(info.settings.map((s) => [s.key, s]));
-  const used = new Set();
-  const groups = GROUPS.map(([title, keys]) => [title, keys.filter((k) => byKey[k] && used.add(k))]);
-  const rest = info.settings.map((s) => s.key).filter((k) => !used.has(k));
-  if (rest.length) groups.push(['Other', rest]);
-  $('settingGroups').replaceChildren(renderVoiceSetting(), ...groups.filter(([, keys]) => keys.length).map(([title, keys]) =>
-    el('div', { class: 'group' }, el('h2', {}, title), ...keys.map((k) => {
-      const st = byKey[k];
+  const pages = [['Everyday', 0], ['Set once per student', 1]];
+  $('settingGroups').replaceChildren(renderVoiceSetting(), ...pages.map(([title, page]) => {
+    const list = info.settings.filter((st) => (st.page || 0) === page);
+    if (!list.length) return null;
+    return el('div', { class: 'group' }, el('h2', {}, title), ...list.map((st) => {
+      const k = st.key;
       const sel = el('select', { id: 'set-' + k, onchange: async () => {
         await act(() => cmd(`SET ${k} ${sel.value}`), 'Saved');
-        if (scanOn()) makeMissingPrompts();  // switching to Scan: speak the names
+        makeMissingPrompts();  // e.g. students choosing groups need a "Back" prompt
       } },
         ...st.choices.map((c, i) => el('option', { value: i, selected: i === st.cur }, c)));
       return el('div', { class: 'setting' }, el('label', { for: 'set-' + k }, st.name), sel,
         HELP[k] ? el('div', { class: 'help' }, HELP[k]) : null);
-    }))));
+    }));
+  }).filter(Boolean));
 }
 
 // ---------------------------------------------------------------- audio
@@ -909,8 +953,7 @@ async function setVoice(id, speed) {
 // After a voice change: every named message / IR code gets a new prompt.
 async function remakeAllPrompts() {
   if (!info || !ttsAvailable()) return;
-  const todo = [...info.slots.map((x, i) => [x, i]), ...info.irs.map((x, i) => [x, IRS + i])]
-    .filter(([x]) => x.name).map(([, snd]) => snd);
+  const todo = promptItems().map(([n]) => n);
   if (!todo.length) return;
   toast(`Remaking ${todo.length} scanning prompt${todo.length > 1 ? 's' : ''} in the new voice…`);
   for (const snd of todo) await makePrompt(snd);
