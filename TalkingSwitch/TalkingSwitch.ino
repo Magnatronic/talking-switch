@@ -4,7 +4,9 @@
 //  One big switch, three jobs:
 //    SPEAK     Plays one recorded message (BIGmack style). Keep holding
 //              the switch to move on to the next message. Play style
-//              setting: Tap / Hold to play / Latch.
+//              setting: Tap / Hold to play / Latch / Scan.
+//              Scan: a press starts stepping through the messages, each
+//              with a quiet spoken prompt; the next press chooses one.
 //    KEYBOARD  Acts as a USB or Bluetooth keyboard key, e.g. Space/Enter
 //              for Grid 3 or Mind Express switch access. Key goes down on
 //              press and up on release, so dwell and hold-to-scan settings
@@ -89,7 +91,9 @@ static const uint32_t LONG_REPEAT_MS = 2000; // SPEAK long press: keep moving on
 static const uint32_t SAMPLE_RATE = 16000; // recording sample rate (Hz)
 static const uint32_t MAX_SECONDS = 10;    // longest message per slot
 static const int      NUM_SLOTS   = 4;     // messages, and separately IR codes
-static const int      NUM_SOUNDS  = NUM_SLOTS * 2;  // sounds 0-3: messages, 4-7: the IR codes' sounds
+static const int      NUM_SOUNDS  = NUM_SLOTS * 4;  // sounds 0-3: messages, 4-7: the IR codes' sounds,
+                                                    // 8-11: message prompts, 12-15: IR code prompts (scanning)
+static const uint32_t PROMPT_SECONDS = 3;   // longest scanning prompt
 static const uint8_t  MIC_PGA     = 8;     // mic analogue gain, 3dB steps (0-10). Lower if loud voices distort
 
 static const char*    BLE_NAME      = "Talking Switch"; // Bluetooth name; the last 4 characters of the
@@ -128,7 +132,7 @@ static const uint8_t SCREEN_RGB[M_COUNT][3] = {
 static const bool HEADER_DARK_TEXT[M_COUNT] = {false, false, true, false};
 
 enum KbOut : uint8_t { OUT_NONE, OUT_BLE, OUT_USB };  // where keyboard presses go
-enum PlayStyle : uint8_t { PLAY_TAP, PLAY_HOLD, PLAY_LATCH };
+enum PlayStyle : uint8_t { PLAY_TAP, PLAY_HOLD, PLAY_LATCH, PLAY_SCAN };
 
 enum Arrow : uint8_t { A_NONE, A_UP, A_DOWN, A_LEFT, A_RIGHT };
 struct KeyDef { const char* name; uint8_t usage; Arrow arrow; };
@@ -143,7 +147,7 @@ static const int NUM_KEYS = sizeof(KEYS) / sizeof(KEYS[0]);
 //  Staff settings - changed in SETTINGS mode on the StickS3
 //  and remembered after power-off. Each has a fixed list of choices.
 // ---------------------------------------------------------------------
-enum SettingId : uint8_t { S_PLAY, S_HOLD, S_ACCEPT, S_LOCKOUT, S_WAKE, S_SLEEP, S_AUTOOFF, S_LOUD, S_KEY_ACTION, S_PRESS_SOUND, S_FORGET, S_COUNT };
+enum SettingId : uint8_t { S_PLAY, S_SCAN_SPEED, S_SCAN_ROUNDS, S_HOLD, S_ACCEPT, S_LOCKOUT, S_WAKE, S_SLEEP, S_AUTOOFF, S_LOUD, S_KEY_ACTION, S_PRESS_SOUND, S_FORGET, S_COUNT };
 struct Setting {
   const char* name;       // shown on screen
   const char* key;        // Preferences key (nullptr = an action, not a stored value)
@@ -155,7 +159,11 @@ static const Setting SETTINGS[S_COUNT] = {
   // SPEAK: Tap = a press plays the whole message; Hold to play =
   // plays (looping) only while the switch is held; Latch = one press starts it
   // looping, the next stops it
-  {"Play style",          "s_play",    3, 0, {0, 1, 2}, {"Tap", "Hold to play", "Latch"}},
+  // (SPEAK and IR) Scan = press to start stepping through them, press again to choose
+  {"Play style",          "s_play",    4, 0, {0, 1, 2, 3}, {"Tap", "Hold to play", "Latch", "Scan"}},
+  // Scan: how long each message / code is offered, and how many times round before stopping
+  {"Scan speed",          "s_scanspd", 5, 2, {1500, 2000, 3000, 4000, 5000}, {"1.5 s", "2 s", "3 s", "4 s", "5 s"}},
+  {"Scan rounds",         "s_scanrnd", 3, 1, {1, 2, 3}, {"1", "2", "3"}},
   // SPEAK, Tap play style: keep holding the switch this long to move to the next message
   {"Hold for next msg",   "s_hold",    5, 2, {0, 1000, 1500, 2000, 3000}, {"Off", "1 s", "1.5 s", "2 s", "3 s"}},
   // press must be held this long to count - filters accidental brushes
@@ -188,6 +196,7 @@ uint8_t mode = M_SPEAK;
 uint8_t slot = 0;        // selected message
 uint8_t irSlot = 0;      // selected IR code
 int irSound(int i) { return NUM_SLOTS + i; }  // sound number of IR code i's sound
+int promptSound(bool ir, int i) { return NUM_SLOTS * (ir ? 3 : 2) + i; }  // scanning prompt
 uint8_t keyIdx = 0;      // selected keyboard key (NUM_KEYS = the custom key)
 // Custom key/shortcut set from the setup page, e.g. Win+H.
 // Modifier bits: 1 Ctrl, 2 Shift, 4 Alt, 8 Win (HID left-hand modifiers).
@@ -201,9 +210,15 @@ uint32_t pressCount = 0; // student activations since boot
 KbOut    keyDownOut = OUT_NONE; // where the current key-down went (the key-up goes there too)
 bool     keyLatched = false;    // Latch key action: key is being held down
 bool     playLatched = false;   // Latch play style: message is looping
+bool     scanning = false;      // Scan play style: stepping through the choices
+int8_t   scanPos = -1;          // choice being offered
+int      scanStepsLeft = 0;
+uint32_t scanNext = 0;          // when to offer the next one
 
 static const size_t MAX_SAMPLES = SAMPLE_RATE * MAX_SECONDS;
-int16_t* slotBuf[NUM_SOUNDS];  // sounds: messages then IR-code sounds
+static const size_t PROMPT_SAMPLES = SAMPLE_RATE * PROMPT_SECONDS;
+size_t soundMax(int i) { return i < NUM_SLOTS * 2 ? MAX_SAMPLES : PROMPT_SAMPLES; }
+int16_t* slotBuf[NUM_SOUNDS];  // sounds: messages, IR-code sounds, then prompts
 size_t   slotLen[NUM_SOUNDS];
 
 static const size_t IR_MAX = 192;
@@ -250,8 +265,9 @@ uint8_t studentMode() { return mode == M_SETTINGS ? prevMode : mode; }
 void ledShow(uint8_t r, uint8_t g, uint8_t b) { rgbLedWrite(PIN_LED, r, g, b); }
 void ledIdle() {
   uint8_t m = studentMode();
-  const uint8_t* c = m == M_SPEAK ? SLOT_RGB[slot] : m == M_IR ? SLOT_RGB[irSlot] : MODE_RGB[m];
-  int k = (keyLatched || playLatched) ? 3 : 1;  // brighter while something is latched on
+  const uint8_t* c = scanning ? SLOT_RGB[scanPos]
+                   : m == M_SPEAK ? SLOT_RGB[slot] : m == M_IR ? SLOT_RGB[irSlot] : MODE_RGB[m];
+  int k = (keyLatched || playLatched || scanning) ? 3 : 1;  // brighter while latched on / scanning
   ledShow(c[0] * k, c[1] * k, c[2] * k);
 }
 
@@ -259,7 +275,8 @@ void ledIdle() {
 //  Storage
 // ---------------------------------------------------------------------
 String slotPath(int i) {
-  return i < NUM_SLOTS ? String("/msg") + i + ".raw" : String("/irs") + (i - NUM_SLOTS) + ".raw";
+  static const char* DIRS[] = {"/msg", "/irs", "/pm", "/pi"};  // messages, IR sounds, their prompts
+  return String(DIRS[i / NUM_SLOTS]) + (i % NUM_SLOTS) + ".raw";
 }
 
 void saveSettings() {
@@ -299,7 +316,7 @@ void loadSlots() {
     slotLen[i] = 0;
     File f = LittleFS.open(slotPath(i), "r");
     if (!f) continue;
-    size_t n = min((size_t)f.size() / 2, MAX_SAMPLES);
+    size_t n = min((size_t)f.size() / 2, soundMax(i));
     slotLen[i] = f.read((uint8_t*)slotBuf[i], n * 2) / 2;
     f.close();
   }
@@ -805,6 +822,11 @@ void drawMain(lgfx::LovyanGFX& c) {
   uint16_t accent = rgb(SCREEN_RGB[mode]);
   switch (mode) {
     case M_SPEAK: {
+      if (scanning) {
+        drawFit(c, titleOf(scanPos), 60, TFT_WHITE);
+        drawCentered(c, "Press to choose", 94, &fonts::FreeSansBold9pt7b, TFT_YELLOW);
+        break;
+      }
       drawFit(c, titleOf(slot), 60, TFT_WHITE);
       String l = slotLen[slot] ? String(slotLen[slot] / (float)SAMPLE_RATE, 1) + " s recorded"
                                : String("Empty - hold A to record");
@@ -835,6 +857,11 @@ void drawMain(lgfx::LovyanGFX& c) {
       break;
     }
     case M_IR: {
+      if (scanning) {
+        drawFit(c, titleOf(irSound(scanPos)), 60, TFT_WHITE);
+        drawCentered(c, "Press to choose", 94, &fonts::FreeSansBold9pt7b, TFT_YELLOW);
+        break;
+      }
       int snd = irSound(irSlot);
       drawFit(c, titleOf(snd), 54, TFT_WHITE);
       drawCentered(c, !irLen[irSlot] ? "No IR code" : slotLen[snd] ? "Code ready + sound" : "Code ready", 84,
@@ -997,7 +1024,7 @@ bool canSleep(uint32_t idle) {
   if (!mins || idle < mins * 60000UL) return false;
   if (bleRunning || studentMode() == M_KEYBOARD) return false;
   if (swStable || swActive || M5.BtnA.isPressed() || M5.BtnB.isPressed()) return false;
-  if (M5.Speaker.isPlaying()) return false;
+  if (M5.Speaker.isPlaying() || scanning) return false;
   return true;
 }
 
@@ -1062,6 +1089,63 @@ void managePower(uint32_t now) {
 // ---------------------------------------------------------------------
 //  Student switch actions
 // ---------------------------------------------------------------------
+// ---------------------------------------------------------------------
+//  Scanning (Play style = Scan): the switch offers each message (SPEAK) or
+//  IR code (IR) in turn - LED colour, name on screen, a quiet spoken prompt -
+//  and the next press chooses the one being offered.
+// ---------------------------------------------------------------------
+static const uint8_t PROMPT_VOLUME = 150;  // channel volume for prompts (255 = as loud as messages)
+
+void playPrompt(int item) {
+  bool ir = studentMode() == M_IR;
+  int p = promptSound(ir, item);
+  if (!slotLen[p] && ir) p = irSound(item);  // an IR code's own sound is short enough
+  if (!slotLen[p]) { M5.Speaker.tone(1200, 60); return; }
+  M5.Speaker.setChannelVolume(1, PROMPT_VOLUME);
+  M5.Speaker.playRaw(slotBuf[p], slotLen[p], SAMPLE_RATE, false, 1, 1, true);
+}
+
+void stopScan() {
+  if (!scanning) return;
+  scanning = false;
+  M5.Speaker.stop(1);
+  ledIdle();
+  needRedraw = true;
+}
+
+void offer(int item) {
+  scanPos = item;
+  scanNext = millis() + setting(S_SCAN_SPEED);
+  playPrompt(item);
+  ledIdle();
+  needRedraw = true;
+}
+
+// Press with Scan: start scanning, or choose what's being offered.
+// Returns the chosen item, or -1 if this press only started the scan.
+int scanPress() {
+  if (scanning) {
+    int chosen = scanPos;
+    stopScan();
+    return chosen;
+  }
+  int n = 0;
+  for (int i = 0; i < NUM_SLOTS; i++) if (slotUsed(i)) n++;
+  uint8_t sel = studentMode() == M_IR ? irSlot : slot;
+  if (n == 0) return sel;                                          // empty: the usual low beep
+  if (n == 1) return slotUsed(sel) ? sel : nextUsedSlot(sel);      // nothing to choose between
+  scanning = true;
+  scanStepsLeft = n * setting(S_SCAN_ROUNDS);
+  offer(slotUsed(0) ? 0 : nextUsedSlot(0));
+  return -1;
+}
+
+void updateScan(uint32_t now) {
+  if (!scanning || (int32_t)(now - scanNext) < 0) return;
+  if (--scanStepsLeft <= 0) { stopScan(); return; }
+  offer(nextUsedSlot(scanPos));
+}
+
 void onActivate() {
   pressCount++;
   markActivity();
@@ -1071,6 +1155,13 @@ void onActivate() {
   ledFlashUntil = millis() + 250;
 
   const uint8_t style = setting(S_PLAY);
+  if (style == PLAY_SCAN && (studentMode() == M_SPEAK || studentMode() == M_IR)) {
+    int chosen = scanPress();
+    if (chosen < 0) { needRedraw = true; return; }  // scan started (or nothing to scan)
+    if (studentMode() == M_IR) irSlot = chosen; else slot = chosen;
+    saveSettings();
+    ledIdle();
+  }
   switch (studentMode()) {
     case M_SPEAK:
       if (style == PLAY_LATCH) {
@@ -1197,6 +1288,7 @@ void pollStaffButtons() {
           || M5.BtnB.wasHold() || M5.BtnB.wasClicked();
   if (!any) return;
   markActivity();
+  stopScan();
   if (wakeScreen()) return;  // screen was dim/off: this press only wakes it
   if (mode == M_SETTINGS && (M5.BtnA.wasHold() || M5.BtnB.wasClicked())) { settingsButtons(); return; }
 
@@ -1243,7 +1335,8 @@ void pollStaffButtons() {
 //    INFO                 -> @INFO {json}
 //    MODE n / SLOT n / IRSLOT n / KEY n / VOL n / SET <key> <choice>
 //    PLAY n / STOP / DEL n / NAME n <text> / FORGET
-//      (sound numbers n: 0-3 messages, 4-7 the IR codes' sounds and names)
+//      (sound numbers n: 0-3 messages, 4-7 the IR codes' sounds and names,
+//       8-11 message prompts, 12-15 IR code prompts - up to 3 s, for scanning)
 //    IRLEARN n (waits up to 8s for a remote) / IRSEND n / IRDEL n  (n 0-3)
 //    CKEY <mods> <usage> <label>  (custom key; usage 0 removes it)
 //    UP n <samples>       -> @READY, then the samples in 4KB pieces, each
@@ -1275,10 +1368,12 @@ void sendInfo() {
   j += "],\"ckey\":{\"mods\":" + String(customMods) + ",\"usage\":" + String(customUsage) + ",\"name\":" + jsonStr(customName) + "}";
   j += ",\"slots\":[";
   for (int i = 0; i < NUM_SLOTS; i++)
-    j += String(i ? "," : "") + "{\"len\":" + String(slotLen[i]) + ",\"name\":" + jsonStr(slotName[i]) + "}";
+    j += String(i ? "," : "") + "{\"len\":" + String(slotLen[i]) + ",\"pr\":" + String(slotLen[promptSound(false, i)] ? "true" : "false")
+         + ",\"name\":" + jsonStr(slotName[i]) + "}";
   j += "],\"irs\":[";
   for (int i = 0; i < NUM_SLOTS; i++)
     j += String(i ? "," : "") + "{\"ir\":" + String(irLen[i] ? "true" : "false") + ",\"len\":" + String(slotLen[irSound(i)])
+         + ",\"pr\":" + String(slotLen[promptSound(true, i)] ? "true" : "false")
          + ",\"name\":" + jsonStr(slotName[irSound(i)]) + "}";
   j += "],\"settings\":[";
   bool first = true;
@@ -1302,7 +1397,7 @@ void reply(const char* err = nullptr) {
 
 // Receives a recording from the page straight into a slot.
 void receiveSlot(int i, size_t samples) {
-  if (samples == 0 || samples > MAX_SAMPLES) return reply("bad length");
+  if (samples == 0 || samples > soundMax(i)) return reply("bad length");
   stopPlay();
   M5.Speaker.stop();
   Serial.println("@READY");
@@ -1355,6 +1450,7 @@ void handleCommand(String line) {
   bool okSlot = n >= 0 && n < NUM_SLOTS;   // message / IR code number
   bool okSnd = n >= 0 && n < NUM_SOUNDS;   // sound number
   markActivity();
+  stopScan();
   needRedraw = true;
 
   if (cmd == "INFO") {
@@ -1536,7 +1632,7 @@ void setup() {
 
   bool havePsram = psramFound();
   for (int i = 0; i < NUM_SOUNDS; i++) {
-    slotBuf[i] = (int16_t*)(havePsram ? ps_malloc(MAX_SAMPLES * 2) : nullptr);
+    slotBuf[i] = (int16_t*)(havePsram ? ps_malloc(soundMax(i) * 2) : nullptr);
     slotLen[i] = 0;
   }
   if (!havePsram || !slotBuf[NUM_SOUNDS - 1]) {
@@ -1590,6 +1686,7 @@ void loop() {
   if (now - lastRefresh > 5000) { lastRefresh = now; readBattery(); }
   if (forgetConfirmUntil && now >= forgetConfirmUntil) { forgetConfirmUntil = 0; needRedraw = true; }
   if (mode == M_SETTINGS && now - lastInteraction > SETTINGS_EXIT_MS) { mode = prevMode; ledIdle(); needRedraw = true; }
+  updateScan(now);
   manageBle(now);
   managePower(now);
   if (needRedraw && scr != SCR_OFF) drawScreen();

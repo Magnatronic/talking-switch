@@ -144,6 +144,7 @@ ol { padding-left: 1.2em; margin: 8px 0 0; }
     <section id="tab-messages" class="card" role="tabpanel">
       <p class="muted small" style="margin-top:0">In <b>SPEAK</b> mode the switch plays the <b>selected</b> message. Click
         <b>Change</b> to record, type or upload one.</p>
+      <div id="msgScan" class="preview hidden" style="margin-bottom:10px"></div>
       <div id="msgList" class="slots"></div>
     </section>
 
@@ -152,6 +153,7 @@ ol { padding-left: 1.2em; margin: 8px 0 0; }
         code. Give a code a <b>sound</b> (e.g. "Bubbles!") and the switch says it as it sends – leave it out for silence.<br>
         To learn a code: click <b>Learn</b>, point the remote at the <b>end</b> of the switch from 30cm–1m away and press
         its button within 8 seconds.</p>
+      <div id="irScan" class="preview hidden" style="margin-bottom:10px"></div>
       <div id="irList" class="slots"></div>
     </section>
 
@@ -425,6 +427,8 @@ function segment(box, labels, current, onPick) {
 
 // Sound numbers: 0-3 are the messages, 4-7 the IR codes' own sounds.
 const IRS = 4;
+// Scanning prompts: sound numbers 8-11 (messages) and 12-15 (IR codes).
+function promptOf(snd) { return snd < IRS ? 8 + snd : 12 + (snd - IRS); }
 function soundInfo(snd) { return snd < IRS ? info.slots[snd] : info.irs[snd - IRS]; }
 function secs(n) { return (n / info.rate).toFixed(1) + ' s'; }
 
@@ -443,6 +447,8 @@ function render() {
   segment($('keys'), info.keys, info.key, (i) => act(() => cmd(`KEY ${i}`)));
   renderMessages();
   renderIr();
+  renderScanNote('msgScan', info.slots, 'message');
+  renderScanNote('irScan', info.irs, 'IR code');
   renderSettings();
   renderCustomKey();
 }
@@ -459,7 +465,7 @@ function renderMessages() {
     const name = el('input', {
       type: 'text', class: 'name', maxLength: 24, value: s.name, placeholder: `Name, e.g. "Bubbles"`,
       'aria-label': `Name for slot ${i + 1}`,
-      onchange: () => act(() => cmd(`NAME ${i} ${name.value.replace(/[\r\n]/g, ' ')}`), 'Name saved'),
+      onchange: () => renameItem(i, name.value),
     });
     const open = editing === i;
     return el('div', { class: 'slot' + (i === info.slot ? ' selected' : '') },
@@ -467,6 +473,7 @@ function renderMessages() {
         el('span', { class: 'num' }, String(i + 1)),
         name,
         el('span', { class: 'status' + (s.len ? ' has' : '') }, s.len ? secs(s.len) : 'No message'),
+        scanOn() ? promptBadge(s) : null,
         el('button', { disabled: !s.len, onclick: () => act(() => cmd(`PLAY ${i}`)), title: 'Play it on the switch' }, '▶ Play'),
         el('button', { class: open ? 'on' : '', onclick: () => toggleEditor(i) }, open ? 'Close' : 'Change'),
         el('button', { class: 'danger', disabled: !s.len, onclick: () => {
@@ -574,6 +581,71 @@ async function saveWav(i) {
   } catch (e) { toast(e.message, true); }
 }
 
+// ---------------------------------------------------------------- scanning prompts
+function scanOn() {
+  const st = info && info.settings.find((x) => x.key === 's_play');
+  return !!st && st.choices[st.cur] === 'Scan';
+}
+
+function promptBadge(item) {
+  if (!item.name && !item.len && !item.ir) return null;  // empty: nothing to say
+  if (!item.name) return el('span', { class: 'small muted', title: 'Give it a name to get a spoken prompt' }, 'no prompt');
+  return el('span', { class: 'small ' + (item.pr ? 'muted' : ''), style: item.pr ? '' : 'color: var(--bad)' },
+    item.pr ? 'prompt ✓' : 'no prompt');
+}
+
+async function renameItem(snd, value) {
+  await act(() => cmd(`NAME ${snd} ${value.replace(/[\r\n]/g, ' ')}`), 'Name saved');
+  if (!value.trim()) await act(() => cmd(`DEL ${promptOf(snd)}`));  // no name: no prompt
+  else makePrompt(snd);
+}
+
+// Speaks an item's name with the chosen voice and stores it as its scanning
+// prompt. Runs one at a time; quietly does nothing where typed speech can't run.
+let promptChain = Promise.resolve();
+function makePrompt(snd) {
+  promptChain = promptChain.then(async () => {
+    const name = info && (soundInfo(snd).name || '').trim();
+    if (!name || !ttsAvailable()) return;
+    try {
+      const v = VOICES.find((x) => x.id === savedVoice());
+      engineMods[v.engine] ||= await import(ENGINES[v.engine]);
+      const { samples, sampleRate } = await engineMods[v.engine].synthesize(name, v.id, 1, showTtsProgress);
+      const audio = new AudioBuffer({ length: samples.length, sampleRate, numberOfChannels: 1 });
+      audio.copyToChannel(samples, 0);
+      const { pcm } = await toSwitchFormat(audio, 3);
+      await upload(promptOf(snd), pcm);
+      await refresh();
+    } catch (e) {
+      toast(`Couldn't make the prompt for "${name}": ${e.message || e}`, true);
+    }
+  });
+  return promptChain;
+}
+
+async function makeMissingPrompts() {
+  if (!info) return;
+  const todo = [...info.slots.map((x, i) => [x, i]), ...info.irs.map((x, i) => [x, IRS + i])]
+    .filter(([x]) => x.name && !x.pr).map(([, snd]) => snd);
+  if (!todo.length) return;
+  toast(`Making ${todo.length} spoken prompt${todo.length > 1 ? 's' : ''} from the names…`);
+  for (const snd of todo) await makePrompt(snd);
+  toast('Prompts ready');
+}
+
+function renderScanNote(boxId, items, what) {
+  const box = $(boxId);
+  box.classList.toggle('hidden', !scanOn());
+  if (!scanOn()) return;
+  const missing = items.filter((x) => x.name && !x.pr).length;
+  const unnamed = items.filter((x) => (x.len || x.ir) && !x.name).length;
+  box.replaceChildren(...[
+    el('span', { class: 'small' }, `Scanning is on: each ${what}'s name is spoken quietly as it's offered.` +
+      (unnamed ? ` Name the rest to give them a prompt.` : '')),
+    missing ? el('button', { onclick: () => makeMissingPrompts() }, `Make ${missing} missing prompt${missing > 1 ? 's' : ''}`) : null,
+  ].filter(Boolean));
+}
+
 // ---------------------------------------------------------------- IR tab
 async function learnIr(i) {
   toast('Point the remote at the end of the switch from 30cm+ and press its button…');
@@ -587,13 +659,14 @@ function renderIr() {
     const name = el('input', {
       type: 'text', class: 'name', maxLength: 24, value: c.name, placeholder: `Name, e.g. "TV on/off"`,
       'aria-label': `Name for IR code ${i + 1}`,
-      onchange: () => act(() => cmd(`NAME ${snd} ${name.value.replace(/[\r\n]/g, ' ')}`), 'Name saved'),
+      onchange: () => renameItem(snd, name.value),
     });
     return el('div', { class: 'slot' + (i === info.irSlot ? ' selected' : '') },
       el('div', { class: 'slot-main' },
         el('span', { class: 'num' }, String(i + 1)),
         name,
         el('span', { class: 'status' + (c.ir ? ' has' : '') }, c.ir ? 'Code saved' : 'No code'),
+        scanOn() ? promptBadge(c) : null,
         el('button', { onclick: () => learnIr(i) }, c.ir ? 'Learn again' : 'Learn'),
         el('button', { disabled: !c.ir, onclick: () => act(() => cmd(`IRSEND ${i}`), 'Sent') }, 'Test'),
         el('button', { class: 'danger', disabled: !c.ir, onclick: () => {
@@ -615,12 +688,14 @@ function renderIr() {
 
 // ---------------------------------------------------------------- settings tab
 const GROUPS = [
-  ['How the switch responds', ['s_play', 's_hold', 's_accept', 's_lockout', 's_keyact', 's_psound']],
+  ['How the switch responds', ['s_play', 's_scanspd', 's_scanrnd', 's_hold', 's_accept', 's_lockout', 's_keyact', 's_psound']],
   ['Recording on the switch', ['s_loud']],
   ['Screen and power', ['s_wake', 's_sleep', 's_autooff']],
 ];
 const HELP = {
-  s_play: 'SPEAK mode. Tap: a press plays the whole message. Hold to play: plays only while the switch is held. Latch: one press starts it, the next stops it.',
+  s_play: 'Tap: a press plays the whole message. Hold to play: plays only while the switch is held. Latch: one press starts it, the next stops it. Scan: a press starts offering each message (or IR code) in turn with its name spoken quietly; the next press chooses.',
+  s_scanspd: 'Scan: how long each choice is offered before moving on. Go at the student’s pace.',
+  s_scanrnd: 'Scan: how many times round the choices before it stops by itself.',
   s_hold: 'In SPEAK, holding the switch this long moves to the next message. Turn off for students who can’t let go quickly.',
   s_accept: 'A press must last this long to count – filters accidental brushes.',
   s_lockout: 'Presses this soon after the last one are ignored – filters tremor and bounces.',
@@ -641,7 +716,10 @@ function renderSettings() {
   $('settingGroups').replaceChildren(...groups.filter(([, keys]) => keys.length).map(([title, keys]) =>
     el('div', { class: 'group' }, el('h2', {}, title), ...keys.map((k) => {
       const st = byKey[k];
-      const sel = el('select', { id: 'set-' + k, onchange: () => act(() => cmd(`SET ${k} ${sel.value}`), 'Saved') },
+      const sel = el('select', { id: 'set-' + k, onchange: async () => {
+        await act(() => cmd(`SET ${k} ${sel.value}`), 'Saved');
+        if (scanOn()) makeMissingPrompts();  // switching to Scan: speak the names
+      } },
         ...st.choices.map((c, i) => el('option', { value: i, selected: i === st.cur }, c)));
       return el('div', { class: 'setting' }, el('label', { for: 'set-' + k }, st.name), sel,
         HELP[k] ? el('div', { class: 'help' }, HELP[k]) : null);
@@ -679,7 +757,7 @@ function wavBlob(pcm, rate) {
 // Any decoded audio -> the switch's format: mono, info.rate Hz, 16-bit.
 // Bass the small speaker can't play is removed, silence trimmed, and the
 // level brought up to full with optional soft-clip "loudness".
-async function toSwitchFormat(audio) {
+async function toSwitchFormat(audio, maxSec = info.maxSec) {
   const rate = info.rate;
   const off = new OfflineAudioContext(1, Math.max(1, Math.ceil(audio.duration * rate)), rate);
   const src = off.createBufferSource();
@@ -709,7 +787,7 @@ async function toSwitchFormat(audio) {
   if (first < 0 || max < 1e-4) throw new Error('Nothing heard in that recording');
   const start = Math.max(0, first * B - Math.round(rate * 0.08));
   let end = Math.min(x.length, (last + 1) * B + Math.round(rate * 0.15));
-  const limit = info.maxSec * rate;
+  const limit = maxSec * rate;
   const truncated = end - start > limit;
   if (truncated) end = start + limit;
   x = x.slice(start, end);

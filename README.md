@@ -100,7 +100,9 @@ Click A until the screen says **SETTINGS**. **B click** changes the value, **hol
 
 | Setting | Choices (default **bold**) | What it does |
 |---|---|---|
-| Play style | **Tap**, Hold to play, Latch | SPEAK. *Tap*: a press plays the whole message. *Hold to play*: plays (looping) only while the switch is held – classic cause and effect. *Latch*: one press starts it looping, the next press stops it |
+| Play style | **Tap**, Hold to play, Latch, Scan | *Tap*: a press plays the whole message. *Hold to play*: plays (looping) only while the switch is held – classic cause and effect. *Latch*: one press starts it looping, the next press stops it. *Scan*: choice-making – see below |
+| Scan speed | 1.5s, 2s, **3s**, 4s, 5s | Scan: how long each choice is offered |
+| Scan rounds | 1, **2**, 3 | Scan: how many times round before it stops by itself |
 | Hold for next msg | Off, 1s, **1.5s**, 2s, 3s | SPEAK: how long the student holds the switch to move to the next message. Turn off for students who can't let go quickly |
 | Press must last | **Instant**, 0.1s, 0.25s, 0.5s, 1s | Filters accidental brushes |
 | Ignore repeats for | Off, 0.2s, **0.4s**, 0.8s, 1.5s | Filters tremor and bounces after a press |
@@ -121,6 +123,17 @@ Click A until the screen says **SETTINGS**. **B click** changes the value, **hol
 - A white frame appears while the big switch is held down.
 
 Recordings are trimmed and boosted automatically, stored in flash, and survive power-off.
+
+### Scanning (choice-making with one switch)
+
+Set **Play style** to **Scan**. In SPEAK mode, a press starts the switch offering each message in turn: its LED
+colour, its name on screen and a short **spoken prompt** played quietly ("Drink"… "Music"… "Toilet"). The next
+press **chooses** – the full message plays ("Can I have a drink, please?"). With no choice it stops after the set
+number of rounds. In IR mode it offers the IR codes the same way, so a student can choose what to switch on.
+
+The prompts are made automatically by the setup page from each message's or IR code's **name**, in the chosen
+voice – name a message and its prompt appears. Items without a name get a soft beep (IR codes fall back to their
+own sound). Only messages / codes that are set up are offered, so two messages make a simple two-way choice.
 
 **To delete a message:** choose it with B, then hold A for a couple of seconds *without speaking* and let go.
 The screen says "Nothing heard – msg cleared".
