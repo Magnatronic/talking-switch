@@ -47,19 +47,27 @@ Edge** (Firefox and Safari can't talk to USB devices). Plug the StickS3 in, clos
 click **Connect** and pick the switch. The switch is set up over the USB cable – no Wi-Fi – and recordings and
 typed words stay on the computer.
 
-- **Quick tab:** 4 quick messages for SPEAK (CHOOSE can scan them too). For each: a name, ▶ Play, **Change** (record with the computer's
-  microphone or a headset, **type the words** – spoken in the switch's voice – or upload an audio file; then listen
-  and save), Delete, and *Select* (the one SPEAK plays).
-- **Topics tab:** 4 **topics** of up to 4 messages each, for CHOOSE (up to 5 seconds per message). Name each topic
-  and message – the names become the spoken prompts. With *Choose from: A topic*, *Use in CHOOSE* picks the topic.
-- **IR remote tab:** 4 remote-control codes, separate from the messages. For each: a name, **Learn / Test / Delete**,
-  and an optional **sound** (made the same three ways) that the switch says as it sends the code.
-- **Keyboard tab:** the key, including a **custom key or shortcut** such as Win+H (dictation).
-- **Settings tab:** the switch's **voice** and speed for typed messages and scanning prompts (natural: Emma, Isabella,
-  George, Fable; quick: Cori, Alba, Southern English female, Northern English male – stored on the switch, so every
-  computer uses the same one; changing it remakes the prompts), then the settings with explanations, in the same
-  sections as the switch: General, SPEAK, CHOOSE, KEYBOARD and IR – and Bluetooth.
-- **Mode** is at the top of the page.
+**Mode** and **Volume** are at the top of the page. Below them is one tab per mode, plus **Switch**; each tab
+has that mode's settings at the top (settings that do nothing with the current choices are hidden) and what it
+uses below. Clicking a mode opens its tab; the tab of the mode in use has a green dot.
+
+- **SPEAK:** Play style, Hold for next; the 4 Quick messages. For each: a name, ▶ Play, **Change** (record with the
+  computer's microphone or a headset, **type the words** – spoken in the switch's voice – or upload an audio file;
+  then listen and save), Delete, and *Select* (the one SPEAK plays).
+- **CHOOSE:** Choose from, Choosing, Scan speed, Scan rounds; then what it chooses from – the Quick messages, or
+  the 4 **topics** of up to 4 messages each (up to 5 seconds per message). Name each topic and message – the names
+  become the spoken prompts. With *Choose from: One topic*, *Use this topic* picks it.
+- **KEYBOARD:** the key, Key action, Press sound; a **custom key or shortcut** such as Win+H (dictation); Bluetooth
+  name and *Forget all paired devices*.
+- **IR:** IR codes (and the scanning settings when students scan), Press sound; 4 remote-control codes, separate
+  from the messages. For each: a name, **Learn / Test / Delete**, and an optional **sound** (made the same three
+  ways) that the switch says as it sends the code.
+- **Switch:** switch access (Press must last, Ignore repeats), power and screen, and the switch's **voice**, speed
+  and **loudness** for typed messages and scanning prompts (natural: Emma, Isabella, George, Fable; quick: Cori,
+  Alba, Southern English female, Northern English male – stored on the switch, so every computer uses the same
+  one; changing the voice remakes the prompts). Loudness is the switch's *Recording boost*: it applies to messages
+  recorded on the switch and to ones made on the page. Voice, speed and loudness can also be changed in the
+  message editor.
 - **Names become prompts:** naming a message, topic or IR code makes its short spoken prompt for scanning, in
   the switch's voice (plus a "Back" prompt when students choose topics).
 
@@ -114,8 +122,8 @@ prompt** played quietly ("Toast"… "Crisps"… "Yoghurt") – and the student p
 
 - **Choose from: Quick messages** (default) – it offers the 4 Quick messages, the same ones SPEAK plays. The
   simplest start.
-- **Choose from: A topic** – it offers the messages in the topic staff selected (B on the switch, or *Use in
-  CHOOSE* on the setup page), e.g. "Snack time".
+- **Choose from: A topic** – it offers the messages in the topic staff selected (B on the switch, or *Use this
+  topic* on the setup page), e.g. "Snack time".
 - **Choose from: Topics** – it offers the **topics** first ("Snack time"… "Music"…), then the chosen topic's
   messages and **"Back"** (to return to the topics).
 - **Choosing: Press twice** – a press starts the offers, the next press chooses. With no choice it stops after the
@@ -133,7 +141,7 @@ record the Quick messages (SPEAK, hold A) and set *Choose from: Quick messages*.
 Each mode has its own settings – press B until the screen shows **Settings**, then hold A to open them – and the
 **SETTINGS** mode holds the general ones. In any settings: **B** = next setting, **hold A** = change the value,
 **A** = close (or next mode). Changes are saved straight away; settings close by themselves after 30s untouched.
-All of these are on the setup page's Settings tab too.
+All of these are on the setup page too, on each mode's tab and the Switch tab.
 
 | Where | Setting | Choices (default **bold**) | What it does |
 |---|---|---|---|
