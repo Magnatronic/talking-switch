@@ -1,6 +1,6 @@
 # Name,   Type, SubType, Offset,   Size,     Flags
-# 8MB flash: 3MB app, ~4.8MB LittleFS for recorded messages and IR codes
+# 8MB flash: 2MB app (the firmware is ~1MB), ~5.9MB LittleFS for recordings and IR codes
 nvs,      data, nvs,     0x9000,   0x5000,
-app0,     app,  factory, 0x10000,  0x300000,
-spiffs,   data, spiffs,  0x310000, 0x4E0000,
+app0,     app,  factory, 0x10000,  0x200000,
+spiffs,   data, spiffs,  0x210000, 0x5E0000,
 coredump, data, coredump,0x7F0000, 0x10000,

@@ -26,7 +26,10 @@ Bluetooth/USB keyboard key, and IR remote, all in one.
 
 Open `TalkingSwitch/TalkingSwitch.ino` (Arduino needs the sketch folder and
 `.ino` to share a name). The `partitions.csv` in that folder replaces the
-partition layout automatically, giving ~4.8MB for recordings. Keep it next to the `.ino`.
+partition layout automatically (2MB for the firmware, ~5.9MB for recordings). Keep it next to the `.ino`.
+
+**Changing the partition layout wipes the recordings and learned IR codes** on the stick at the next upload
+(names and settings are kept) – record them again afterwards.
 
 If the screen says **"No PSRAM!"**, change PSRAM to *QSPI PSRAM* and upload again.
 
@@ -41,20 +44,21 @@ Edge** (Firefox and Safari can't talk to USB devices). Plug the StickS3 in, clos
 click **Connect** and pick the switch. The switch is set up over the USB cable – no Wi-Fi – and recordings and
 typed words stay on the computer.
 
-- **Messages tab:** 16 messages in **4 groups of 4** (up to 5 seconds each). Each group has a name; click a group
-  to open it. For each message: a name, ▶ Play, **Change** (record with the computer's microphone or a headset,
-  **type the words** – spoken in the switch's voice – or upload an audio file; then listen and save), Delete, and
-  *Select* (the message SPEAK plays). With *Groups chosen by: Staff*, *Use in CHOOSE* picks the group CHOOSE offers.
+- **Quick tab:** 4 quick messages for SPEAK. For each: a name, ▶ Play, **Change** (record with the computer's
+  microphone or a headset, **type the words** – spoken in the switch's voice – or upload an audio file; then listen
+  and save), Delete, and *Select* (the one SPEAK plays).
+- **Topics tab:** 4 **topics** of up to 4 messages each, for CHOOSE (up to 5 seconds per message). Name each topic
+  and message – the names become the spoken prompts. With *Topics chosen by: Staff*, *Use in CHOOSE* picks the topic.
 - **IR remote tab:** 4 remote-control codes, separate from the messages. For each: a name, **Learn / Test / Delete**,
   and an optional **sound** (made the same three ways) that the switch says as it sends the code.
 - **Keyboard tab:** the key, including a **custom key or shortcut** such as Win+H (dictation).
 - **Settings tab:** the switch's **voice** and speed for typed messages and scanning prompts (natural: Emma, Isabella,
   George, Fable; quick: Cori, Alba, Southern English female, Northern English male – stored on the switch, so every
-  computer uses the same one; changing it remakes the prompts), then the *Everyday* and *Set once per student*
-  settings with explanations (the same as the switch's two SETTINGS pages), and Bluetooth.
+  computer uses the same one; changing it remakes the prompts), then the settings with explanations, in the same
+  sections as the switch: General, SPEAK, CHOOSE, KEYBOARD and IR – and Bluetooth.
 - **Mode** is at the top of the page.
-- **Names become prompts:** naming a message, group or IR code makes its short spoken prompt for scanning, in the
-  switch's voice (plus a "Back" prompt when students choose groups).
+- **Names become prompts:** naming a topic, topic message or IR code makes its short spoken prompt for scanning, in
+  the switch's voice (plus a "Back" prompt when students choose topics).
 
 **Typed speech** runs in the browser with two engines. **Kokoro** (the default) sounds much more natural and
 takes a few seconds per phrase; **Piper** is almost instant but flatter. Both, and their voices, are served by the
@@ -74,28 +78,29 @@ To test locally: `python -m http.server 8765 --directory docs`, then open http:/
 
 ## Using it
 
-The switch holds **16 messages in 4 groups** (for SPEAK and CHOOSE) and, separately, **4 IR codes** (for IR).
-Each IR code can have its own sound, e.g. IR code 1 "Bubbles" turns the bubble tube on *and* says "Bubbles!".
-Recordings, names and IR codes from older firmware are kept (old messages 1–4 become group 1).
+The switch holds **4 Quick messages** (SPEAK), **4 Topics of 4 messages** (CHOOSE) and **4 IR codes** (IR), each
+up to 5 seconds. Each IR code can have its own sound, e.g. IR code 1 "Bubbles" turns the bubble tube on *and* says
+"Bubbles!".
 
 **Student:** press the big switch. What happens depends on the mode.
 
 | Mode | Big switch does | LED glow |
 |---|---|---|
-| SPEAK | Plays the selected message. See *Play style* for hold-to-play and latch; with Tap, keep holding to move to the next message in its group | message colour: 1 green, 2 blue, 3 purple, 4 orange |
-| CHOOSE | The student **chooses** a message by scanning – see below | colour of the choice on offer |
+| SPEAK | Plays the selected Quick message. See *Play style* for hold-to-play and latch; with Tap, keep holding to move to the next Quick message | message colour: 1 green, 2 blue, 3 purple, 4 orange |
+| CHOOSE | The student **chooses** a message from the Topics by scanning – see below | colour of the choice on offer |
 | KEYBOARD | Holds down the chosen key while pressed | purple |
-| IR | Sends the selected IR code, and says its sound if it has one. With *Hold to play* it keeps sending while held, like holding a remote's volume button. *IR codes: Student scans* lets the student choose the code, as in CHOOSE | code colour |
-| SETTINGS, SETTINGS 2 | Keeps doing whatever the previous mode did | as previous mode |
+| IR | Sends the selected IR code, and says its sound if it has one. *IR codes* setting: Staff pick / Repeat held (keeps sending while held, like a remote's volume button) / Student scans (the student chooses, as in CHOOSE) | code colour |
+| SETTINGS | Keeps doing whatever the previous mode did | as previous mode |
 
-**Staff (StickS3 buttons):**
+### Staff buttons – one rule everywhere
 
-| Button | SPEAK | CHOOSE | KEYBOARD | IR | SETTINGS pages |
-|---|---|---|---|---|---|
-| A click | next mode | next mode | next mode | next mode | next page / leave |
-| A hold | record the selected message (release to stop) | – | – | learn the selected code (remote 30cm+ from the end of the stick, within 8s) | next setting |
-| B click | next message in the group | next group (plays its name) | next key | next code | change the value |
-| B hold | next group | – | – | – | – |
+The bottom line of the screen always shows what the buttons do right now.
+
+| Button | Does |
+|---|---|
+| **A click** | Next mode (SPEAK → CHOOSE → KEYBOARD → IR → SETTINGS). In a mode's settings: close them |
+| **B click** | Next: Quick message / topic / key / IR code, then the mode's **Settings** item, then back to the first. In settings: the next setting |
+| **Hold A** | Do it: SPEAK – record the selected Quick message (release to stop); IR – learn the selected code (remote 30cm+ from the end of the stick, within 8s); on **Settings** – open them; in settings – change the value |
 
 When the screen is dim or off, the first press of A or B only wakes it.
 
@@ -104,64 +109,59 @@ When the screen is dim or off, the first press of A or B only wakes it.
 The switch offers the choices one at a time – each with its LED colour, its name on screen and a short **spoken
 prompt** played quietly ("Toast"… "Crisps"… "Yoghurt") – and the student picks one, which then plays in full.
 
-- **Groups chosen by: Staff** – it offers the messages in the group staff selected (B on the switch, or *Use in
+- **Topics chosen by: Staff** – it offers the messages in the topic staff selected (B on the switch, or *Use in
   CHOOSE* on the setup page), e.g. "Snack time". A good place to start.
-- **Groups chosen by: Student** – it offers the **groups** first ("Food"… "Activities"…), then the chosen group's
-  messages and **"Back"** (to return to the groups).
+- **Topics chosen by: Student** – it offers the **topics** first ("Snack time"… "Music"…), then the chosen topic's
+  messages and **"Back"** (to return to the topics).
 - **Choosing: Press twice** – a press starts the offers, the next press chooses. With no choice it stops after the
   set number of *Scan rounds*.
 - **Choosing: Hold & release** – hold the switch to step through the offers, let go to choose. After choosing a
-  group, hold again for its messages.
+  topic, hold again for its messages.
 
-Only groups and messages that are set up are offered, so two messages make a simple two-way choice. Prompts are
+Only topics and messages that are set up are offered, so two messages make a simple two-way choice. Prompts are
 made by the setup page from the **names**; anything without a name gets a soft beep.
 
 ### Settings
 
-Click A until the screen says **SETTINGS** (everyday) or **SETTINGS 2** (set once per student). **B click**
-changes the value, **hold A** goes to the next setting, **A click** moves on. Changes are saved straight away. It
-goes back to the previous mode after 30s untouched. All of these are on the setup page's Settings tab too.
+Each mode has its own settings – press B until the screen shows **Settings**, then hold A to open them – and the
+**SETTINGS** mode holds the general ones. In any settings: **B** = next setting, **hold A** = change the value,
+**A** = close (or next mode). Changes are saved straight away; settings close by themselves after 30s untouched.
+All of these are on the setup page's Settings tab too.
 
-**SETTINGS**
-
-| Setting | Choices (default **bold**) | What it does |
-|---|---|---|
-| Volume | 1, 2, **3**, 4 | How loud messages play |
-| Play style | **Tap**, Hold to play, Latch | SPEAK. *Tap*: a press plays the whole message. *Hold to play*: plays (looping) only while the switch is held – classic cause and effect. *Latch*: one press starts it looping, the next press stops it |
-| Groups chosen by | **Staff**, Student | CHOOSE – see above |
-| Choosing | **Press twice**, Hold & release | CHOOSE and IR scanning – see above |
-| Scan speed | 1.5s, 2s, **3s**, 4s, 5s | How long each choice is offered |
-| Scan rounds | 1, **2**, 3 | Press twice: how many times round before it stops by itself |
-| IR codes | **Staff pick**, Student scans | IR: send the selected code, or let the student choose |
-| Hold for next msg | Off, 1s, **1.5s**, 2s, 3s | SPEAK, Tap: how long the student holds the switch to move to the next message in its group. Turn off for students who can't let go quickly |
-
-**SETTINGS 2**
-
-| Setting | Choices (default **bold**) | What it does |
-|---|---|---|
-| Press must last | **Instant**, 0.1s, 0.25s, 0.5s, 1s | Filters accidental brushes |
-| Ignore repeats for | Off, 0.2s, **0.4s**, 0.8s, 1.5s | Filters tremor and bounces after a press |
-| Switch wakes screen | **No**, Yes | Whether student presses light up the screen |
-| Sleep after | Off, 2 min, **5 min**, 15 min | On battery, with no presses: sleep to save power. The big switch still works (see below) |
-| Auto power off | **Never**, 30 min, 60 min, 2 hours | On battery, with no presses: turn off completely, e.g. at the end of the day |
-| Recording boost | Off, Low, **Medium**, High | Makes recordings made on the switch louder, at the cost of some harshness |
-| Key action | **Momentary**, Latch | KEYBOARD: *Momentary* holds the key while the switch is held; *Latch* – one press holds the key down, the next lets it go. The screen says "Key held" and the LED glows brighter while latched |
-| Press sound | **Off**, Click, Beep | KEYBOARD mode, and IR codes with no sound of their own: a sound on each press, as feedback |
-| Forget BT devices | B, then B again to confirm | Clears every paired computer/tablet. Also remove the switch in that device's Bluetooth settings |
+| Where | Setting | Choices (default **bold**) | What it does |
+|---|---|---|---|
+| General | Volume | 1, 2, **3**, 4 | How loud messages play |
+| General | Press must last | **Instant**, 0.1s, 0.25s, 0.5s, 1s | Filters accidental brushes |
+| General | Ignore repeats for | Off, 0.2s, **0.4s**, 0.8s, 1.5s | Filters tremor and bounces after a press |
+| General | Switch wakes screen | **No**, Yes | Whether student presses light up the screen |
+| General | Sleep after | Off, 2 min, **5 min**, 15 min | On battery, with no presses: sleep to save power. The big switch still works (see below) |
+| General | Auto power off | **Never**, 30 min, 60 min, 2 hours | On battery, with no presses: turn off completely, e.g. at the end of the day |
+| General | Recording boost | Off, Low, **Medium**, High | Makes recordings made on the switch louder, at the cost of some harshness |
+| General | Forget BT devices | hold A, then again to confirm | Clears every paired computer/tablet. Also remove the switch in that device's Bluetooth settings |
+| SPEAK | Play style | **Tap**, Hold to play, Latch | *Tap*: a press plays the whole message. *Hold to play*: plays (looping) only while the switch is held – classic cause and effect. *Latch*: one press starts it looping, the next press stops it |
+| SPEAK | Hold for next msg | Off, 1s, **1.5s**, 2s, 3s | With Tap: how long the student holds the switch to move to the next Quick message. Turn off for students who can't let go quickly |
+| CHOOSE | Topics chosen by | **Staff**, Student | See above |
+| CHOOSE, IR | Choosing | **Press twice**, Hold & release | See above |
+| CHOOSE, IR | Scan speed | 1.5s, 2s, **3s**, 4s, 5s | How long each choice is offered |
+| CHOOSE, IR | Scan rounds | 1, **2**, 3 | Press twice: how many times round before it stops by itself |
+| KEYBOARD | Key action | **Momentary**, Latch | *Momentary* holds the key while the switch is held; *Latch* – one press holds the key down, the next lets it go. The screen says "Key held" and the LED glows brighter while latched |
+| KEYBOARD, IR | Press sound | **Off**, Click, Beep | A sound on each press, as feedback (IR: only for codes with no sound of their own) |
+| IR | IR codes | **Staff pick**, Repeat held, Student scans | See the IR mode above |
 
 ### The screen
 
-- **Top bar:** the mode, in its colour, and the battery (% and icon; green bolt = charging, red = low).
-- **Middle:** what the switch will do – the message and its group, the group CHOOSE will offer (or the choice on
-  offer while scanning), the key and whether it's sending by USB or Bluetooth, or the IR code.
-- **Bottom:** volume bars, USB/BT connection (green = connected) and the press counter.
+- **Top bar:** the mode, in its colour; on the right, the volume (4 bars) and the battery (% and icon; green bolt =
+  charging, red = low).
+- **Middle:** what the switch will do – the Quick message, the topic CHOOSE will offer (or the choice on offer while
+  scanning), the key and whether it's sending by USB or Bluetooth, or the IR code.
+- **Bottom:** what the buttons do right now.
 - A white frame appears while the big switch is held down.
 
 Recordings are trimmed and boosted automatically, stored in flash, and survive power-off.
 
-**To delete a message:** select it (B in SPEAK), then hold A for a couple of seconds *without speaking* and let
-go. The screen says "Nothing heard – cleared". Or use Delete on the setup page.
-Mode, selected message, group and IR code, key and settings are remembered too.
+**To delete a Quick message:** select it (B in SPEAK), then hold A for a couple of seconds *without speaking* and
+let go. The screen says "Nothing heard – cleared". Or use Delete on the setup page (topic messages are made there).
+Mode, selected Quick message, topic and IR code, key and settings are remembered too.
 
 **Recording tips:** speak 10–15cm from the stick in a normal voice. The recording is cleaned up automatically:
 silence trimmed, hiss between words turned down, level evened out.

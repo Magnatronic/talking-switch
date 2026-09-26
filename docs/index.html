@@ -134,16 +134,22 @@ ol { padding-left: 1.2em; margin: 8px 0 0; }
     </section>
 
     <nav class="tabs" role="tablist">
-      <button role="tab" data-tab="messages">Messages</button>
+      <button role="tab" data-tab="quick">Quick</button>
+      <button role="tab" data-tab="topics">Topics</button>
       <button role="tab" data-tab="ir">IR remote</button>
       <button role="tab" data-tab="keyboard">Keyboard</button>
       <button role="tab" data-tab="settings">Settings</button>
     </nav>
 
-    <section id="tab-messages" class="card" role="tabpanel">
-      <p class="muted small" style="margin-top:0">16 messages in 4 groups. <b>SPEAK</b> plays the <b>selected</b> message;
-        <b>CHOOSE</b> lets the student pick one by scanning. Click <b>Change</b> to record, type or upload a message.
-        Names are spoken as the prompts when scanning.</p>
+    <section id="tab-quick" class="card" role="tabpanel">
+      <p class="muted small" style="margin-top:0">4 quick messages for <b>SPEAK</b> mode: the switch plays the
+        <b>selected</b> one. Click <b>Change</b> to record, type or upload a message.</p>
+      <div id="quickList" class="slots"></div>
+    </section>
+
+    <section id="tab-topics" class="card" role="tabpanel">
+      <p class="muted small" style="margin-top:0">4 topics of up to 4 messages for <b>CHOOSE</b> mode, where the student
+        picks a message by scanning. Name each topic and message – the names are spoken as the prompts.</p>
       <div id="msgScan" class="preview hidden" style="margin-bottom:10px"></div>
       <div id="msgList" class="slots"></div>
     </section>
@@ -217,8 +223,8 @@ let ttsBusy = false;
 let typed = '';           // words typed in the editor
 
 const MODE_HELP = {
-  'SPEAK': 'Plays the selected message (Messages tab) each time the switch is pressed.',
-  'CHOOSE': 'The student chooses a message by scanning – see “Groups chosen by” and “Choosing” on the Settings tab.',
+  'SPEAK': 'Plays the selected Quick message each time the switch is pressed.',
+  'CHOOSE': 'The student chooses a message from the Topics by scanning – see the CHOOSE settings.',
   'KEYBOARD': 'Acts as a keyboard key (set it on the Keyboard tab).',
   'IR': 'Sends the selected remote-control code, and says its sound if it has one (IR remote tab).',
 };
@@ -427,18 +433,24 @@ function segment(box, labels, current, onPick) {
 }
 
 // Numbers shared with the switch.
-//   Sounds: 0-15 messages (group g, item k = g*4+k), 16-19 IR codes' sounds,
-//           20-35 message prompts, 36-39 group prompts, 40-43 IR prompts, 44 "Back".
-//   Names:  0-15 messages, 16-19 IR codes, 20-23 groups (and BACK below for its prompt).
-const PER = 4, IRS = 16, GROUPN = 20, BACK = 44;
-function promptOf(n) {
+//   Sounds: 0-3 Quick, 4-19 topic messages (topic t, item k = 4 + t*4 + k), 20-23 IR codes' sounds,
+//           24-39 topic message prompts, 40-43 topic prompts, 44-47 IR prompts, 48 "Back".
+//   Names:  0-3 Quick, 4-19 topic messages, 20-23 IR codes, 24-27 topics (BACK only has a prompt).
+const PER = 4, TOPIC0 = 4, IRS = 20, TOPICN = 24, BACK = 48;
+function topicMsg(t, k) { return TOPIC0 + t * PER + k; }
+function promptOf(n) {  // -1: Quick messages have no prompt (they're never scanned)
   if (n === BACK) return BACK;
-  return n < IRS ? 20 + n : n < GROUPN ? 40 + (n - IRS) : 36 + (n - GROUPN);
+  if (n < TOPIC0) return -1;
+  return n < IRS ? 24 + (n - TOPIC0) : n < TOPICN ? 44 + (n - IRS) : 40 + (n - TOPICN);
 }
-function soundInfo(n) { return n < IRS ? info.slots[n] : n < GROUPN ? info.irs[n - IRS] : info.groups[n - GROUPN]; }
+function soundInfo(n) {
+  if (n < TOPIC0) return info.quick[n];
+  if (n < IRS) return info.topics[Math.floor((n - TOPIC0) / PER)].msgs[(n - TOPIC0) % PER];
+  return n < TOPICN ? info.irs[n - IRS] : info.topics[n - TOPICN];
+}
 function setCur(key) { const st = info.settings.find((x) => x.key === key); return st ? st.cur : 0; }
 function chooseMode() { return info.modes[info.mode] === 'CHOOSE'; }
-function irScanning() { return setCur('s_irchoose') === 1; }
+function irScanning() { return setCur('s_irmode') === 2; }
 function secs(n) { return (n / info.rate).toFixed(1) + ' s'; }
 
 // ---------------------------------------------------------------- render
@@ -456,7 +468,8 @@ function render() {
   });
   $('modeHelp').textContent = MODE_HELP[info.modes[info.mode]] || '';
   segment($('keys'), info.keys, info.key, (i) => act(() => cmd(`KEY ${i}`)));
-  renderMessages();
+  renderQuick();
+  renderTopics();
   renderIr();
   renderScanNotes();
   renderSettings();
@@ -469,53 +482,58 @@ function selectRadio(i, group, current, command, on = 'Selected', off = 'Select'
     i === current ? on : off);
 }
 
-// ---------------------------------------------------------------- messages tab
-const openGroups = new Set();  // group sections shown open on the Messages tab
+// ---------------------------------------------------------------- quick and topics tabs
+function renderQuick() {
+  $('quickList').replaceChildren(...info.quick.map((m, i) => messageRow(i, m, true)));
+}
 
-function renderMessages() {
-  if (!renderMessages.started) { openGroups.add(Math.floor(info.slot / PER)); renderMessages.started = true; }
-  if (editing !== null && editing < IRS) openGroups.add(Math.floor(editing / PER));
-  const staffGroups = setCur('s_groups') === 0;
-  $('msgList').replaceChildren(...info.groups.map((g, gi) => {
-    const open = openGroups.has(gi);
-    const msgs = info.slots.slice(gi * PER, gi * PER + PER);
-    const count = msgs.filter((m) => m.len).length;
+const openTopics = new Set();  // topic sections shown open
+
+function renderTopics() {
+  if (!renderTopics.started) { openTopics.add(info.topic); renderTopics.started = true; }
+  if (editing !== null && editing >= TOPIC0 && editing < IRS) openTopics.add(Math.floor((editing - TOPIC0) / PER));
+  const staffTopics = setCur('s_groups') === 0;
+  $('msgList').replaceChildren(...info.topics.map((tp, t) => {
+    const open = openTopics.has(t);
+    const count = tp.msgs.filter((m) => m.len).length;
     const name = el('input', {
-      type: 'text', class: 'name', maxLength: 24, value: g.name, placeholder: `Name, e.g. "Food"`,
-      'aria-label': `Name for group ${gi + 1}`, onchange: () => renameItem(GROUPN + gi, name.value),
+      type: 'text', class: 'name', maxLength: 24, value: tp.name, placeholder: `Name, e.g. "Snack time"`,
+      'aria-label': `Name for topic ${t + 1}`, onchange: () => renameItem(TOPICN + t, name.value),
     });
-    return el('div', { class: 'group-box' + (chooseMode() && staffGroups && gi === info.group ? ' selected' : '') },
+    return el('div', { class: 'group-box' + (staffTopics && t === info.topic ? ' selected' : '') },
       el('div', { class: 'slot-main' },
         el('button', { class: 'link', 'aria-expanded': String(open),
-          onclick: () => { if (open) openGroups.delete(gi); else openGroups.add(gi); render(); } },
-          (open ? '▾' : '▸') + ` Group ${gi + 1}`),
+          onclick: () => { if (open) openTopics.delete(t); else openTopics.add(t); render(); } },
+          (open ? '▾' : '▸') + ` Topic ${t + 1}`),
         name,
         el('span', { class: 'status' + (count ? ' has' : '') }, `${count} of ${PER}`),
-        chooseMode() ? promptBadge(g) : null,
-        staffGroups ? selectRadio(gi, 'grpSel', info.group, 'GROUP', 'Used in CHOOSE', 'Use in CHOOSE') : null),
-      open ? el('div', { class: 'slots', style: 'margin-top:8px' }, ...msgs.map((m, k) => messageRow(gi * PER + k, m))) : null);
+        promptBadge(tp),
+        staffTopics ? selectRadio(t, 'topicSel', info.topic, 'TOPIC', 'Used in CHOOSE', 'Use in CHOOSE') : null),
+      open ? el('div', { class: 'slots', style: 'margin-top:8px' }, ...tp.msgs.map((m, k) => messageRow(topicMsg(t, k), m, false))) : null);
   }));
 }
 
-function messageRow(i, s) {
+// One message row. Quick messages can be selected for SPEAK; topic messages
+// show whether they have a spoken prompt.
+function messageRow(i, s, quick) {
   const name = el('input', {
     type: 'text', class: 'name', maxLength: 24, value: s.name, placeholder: `Name, e.g. "Drink"`,
-    'aria-label': `Name for message ${i % PER + 1} in group ${Math.floor(i / PER) + 1}`,
+    'aria-label': `Name for message ${(quick ? i : (i - TOPIC0) % PER) + 1}`,
     onchange: () => renameItem(i, name.value),
   });
   const open = editing === i;
-  return el('div', { class: 'slot' + (i === info.slot ? ' selected' : '') },
+  return el('div', { class: 'slot' + (quick && i === info.slot ? ' selected' : '') },
     el('div', { class: 'slot-main' },
-      el('span', { class: 'num' }, String(i % PER + 1)),
+      el('span', { class: 'num' }, String((quick ? i : (i - TOPIC0) % PER) + 1)),
       name,
       el('span', { class: 'status' + (s.len ? ' has' : '') }, s.len ? secs(s.len) : 'No message'),
-      chooseMode() ? promptBadge(s) : null,
+      quick ? null : promptBadge(s),
       el('button', { disabled: !s.len, onclick: () => act(() => cmd(`PLAY ${i}`)), title: 'Play it on the switch' }, '▶ Play'),
       el('button', { class: open ? 'on' : '', onclick: () => toggleEditor(i) }, open ? 'Close' : 'Change'),
       el('button', { class: 'danger', disabled: !s.len, onclick: () => {
         if (confirm(`Delete "${s.name || 'this message'}"?`)) act(() => cmd(`DEL ${i}`), 'Message deleted');
       } }, 'Delete'),
-      selectRadio(i, 'msgSel', info.slot, 'SLOT', 'Selected for SPEAK', 'Select')),
+      quick ? selectRadio(i, 'quickSel', info.slot, 'SLOT') : null),
     open ? renderEditor(i) : null);
 }
 
@@ -601,7 +619,8 @@ async function listenSaved(i) {
 async function saveWav(i) {
   try {
     const pcm = await download(i);
-    const fallback = i < IRS ? `message-${Math.floor(i / PER) + 1}-${i % PER + 1}` : `ir-code-${i - IRS + 1}`;
+    const fallback = i < TOPIC0 ? `quick-${i + 1}` : i < IRS ? `topic-${Math.floor((i - TOPIC0) / PER) + 1}-${(i - TOPIC0) % PER + 1}`
+      : `ir-code-${i - IRS + 1}`;
     const name = (soundInfo(i).name || fallback).replace(/[^\w\- ]+/g, '').trim() || fallback;
     const a = el('a', { href: URL.createObjectURL(wavBlob(pcm, info.rate)), download: name + '.wav' });
     a.click();
@@ -621,6 +640,7 @@ function promptBadge(item) {
 
 async function renameItem(n, value) {
   await act(() => cmd(`NAME ${n} ${value.replace(/[\r\n]/g, ' ')}`), 'Name saved');
+  if (promptOf(n) < 0) return;                                     // Quick messages: no prompt
   if (!value.trim()) await act(() => cmd(`DEL ${promptOf(n)}`));  // no name: no prompt
   else makePrompt(n);
 }
@@ -651,8 +671,8 @@ function makePrompt(n) {
 // Names that should have a prompt: [name number, has one already]
 function promptItems() {
   const list = [
-    ...info.slots.map((x, i) => [i, x]),
-    ...info.groups.map((x, g) => [GROUPN + g, x]),
+    ...info.topics.flatMap((tp, t) => tp.msgs.map((x, k) => [topicMsg(t, k), x])),
+    ...info.topics.map((x, t) => [TOPICN + t, x]),
     ...info.irs.map((x, i) => [IRS + i, x]),
   ].filter(([, x]) => x.name).map(([n, x]) => [n, x.pr]);
   if (setCur('s_groups') === 1) list.push([BACK, info.back.pr]);
@@ -680,8 +700,8 @@ function renderScanNotes() {
       missing ? el('button', { onclick: () => makeMissingPrompts() }, `Make ${missing} missing prompt${missing > 1 ? 's' : ''}`) : null,
     ].filter(Boolean));
   };
-  note('msgScan', chooseMode(), 'CHOOSE mode: each group’s and message’s name is spoken quietly as it’s offered.',
-    [...info.groups, ...info.slots]);
+  note('msgScan', true, 'When scanning, each topic’s and message’s name is spoken quietly as it’s offered.',
+    [...info.topics, ...info.topics.flatMap((tp) => tp.msgs)]);
   note('irScan', irScanning(), 'Students choose IR codes by scanning: each code’s name is spoken quietly as it’s offered.', info.irs);
 }
 
@@ -728,13 +748,13 @@ function renderIr() {
 // ---------------------------------------------------------------- settings tab
 const HELP = {
   vol: 'How loud messages play. 4 is the loudest the switch can go.',
-  s_play: 'SPEAK mode. Tap: a press plays the whole message. Hold to play: plays only while the switch is held. Latch: one press starts it, the next stops it.',
-  s_groups: 'CHOOSE mode. Staff: the student chooses from the group you select (Messages tab, or B on the switch). Student: the switch offers the groups first, then that group’s messages and “Back”.',
-  s_access: 'CHOOSE and IR scanning. Press twice: a press starts the offers, the next press chooses. Hold & release: hold to step through them, let go to choose.',
+  s_play: 'Tap: a press plays the whole message. Hold to play: plays only while the switch is held. Latch: one press starts it, the next stops it.',
+  s_groups: 'Staff: the student chooses from the topic you select (Topics tab, or B on the switch). Student: the switch offers the topics first, then that topic’s messages and “Back”.',
+  s_access: 'Press twice: a press starts the offers, the next press chooses. Hold & release: hold to step through them, let go to choose.',
   s_scanspd: 'How long each choice is offered before moving on. Go at the student’s pace.',
-  s_scanrnd: 'Press twice: how many times round the choices before it stops by itself.',
-  s_irchoose: 'IR mode. Staff pick: the switch sends the selected code. Student scans: the student chooses the code, as in CHOOSE.',
-  s_hold: 'SPEAK, Tap: holding the switch this long moves to the next message in its group. Turn off for students who can’t let go quickly.',
+  s_scanrnd: 'With Press twice: how many times round the choices before it stops by itself.',
+  s_irmode: 'Staff pick: the switch sends the selected code. Repeat held: it keeps sending while the switch is held, like holding a remote’s volume button. Student scans: the student chooses the code, as in CHOOSE.',
+  s_hold: 'With Tap, holding the switch this long moves to the next Quick message. Turn off for students who can’t let go quickly.',
   s_accept: 'A press must last this long to count – filters accidental brushes.',
   s_lockout: 'Presses this soon after the last one are ignored – filters tremor and bounces.',
   s_keyact: 'KEYBOARD mode. Latch: one press holds the key down, the next lets it go.',
@@ -745,19 +765,20 @@ const HELP = {
   s_autooff: 'On battery, turns off completely after this long without presses.',
 };
 
+const SECTIONS = [['General', 1], ['SPEAK', 2], ['CHOOSE', 4], ['KEYBOARD', 8], ['IR', 16]];
+
 function renderSettings() {
-  const pages = [['Everyday', 0], ['Set once per student', 1]];
-  $('settingGroups').replaceChildren(renderVoiceSetting(), ...pages.map(([title, page]) => {
-    const list = info.settings.filter((st) => (st.page || 0) === page);
+  $('settingGroups').replaceChildren(renderVoiceSetting(), ...SECTIONS.map(([title, bit]) => {
+    const list = info.settings.filter((st) => st.groups & bit);
     if (!list.length) return null;
     return el('div', { class: 'group' }, el('h2', {}, title), ...list.map((st) => {
-      const k = st.key;
-      const sel = el('select', { id: 'set-' + k, onchange: async () => {
+      const k = st.key, id = `set-${bit}-${k}`;
+      const sel = el('select', { id, onchange: async () => {
         await act(() => cmd(`SET ${k} ${sel.value}`), 'Saved');
-        makeMissingPrompts();  // e.g. students choosing groups need a "Back" prompt
+        makeMissingPrompts();  // e.g. students choosing topics need a "Back" prompt
       } },
         ...st.choices.map((c, i) => el('option', { value: i, selected: i === st.cur }, c)));
-      return el('div', { class: 'setting' }, el('label', { for: 'set-' + k }, st.name), sel,
+      return el('div', { class: 'setting' }, el('label', { for: id }, st.name), sel,
         HELP[k] ? el('div', { class: 'help' }, HELP[k]) : null);
     }));
   }).filter(Boolean));
@@ -1070,11 +1091,13 @@ $('ckDel').addEventListener('click', () => act(() => cmd('CKEY 0 0'), 'Custom ke
 // ---------------------------------------------------------------- tabs
 function showTab(name) {
   for (const b of document.querySelectorAll('.tabs button')) b.setAttribute('aria-selected', String(b.dataset.tab === name));
-  for (const t of ['messages', 'ir', 'keyboard', 'settings']) $('tab-' + t).classList.toggle('hidden', t !== name);
+  if (!['quick', 'topics', 'ir', 'keyboard', 'settings'].includes(name)) name = 'quick';
+  for (const b of document.querySelectorAll('.tabs button')) b.setAttribute('aria-selected', String(b.dataset.tab === name));
+  for (const t of ['quick', 'topics', 'ir', 'keyboard', 'settings']) $('tab-' + t).classList.toggle('hidden', t !== name);
   store('tab', name);
 }
 for (const b of document.querySelectorAll('.tabs button')) b.addEventListener('click', () => showTab(b.dataset.tab));
-showTab(store('tab') || 'messages');
+showTab(store('tab') || 'quick');
 
 // ---------------------------------------------------------------- wiring
 $('forgetBtn').addEventListener('click', () => {
