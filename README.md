@@ -42,13 +42,15 @@ click **Connect** and pick the switch. The switch is set up over the USB cable �
 typed words stay on the computer.
 
 - **Messages tab:** 4 messages. For each: a name, ▶ Play, **Change** (record with the computer's microphone or a
-  headset, **type the words** and pick a voice – natural: Emma, Isabella, George, Fable; quick: Cori, Alba, Southern
-  English female, Northern English male – or
+  headset, **type the words** (spoken in the switch's voice – see Settings), or
   upload an audio file; then listen and save) and Delete. Silence is trimmed and the level evened out.
 - **IR remote tab:** 4 remote-control codes, separate from the messages. For each: a name, **Learn / Test / Delete**,
   and an optional **sound** (made the same three ways) that the switch says as it sends the code.
 - **Keyboard tab:** the key, including a **custom key or shortcut** such as Win+H (dictation).
-- **Settings tab:** everything from the SETTINGS menu, with explanations; Bluetooth name and *Forget all paired devices*.
+- **Settings tab:** the switch's **voice** and speed for typed messages and scanning prompts (natural: Emma, Isabella,
+  George, Fable; quick: Cori, Alba, Southern English female, Northern English male – stored on the switch, so every
+  computer uses the same one; changing it remakes the prompts), everything from the SETTINGS menu with explanations,
+  and the Bluetooth name and *Forget all paired devices*.
 - **Mode and volume** are at the top of the page.
 
 **Typed speech** runs in the browser with two engines. **Kokoro** (the default) sounds much more natural and

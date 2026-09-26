@@ -81,7 +81,7 @@ button.link { background: none; border: none; color: var(--accent); padding: 4px
 
 /* settings */
 .group { margin-bottom: 18px; }
-.setting { display: grid; grid-template-columns: minmax(160px, 1fr) minmax(140px, 200px); gap: 4px 12px; align-items: center; padding: 8px 0; border-top: 1px solid var(--line); }
+.setting { display: grid; grid-template-columns: minmax(160px, 1fr) minmax(140px, 260px); gap: 4px 12px; align-items: center; padding: 8px 0; border-top: 1px solid var(--line); }
 .setting .help { grid-column: 1 / -1; font-size: .85rem; color: var(--muted); }
 @media (max-width: 520px) { .setting { grid-template-columns: 1fr; } }
 
@@ -507,21 +507,14 @@ function renderEditor(i) {
   } else if (editHow === 'type') {
     const text = el('textarea', { placeholder: 'Type the words to say…', value: typed, maxLength: 200,
       'aria-label': 'Words to say', oninput: () => (typed = text.value) });
-    const group = (engine, label) => el('optgroup', { label },
-      ...VOICES.filter((v) => v.engine === engine).map((v) => el('option', { value: v.id, selected: v.id === savedVoice() }, v.name)));
-    const voice = el('select', { 'aria-label': 'Voice', onchange: () => store('voice', voice.value) },
-      group('kokoro', 'Natural – takes a few seconds'), group('piper', 'Quick – less natural'));
-    const speed = el('select', { 'aria-label': 'Speed', onchange: () => store('speed', speed.value) },
-      ...[['0.8', 'Slow'], ['0.9', 'A bit slow'], ['1', 'Normal'], ['1.15', 'Fast']]
-        .map(([v, n]) => el('option', { value: v, selected: v === (store('speed') || '1') }, n)));
     if (!ttsAvailable()) {
       body.push(el('p', { class: 'small muted' }, 'Typed speech works when this page is opened from its web address, not as a file.'));
     } else {
       body.push(text, el('div', { class: 'row' },
-        el('label', { class: 'small' }, 'Voice ', voice),
-        el('label', { class: 'small' }, 'Speed ', speed),
-        el('button', { class: 'primary', disabled: ttsBusy, onclick: () => makeSpeech(i, text.value, voice.value, +speed.value) },
-          ttsBusy ? 'Making…' : 'Make speech')),
+        el('button', { class: 'primary', disabled: ttsBusy, onclick: () => makeSpeech(i, text.value, savedVoice(), +savedSpeed()) },
+          ttsBusy ? 'Making…' : 'Make speech'),
+        el('span', { class: 'small muted' }, `Voice: ${voiceLabel()} – change it on the `),
+        el('button', { class: 'link small', onclick: () => showTab('settings') }, 'Settings tab')),
       el('div', { id: 'ttsProgress', class: 'hidden' },
         el('span', { id: 'ttsProgressText', class: 'small muted' }),
         el('div', { class: 'progress' }, el('div', { id: 'ttsProgressBar' }))),
@@ -610,7 +603,7 @@ function makePrompt(snd) {
     try {
       const v = VOICES.find((x) => x.id === savedVoice());
       engineMods[v.engine] ||= await import(ENGINES[v.engine]);
-      const { samples, sampleRate } = await engineMods[v.engine].synthesize(name, v.id, 1, showTtsProgress);
+      const { samples, sampleRate } = await engineMods[v.engine].synthesize(name, v.id, +savedSpeed(), showTtsProgress);
       const audio = new AudioBuffer({ length: samples.length, sampleRate, numberOfChannels: 1 });
       audio.copyToChannel(samples, 0);
       const { pcm } = await toSwitchFormat(audio, 3);
@@ -713,7 +706,7 @@ function renderSettings() {
   const groups = GROUPS.map(([title, keys]) => [title, keys.filter((k) => byKey[k] && used.add(k))]);
   const rest = info.settings.map((s) => s.key).filter((k) => !used.has(k));
   if (rest.length) groups.push(['Other', rest]);
-  $('settingGroups').replaceChildren(...groups.filter(([, keys]) => keys.length).map(([title, keys]) =>
+  $('settingGroups').replaceChildren(renderVoiceSetting(), ...groups.filter(([, keys]) => keys.length).map(([title, keys]) =>
     el('div', { class: 'group' }, el('h2', {}, title), ...keys.map((k) => {
       const st = byKey[k];
       const sel = el('select', { id: 'set-' + k, onchange: async () => {
@@ -891,9 +884,69 @@ const VOICES = [
 ];
 const ENGINES = { kokoro: './tts/kokoro.js', piper: './tts/tts.js' };
 const engineMods = {};
+// One voice (and speed) per switch, stored on the switch so every computer
+// uses the same one for typed messages and scanning prompts.
+const SPEEDS = [['0.8', 'Slow'], ['0.9', 'A bit slow'], ['1', 'Normal'], ['1.15', 'Fast']];
 function savedVoice() {
-  const v = store('voice');
+  const v = info && info.voice;
   return VOICES.some((x) => x.id === v) ? v : VOICES[0].id;
+}
+function savedSpeed() {
+  const v = info && info.vspeed;
+  return SPEEDS.some(([x]) => x === v) ? v : '1';
+}
+function voiceLabel() {
+  const v = VOICES.find((x) => x.id === savedVoice());
+  const sp = SPEEDS.find(([x]) => x === savedSpeed())[1].toLowerCase();
+  return `${v.name.split(' – ')[0]}, ${sp} speed`;
+}
+
+async function setVoice(id, speed) {
+  await act(() => cmd(`VOICE ${id} ${speed}`), 'Voice saved');
+  remakeAllPrompts();
+}
+
+// After a voice change: every named message / IR code gets a new prompt.
+async function remakeAllPrompts() {
+  if (!info || !ttsAvailable()) return;
+  const todo = [...info.slots.map((x, i) => [x, i]), ...info.irs.map((x, i) => [x, IRS + i])]
+    .filter(([x]) => x.name).map(([, snd]) => snd);
+  if (!todo.length) return;
+  toast(`Remaking ${todo.length} scanning prompt${todo.length > 1 ? 's' : ''} in the new voice…`);
+  for (const snd of todo) await makePrompt(snd);
+  toast('Prompts updated');
+}
+
+function renderVoiceSetting() {
+  const group = (engine, label) => el('optgroup', { label },
+    ...VOICES.filter((v) => v.engine === engine).map((v) => el('option', { value: v.id, selected: v.id === savedVoice() }, v.name)));
+  const voice = el('select', { id: 'set-voice', onchange: () => setVoice(voice.value, speed.value) },
+    group('kokoro', 'Natural – takes a few seconds'), group('piper', 'Quick – less natural'));
+  const speed = el('select', { id: 'set-vspeed', onchange: () => setVoice(voice.value, speed.value) },
+    ...SPEEDS.map(([v, n]) => el('option', { value: v, selected: v === savedSpeed() }, n)));
+  const listen = el('button', { disabled: !ttsAvailable(), onclick: () => previewVoice() }, '▶ Hear it');
+  return el('div', { class: 'group' }, el('h2', {}, 'Speech'),
+    el('div', { class: 'setting' }, el('label', { for: 'set-voice' }, 'Voice'), voice,
+      el('div', { class: 'help' }, 'Used for all typed messages and scanning prompts on this switch. Changing it remakes the prompts; typed messages keep their voice until you type them again.')),
+    el('div', { class: 'setting' }, el('label', { for: 'set-vspeed' }, 'Speed'), speed),
+    el('div', { class: 'row', style: 'padding-top:4px' }, listen,
+      ttsAvailable() ? null : el('span', { class: 'small muted' }, 'Typed speech works when this page is opened from its web address.')));
+}
+
+async function previewVoice() {
+  try {
+    const v = VOICES.find((x) => x.id === savedVoice());
+    engineMods[v.engine] ||= await import(ENGINES[v.engine]);
+    toast('Making a sample…');
+    const { samples, sampleRate } = await engineMods[v.engine].synthesize('Hello, this is how I sound.', v.id, +savedSpeed(), showTtsProgress);
+    const ctx = audioCtx();
+    const b = ctx.createBuffer(1, samples.length, sampleRate);
+    b.copyToChannel(samples, 0);
+    const src = ctx.createBufferSource();
+    src.buffer = b;
+    src.connect(ctx.destination);
+    src.start();
+  } catch (e) { toast(e.message || "Couldn't make the sample", true); }
 }
 function ttsAvailable() { return location.protocol !== 'file:'; }
 

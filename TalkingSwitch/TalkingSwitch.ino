@@ -243,6 +243,7 @@ bool     lowBatWarned = false;
 bool     needRedraw = true;
 uint32_t ledFlashUntil = 0;
 String   slotName[NUM_SOUNDS]; // optional names: messages 0-3, IR codes 4-7 (setup page)
+String   voiceId, voiceSpeed;  // typed-speech voice for this switch, chosen on the setup page
 String   statusMsg = "";
 uint16_t statusColor = TFT_YELLOW;
 uint32_t statusUntil = 0;
@@ -301,6 +302,8 @@ void loadSettings() {
   customMods  = prefs.getUChar("ck_mod", 0);
   customUsage = prefs.getUChar("ck_use", 0);
   customName  = prefs.getString("ck_name", "");
+  voiceId     = prefs.getString("voice", "");
+  voiceSpeed  = prefs.getString("vspeed", "");
   keyIdx = prefs.getUChar("key", 0) % keyCount();
   volIdx = prefs.getUChar("vol", 2) % sizeof(VOLUMES);
   for (int i = 0; i < NUM_SOUNDS; i++) slotName[i] = prefs.getString(("name" + String(i)).c_str(), "");
@@ -1335,6 +1338,7 @@ void pollStaffButtons() {
 //    INFO                 -> @INFO {json}
 //    MODE n / SLOT n / IRSLOT n / KEY n / VOL n / SET <key> <choice>
 //    PLAY n / STOP / DEL n / NAME n <text> / FORGET
+//    VOICE <id> <speed>   (the setup page's typed-speech voice for this switch)
 //      (sound numbers n: 0-3 messages, 4-7 the IR codes' sounds and names,
 //       8-11 message prompts, 12-15 IR code prompts - up to 3 s, for scanning)
 //    IRLEARN n (waits up to 8s for a remote) / IRSEND n / IRDEL n  (n 0-3)
@@ -1360,6 +1364,7 @@ void sendInfo() {
   j += ",\"key\":" + String(keyIdx) + ",\"vol\":" + String(volIdx) + ",\"vols\":" + String(sizeof(VOLUMES));
   j += ",\"bat\":" + String(batLevel) + ",\"chg\":" + String(batCharging ? "true" : "false");
   j += ",\"bt\":" + String(bleConnected ? "true" : "false");
+  j += ",\"voice\":" + jsonStr(voiceId) + ",\"vspeed\":" + jsonStr(voiceSpeed);
   j += ",\"modes\":[";
   for (int i = 0; i < M_SETTINGS; i++) j += (i ? "," : "") + jsonStr(MODE_NAMES[i]);
   j += "],\"keys\":[";
@@ -1565,6 +1570,14 @@ void handleCommand(String line) {
   } else if (cmd == "IRDEL") {
     if (!okSlot) return reply("bad slot");
     deleteIr(n);
+    reply();
+  } else if (cmd == "VOICE") {
+    // just remembered for the setup page; the switch itself only plays sounds
+    int sp2 = arg.indexOf(' ');
+    voiceId = (sp2 < 0 ? arg : arg.substring(0, sp2)).substring(0, 48);
+    voiceSpeed = sp2 < 0 ? "" : arg.substring(sp2 + 1).substring(0, 8);
+    prefs.putString("voice", voiceId);
+    prefs.putString("vspeed", voiceSpeed);
     reply();
   } else if (cmd == "FORGET") {
     forgetBluetooth();
