@@ -1,33 +1,31 @@
 // =====================================================================
 //  TalkingSwitch - M5StickS3 + M5Stack Unit Key accessibility switch
 // ---------------------------------------------------------------------
-//  One big switch, five jobs:
+//  One big switch, three jobs:
 //    SPEAK     Plays one recorded message (BIGmack style). Keep holding
 //              the switch to move on to the next message. Play style
 //              setting: Tap / Hold to play / Latch.
-//    STEPS     Plays messages 1..4 in turn (Step-by-Step style)
 //    KEYBOARD  Acts as a USB or Bluetooth keyboard key, e.g. Space/Enter
 //              for Grid 3 or Mind Express switch access. Key goes down on
 //              press and up on release, so dwell and hold-to-scan settings
 //              in the AAC software still work. When a computer is using it
 //              as a USB keyboard, keys go over USB only; otherwise they go
 //              over Bluetooth. (Never both, so no double presses.)
-//    IR        Sends the selected slot's learned infrared code (TV, fibre
-//              optics, bubble tube). Hold to play: repeats while held.
-//    SPEAK+IR  Plays the slot's message and sends its IR code together
+//    IR        Sends the selected learned infrared code (TV, fibre optics,
+//              bubble tube), and plays that code's own sound if it has one
+//              (e.g. "Bubbles!"). Hold to play: repeats the code while held.
 //
-//  Each of the 4 slots can hold a recorded message, a learned IR code, a
-//  name, or any mix. STEPS goes through the slots that have either.
+//  There are 4 messages and, separately, 4 IR codes, each with an
+//  optional name (and each IR code an optional sound).
 //    SETTINGS  Staff settings: B = change, hold A = next setting.
 //              The big switch keeps doing the previous mode's job.
 //
 //  Staff controls on the StickS3 (when the screen is dim or off, the
 //  first press only wakes it):
-//    Button A (KEY1) click ....... next mode, SETTINGS last (STEPS: changing mode
-//                                  restarts at step 1)
-//    Button A (KEY1) hold ........ SPEAK/STEPS/SPEAK+IR: record while held
-//                                  IR: learn a code into the selected slot
-//    Button B (KEY2) click ....... SPEAK/STEPS/IR/SPEAK+IR: choose slot
+//    Button A (KEY1) click ....... next mode, SETTINGS last
+//    Button A (KEY1) hold ........ SPEAK: record a message while held
+//                                  IR: learn the selected code
+//    Button B (KEY2) click ....... SPEAK: choose message   IR: choose code
 //                                  KEYBOARD: choose key
 //    Button B (KEY2) hold ........ volume (4 levels)
 //
@@ -90,7 +88,8 @@ static const uint32_t LONG_REPEAT_MS = 2000; // SPEAK long press: keep moving on
 
 static const uint32_t SAMPLE_RATE = 16000; // recording sample rate (Hz)
 static const uint32_t MAX_SECONDS = 10;    // longest message per slot
-static const int      NUM_SLOTS   = 4;     // message slots
+static const int      NUM_SLOTS   = 4;     // messages, and separately IR codes
+static const int      NUM_SOUNDS  = NUM_SLOTS * 2;  // sounds 0-3: messages, 4-7: the IR codes' sounds
 static const uint8_t  MIC_PGA     = 8;     // mic analogue gain, 3dB steps (0-10). Lower if loud voices distort
 
 static const char*    BLE_NAME      = "Talking Switch"; // Bluetooth name; the last 4 characters of the
@@ -114,19 +113,19 @@ static const int      LOW_BATTERY   = 15;     // warn below this battery %
 // ---------------------------------------------------------------------
 //  Modes and keys
 // ---------------------------------------------------------------------
-enum Mode : uint8_t { M_SPEAK, M_STEPS, M_KEYBOARD, M_IR, M_SPEAK_IR, M_SETTINGS, M_COUNT };
-static const char* MODE_NAMES[M_COUNT] = {"SPEAK", "STEPS", "KEYBOARD", "IR", "SPEAK+IR", "SETTINGS"};
+enum Mode : uint8_t { M_SPEAK, M_KEYBOARD, M_IR, M_SETTINGS, M_COUNT };
+static const char* MODE_NAMES[M_COUNT] = {"SPEAK", "KEYBOARD", "IR", "SETTINGS"};
 // Mode colours for the switch LED (dim idle glow)
 static const uint8_t MODE_RGB[M_COUNT][3] = {
-  {0, 40, 0}, {0, 25, 40}, {30, 0, 40}, {40, 20, 0}, {40, 35, 0}, {0, 0, 0}
+  {0, 40, 0}, {30, 0, 40}, {40, 20, 0}, {0, 0, 0}
 };
-// SPEAK modes: the LED shows which message is selected
+// SPEAK and IR: the LED shows which message / code is selected
 static const uint8_t SLOT_RGB[NUM_SLOTS][3] = {{0, 40, 0}, {0, 25, 40}, {30, 0, 40}, {40, 20, 0}};
 // Mode colours for the screen header, and whether it needs dark text
 static const uint8_t SCREEN_RGB[M_COUNT][3] = {
-  {0, 160, 70}, {0, 110, 220}, {140, 60, 220}, {240, 130, 0}, {230, 190, 0}, {90, 90, 90}
+  {0, 160, 70}, {140, 60, 220}, {240, 130, 0}, {90, 90, 90}
 };
-static const bool HEADER_DARK_TEXT[M_COUNT] = {false, false, false, true, true, false};
+static const bool HEADER_DARK_TEXT[M_COUNT] = {false, false, true, false};
 
 enum KbOut : uint8_t { OUT_NONE, OUT_BLE, OUT_USB };  // where keyboard presses go
 enum PlayStyle : uint8_t { PLAY_TAP, PLAY_HOLD, PLAY_LATCH };
@@ -153,7 +152,7 @@ struct Setting {
   const char* labels[6];
 };
 static const Setting SETTINGS[S_COUNT] = {
-  // SPEAK/STEPS/SPEAK+IR: Tap = a press plays the whole message; Hold to play =
+  // SPEAK: Tap = a press plays the whole message; Hold to play =
   // plays (looping) only while the switch is held; Latch = one press starts it
   // looping, the next stops it
   {"Play style",          "s_play",    3, 0, {0, 1, 2}, {"Tap", "Hold to play", "Latch"}},
@@ -186,7 +185,9 @@ uint32_t setting(SettingId id) { return SETTINGS[id].values[settingChoice[id]]; 
 // ---------------------------------------------------------------------
 Preferences prefs;
 uint8_t mode = M_SPEAK;
-uint8_t slot = 0;        // selected message slot
+uint8_t slot = 0;        // selected message
+uint8_t irSlot = 0;      // selected IR code
+int irSound(int i) { return NUM_SLOTS + i; }  // sound number of IR code i's sound
 uint8_t keyIdx = 0;      // selected keyboard key (NUM_KEYS = the custom key)
 // Custom key/shortcut set from the setup page, e.g. Win+H.
 // Modifier bits: 1 Ctrl, 2 Shift, 4 Alt, 8 Win (HID left-hand modifiers).
@@ -196,15 +197,14 @@ int keyCount() { return NUM_KEYS + (customUsage ? 1 : 0); }
 bool keyIsCustom() { return keyIdx >= NUM_KEYS; }
 String keyName() { return keyIsCustom() ? customName : String(KEYS[keyIdx].name); }
 uint8_t volIdx = 2;      // selected volume
-uint8_t stepIdx = 0;     // next step in STEPS mode
 uint32_t pressCount = 0; // student activations since boot
 KbOut    keyDownOut = OUT_NONE; // where the current key-down went (the key-up goes there too)
 bool     keyLatched = false;    // Latch key action: key is being held down
 bool     playLatched = false;   // Latch play style: message is looping
 
 static const size_t MAX_SAMPLES = SAMPLE_RATE * MAX_SECONDS;
-int16_t* slotBuf[NUM_SLOTS];
-size_t   slotLen[NUM_SLOTS];
+int16_t* slotBuf[NUM_SOUNDS];  // sounds: messages then IR-code sounds
+size_t   slotLen[NUM_SOUNDS];
 
 static const size_t IR_MAX = 192;
 rmt_data_t irCode[NUM_SLOTS][IR_MAX];  // one learned IR code per slot
@@ -227,7 +227,7 @@ bool     lowBatWarned = false;
 
 bool     needRedraw = true;
 uint32_t ledFlashUntil = 0;
-String   slotName[NUM_SLOTS];  // optional message names, set from the setup page
+String   slotName[NUM_SOUNDS]; // optional names: messages 0-3, IR codes 4-7 (setup page)
 String   statusMsg = "";
 uint16_t statusColor = TFT_YELLOW;
 uint32_t statusUntil = 0;
@@ -250,7 +250,7 @@ uint8_t studentMode() { return mode == M_SETTINGS ? prevMode : mode; }
 void ledShow(uint8_t r, uint8_t g, uint8_t b) { rgbLedWrite(PIN_LED, r, g, b); }
 void ledIdle() {
   uint8_t m = studentMode();
-  const uint8_t* c = (m == M_SPEAK || m == M_SPEAK_IR || m == M_IR) ? SLOT_RGB[slot] : MODE_RGB[m];
+  const uint8_t* c = m == M_SPEAK ? SLOT_RGB[slot] : m == M_IR ? SLOT_RGB[irSlot] : MODE_RGB[m];
   int k = (keyLatched || playLatched) ? 3 : 1;  // brighter while something is latched on
   ledShow(c[0] * k, c[1] * k, c[2] * k);
 }
@@ -258,25 +258,35 @@ void ledIdle() {
 // ---------------------------------------------------------------------
 //  Storage
 // ---------------------------------------------------------------------
-String slotPath(int i) { return String("/msg") + i + ".raw"; }
+String slotPath(int i) {
+  return i < NUM_SLOTS ? String("/msg") + i + ".raw" : String("/irs") + (i - NUM_SLOTS) + ".raw";
+}
 
 void saveSettings() {
-  prefs.putUChar("mode", studentMode());  // never save SETTINGS as the mode
+  prefs.putUChar("mode2", studentMode());  // never save SETTINGS as the mode
   prefs.putUChar("slot", slot);
+  prefs.putUChar("irslot", irSlot);
   prefs.putUChar("key", keyIdx);
   prefs.putUChar("vol", volIdx);
 }
 
 void loadSettings() {
-  mode   = prefs.getUChar("mode", M_SPEAK) % M_COUNT;
+  if (prefs.isKey("mode2")) {
+    mode = prefs.getUChar("mode2", M_SPEAK) % M_COUNT;
+  } else {
+    // older firmware's modes were SPEAK, STEPS, KEYBOARD, IR, SPEAK+IR
+    static const uint8_t OLD[] = {M_SPEAK, M_SPEAK, M_KEYBOARD, M_IR, M_IR};
+    mode = OLD[prefs.getUChar("mode", 0) % 5];
+  }
   if (mode == M_SETTINGS) mode = M_SPEAK;
   slot   = prefs.getUChar("slot", 0) % NUM_SLOTS;
+  irSlot = prefs.getUChar("irslot", 0) % NUM_SLOTS;
   customMods  = prefs.getUChar("ck_mod", 0);
   customUsage = prefs.getUChar("ck_use", 0);
   customName  = prefs.getString("ck_name", "");
   keyIdx = prefs.getUChar("key", 0) % keyCount();
   volIdx = prefs.getUChar("vol", 2) % sizeof(VOLUMES);
-  for (int i = 0; i < NUM_SLOTS; i++) slotName[i] = prefs.getString(("name" + String(i)).c_str(), "");
+  for (int i = 0; i < NUM_SOUNDS; i++) slotName[i] = prefs.getString(("name" + String(i)).c_str(), "");
   for (int i = 0; i < S_COUNT; i++) {
     if (!SETTINGS[i].key) { settingChoice[i] = 0; continue; }
     settingChoice[i] = prefs.getUChar(SETTINGS[i].key, SETTINGS[i].def);
@@ -285,7 +295,7 @@ void loadSettings() {
 }
 
 void loadSlots() {
-  for (int i = 0; i < NUM_SLOTS; i++) {
+  for (int i = 0; i < NUM_SOUNDS; i++) {
     slotLen[i] = 0;
     File f = LittleFS.open(slotPath(i), "r");
     if (!f) continue;
@@ -478,16 +488,8 @@ void recordSlot(int i) {
 bool slotUsed(int i) {
   switch (studentMode()) {
     case M_IR: return irLen[i];
-    case M_STEPS:
-    case M_SPEAK_IR: return slotLen[i] || irLen[i];
     default: return slotLen[i];
   }
-}
-
-int countUsed() {
-  int c = 0;
-  for (int i = 0; i < NUM_SLOTS; i++) if (slotUsed(i)) c++;
-  return c;
 }
 
 // Next used slot after 'from' (wrapping round), or -1 if none.
@@ -499,21 +501,13 @@ int nextUsedSlot(int from) {
   return -1;
 }
 
-// Slot number of the n-th used slot (STEPS mode), or -1.
-int stepSlot(int n) {
-  for (int i = 0; i < NUM_SLOTS; i++) {
-    if (!slotUsed(i)) continue;
-    if (n-- == 0) return i;
-  }
-  return -1;
+// "Bubbles", or "Message 2" / "IR code 2" when it has no name (sound number).
+String titleOf(int snd) {
+  if (slotName[snd].length()) return slotName[snd];
+  return snd < NUM_SLOTS ? "Message " + String(snd + 1) : "IR code " + String(snd - NUM_SLOTS + 1);
 }
 
-// "Bubbles", or "Message 2" / "Slot 2" when the slot has no name.
-String slotTitle(int i, const char* word) {
-  return slotName[i].length() ? slotName[i] : String(word) + " " + String(i + 1);
-}
-
-// Audio cue when a slot is chosen: its message, or a short tone.
+// Audio cue when a message / code is chosen: its sound, or a short tone.
 void slotCue(int i) {
   if (slotLen[i]) playSlot(i);
   else M5.Speaker.tone(1200, 60);
@@ -735,7 +729,7 @@ bool learnIr(int i) {
   bool ok = irLearn(i, 8000);
   M5.Speaker.begin();
   M5.Speaker.setVolume(VOLUMES[volIdx]);
-  if (ok) setStatus("IR code learned\ninto " + slotTitle(i, "slot"), TFT_GREEN);
+  if (ok) setStatus("IR code learned\n" + titleOf(irSound(i)), TFT_GREEN);
   else setStatus("No IR code heard\nHold remote 30cm-1m away", TFT_RED);
   if (ok) beep(2000, 80); else beep(300, 150);
   ledIdle();
@@ -810,36 +804,12 @@ void drawMain(lgfx::LovyanGFX& c) {
   const uint16_t hint = TFT_LIGHTGREY;
   uint16_t accent = rgb(SCREEN_RGB[mode]);
   switch (mode) {
-    case M_SPEAK:
-    case M_SPEAK_IR: {
-      bool two = mode == M_SPEAK_IR;
-      drawFit(c, slotTitle(slot, "Message"), two ? 54 : 60, TFT_WHITE);
+    case M_SPEAK: {
+      drawFit(c, titleOf(slot), 60, TFT_WHITE);
       String l = slotLen[slot] ? String(slotLen[slot] / (float)SAMPLE_RATE, 1) + " s recorded"
                                : String("Empty - hold A to record");
-      if (playLatched) drawCentered(c, "Playing - press to stop", two ? 83 : 94, &fonts::FreeSansBold9pt7b, TFT_YELLOW);
-      else drawCentered(c, l, two ? 83 : 94, &fonts::FreeSans9pt7b, slotLen[slot] ? TFT_GREEN : hint);
-      if (two) drawCentered(c, irLen[slot] ? "+ IR code ready" : "+ no IR code in this slot", 102,
-                            &fonts::FreeSans9pt7b, irLen[slot] ? TFT_GREEN : TFT_ORANGE);
-      break;
-    }
-    case M_STEPS: {
-      int n = countUsed();
-      int next = n ? stepSlot(stepIdx % n) : -1;
-      drawCentered(c, n ? "Step " + String(stepIdx % n + 1) + " of " + String(n) : String("No messages"),
-                   52, &fonts::FreeSansBold18pt7b, TFT_WHITE);
-      // one dot per slot: filled = recorded, big + coloured = plays next, marker = slot B edits
-      const int gap = 40, y = 86;
-      int x0 = W / 2 - gap * (NUM_SLOTS - 1) / 2;
-      c.setFont(&fonts::Font2);
-      c.setTextDatum(middle_center);
-      for (int i = 0; i < NUM_SLOTS; i++) {
-        int x = x0 + i * gap;
-        if (i == next) { c.fillCircle(x, y, 12, accent); c.setTextColor(TFT_WHITE); }
-        else if (slotLen[i]) { c.fillCircle(x, y, 9, TFT_DARKGREY); c.setTextColor(TFT_WHITE); }
-        else { c.drawCircle(x, y, 9, TFT_DARKGREY); c.setTextColor(TFT_DARKGREY); }
-        c.drawString(String(i + 1), x, y + 1);
-        if (i == slot) c.fillTriangle(x, y + 15, x - 5, y + 22, x + 5, y + 22, TFT_WHITE);
-      }
+      if (playLatched) drawCentered(c, "Playing - press to stop", 94, &fonts::FreeSansBold9pt7b, TFT_YELLOW);
+      else drawCentered(c, l, 94, &fonts::FreeSans9pt7b, slotLen[slot] ? TFT_GREEN : hint);
       break;
     }
     case M_KEYBOARD: {
@@ -864,13 +834,15 @@ void drawMain(lgfx::LovyanGFX& c) {
       drawCentered(c, "BT name: " + bleName, 106, &fonts::Font2, TFT_LIGHTGREY);
       break;
     }
-    case M_IR:
-      drawFit(c, slotTitle(slot, "Slot"), 54, TFT_WHITE);
-      drawCentered(c, irLen[slot] ? "IR code ready" : "No IR code", 84, &fonts::FreeSans9pt7b,
-                   irLen[slot] ? TFT_GREEN : TFT_ORANGE);
-      drawCentered(c, irLen[slot] ? "B: next slot   Hold A: re-learn" : "Hold A, then press the remote", 104,
+    case M_IR: {
+      int snd = irSound(irSlot);
+      drawFit(c, titleOf(snd), 54, TFT_WHITE);
+      drawCentered(c, !irLen[irSlot] ? "No IR code" : slotLen[snd] ? "Code ready + sound" : "Code ready", 84,
+                   &fonts::FreeSans9pt7b, irLen[irSlot] ? TFT_GREEN : TFT_ORANGE);
+      drawCentered(c, irLen[irSlot] ? "B: next code   Hold A: re-learn" : "Hold A, then press the remote", 104,
                    &fonts::Font2, hint);
       break;
+    }
   }
 }
 
@@ -1101,8 +1073,6 @@ void onActivate() {
   const uint8_t style = setting(S_PLAY);
   switch (studentMode()) {
     case M_SPEAK:
-    case M_SPEAK_IR:
-      if (studentMode() == M_SPEAK_IR) irSend(slot, IR_REPEATS);
       if (style == PLAY_LATCH) {
         playLatched = !playLatched;
         if (playLatched) playSlotLoop(slot); else M5.Speaker.stop(0);
@@ -1112,16 +1082,6 @@ void onActivate() {
         playSlot(slot);
       }
       break;
-    case M_STEPS: {
-      int n = countUsed();
-      if (n == 0) { beep(300, 150); break; }
-      stepIdx %= n;  // slots may have been cleared since last time
-      int s = stepSlot(stepIdx);
-      irSend(s, IR_REPEATS);          // if the step has a code
-      if (slotLen[s]) playSlot(s);    // and/or a message
-      stepIdx = (stepIdx + 1) % n;
-      break;
-    }
     case M_KEYBOARD:
       if (setting(S_KEY_ACTION) == 1) {  // latch: each press toggles the key
         keyLatched = !keyLatched;
@@ -1132,22 +1092,25 @@ void onActivate() {
       pressSound();
       break;
     case M_IR:
-      if (!irSend(slot, IR_REPEATS)) { beep(300, 150); break; }
-      pressSound();
+      if (!irSend(irSlot, IR_REPEATS)) { beep(300, 150); break; }
+      if (slotLen[irSound(irSlot)]) playSlot(irSound(irSlot));  // the code's own sound, if any
+      else pressSound();
       break;
   }
   needRedraw = true;
 }
 
-// Long press (SPEAK, SPEAK+IR, IR): move to the next used slot and play
-// its message as a cue. IR is only sent by a real press.
+// Long press (SPEAK, IR): move to the next message / code and play its
+// sound as a cue. IR is only sent by a real press.
 void advanceMessage() {
-  int s = nextUsedSlot(slot);
-  if (s < 0 || s == slot) return;  // nothing else to move to
-  slot = s;
+  bool ir = studentMode() == M_IR;
+  uint8_t& sel = ir ? irSlot : slot;
+  int s = nextUsedSlot(sel);
+  if (s < 0 || s == sel) return;  // nothing else to move to
+  sel = s;
   saveSettings();
-  slotCue(slot);
-  ledShow(SLOT_RGB[slot][0] * 2, SLOT_RGB[slot][1] * 2, SLOT_RGB[slot][2] * 2);
+  slotCue(ir ? irSound(sel) : sel);
+  ledShow(SLOT_RGB[sel][0] * 2, SLOT_RGB[sel][1] * 2, SLOT_RGB[sel][2] * 2);
   ledFlashUntil = millis() + 500;
   needRedraw = true;
 }
@@ -1192,16 +1155,16 @@ void pollStudentSwitch() {
   // Still holding in SPEAK: step through the other messages
   uint32_t longPress = setting(S_HOLD);
   uint8_t m = studentMode();
-  if (swActive && longPress && setting(S_PLAY) == PLAY_TAP && (m == M_SPEAK || m == M_SPEAK_IR || m == M_IR)) {
+  if (swActive && longPress && setting(S_PLAY) == PLAY_TAP && (m == M_SPEAK || m == M_IR)) {
     uint32_t wait = swLastAdvance == swLastActivation ? longPress : LONG_REPEAT_MS;
     if (now - swLastAdvance >= wait) { swLastAdvance = now; advanceMessage(); }
   }
   // IR, Hold to play: keep sending while held, like holding a remote button
   static uint32_t lastIrRepeat = 0;
-  if (swActive && m == M_IR && setting(S_PLAY) == PLAY_HOLD && irLen[slot]
+  if (swActive && m == M_IR && setting(S_PLAY) == PLAY_HOLD && irLen[irSlot]
       && now - swLastActivation >= 400 && now - lastIrRepeat >= IR_REPEAT_MS) {
     lastIrRepeat = now;
-    irSend(slot, 0);
+    irSend(irSlot, 0);
   }
 }
 
@@ -1238,11 +1201,8 @@ void pollStaffButtons() {
   if (mode == M_SETTINGS && (M5.BtnA.wasHold() || M5.BtnB.wasClicked())) { settingsButtons(); return; }
 
   if (M5.BtnA.wasHold()) {
-    if (mode == M_IR) {
-      learnIr(slot);
-    } else if (mode != M_KEYBOARD) {
-      recordSlot(slot);
-    }
+    if (mode == M_IR) learnIr(irSlot);
+    else if (mode == M_SPEAK) recordSlot(slot);
     lastInteraction = millis();
     return;
   }
@@ -1253,7 +1213,6 @@ void pollStaffButtons() {
     if (mode != M_SETTINGS) prevMode = mode;
     mode = (mode + 1) % M_COUNT;
     if (mode == M_SETTINGS) settingIdx = 0;
-    stepIdx = 0;
     saveSettings();
     ledIdle();
     needRedraw = true;
@@ -1269,6 +1228,7 @@ void pollStaffButtons() {
   if (M5.BtnB.wasClicked()) {
     switch (mode) {
       case M_KEYBOARD: releaseKey(); keyIdx = (keyIdx + 1) % keyCount(); break;
+      case M_IR: irSlot = (irSlot + 1) % NUM_SLOTS; slotCue(irSound(irSlot)); ledIdle(); break;
       default: stopPlay(); slot = (slot + 1) % NUM_SLOTS; slotCue(slot); ledIdle(); break;
     }
     saveSettings();
@@ -1281,9 +1241,10 @@ void pollStaffButtons() {
 //  serial port). One text command per line; replies start with '@'.
 //  Audio goes as raw 16-bit little-endian mono samples at SAMPLE_RATE.
 //    INFO                 -> @INFO {json}
-//    MODE n / SLOT n / KEY n / VOL n / SET <key> <choice>
+//    MODE n / SLOT n / IRSLOT n / KEY n / VOL n / SET <key> <choice>
 //    PLAY n / STOP / DEL n / NAME n <text> / FORGET
-//    IRLEARN n (waits up to 8s for a remote) / IRSEND n / IRDEL n
+//      (sound numbers n: 0-3 messages, 4-7 the IR codes' sounds and names)
+//    IRLEARN n (waits up to 8s for a remote) / IRSEND n / IRDEL n  (n 0-3)
 //    CKEY <mods> <usage> <label>  (custom key; usage 0 removes it)
 //    UP n <samples>       -> @READY, then the samples in 4KB pieces, each
 //                            answered with @A; finally @OK
@@ -1302,7 +1263,7 @@ String jsonStr(const String& v) {
 void sendInfo() {
   String j = "@INFO {\"name\":" + jsonStr(bleName);
   j += ",\"rate\":" + String(SAMPLE_RATE) + ",\"maxSec\":" + String(MAX_SECONDS);
-  j += ",\"mode\":" + String(studentMode()) + ",\"slot\":" + String(slot);
+  j += ",\"mode\":" + String(studentMode()) + ",\"slot\":" + String(slot) + ",\"irSlot\":" + String(irSlot);
   j += ",\"key\":" + String(keyIdx) + ",\"vol\":" + String(volIdx) + ",\"vols\":" + String(sizeof(VOLUMES));
   j += ",\"bat\":" + String(batLevel) + ",\"chg\":" + String(batCharging ? "true" : "false");
   j += ",\"bt\":" + String(bleConnected ? "true" : "false");
@@ -1314,8 +1275,11 @@ void sendInfo() {
   j += "],\"ckey\":{\"mods\":" + String(customMods) + ",\"usage\":" + String(customUsage) + ",\"name\":" + jsonStr(customName) + "}";
   j += ",\"slots\":[";
   for (int i = 0; i < NUM_SLOTS; i++)
-    j += String(i ? "," : "") + "{\"len\":" + String(slotLen[i]) + ",\"ir\":" + String(irLen[i] ? "true" : "false")
-         + ",\"name\":" + jsonStr(slotName[i]) + "}";
+    j += String(i ? "," : "") + "{\"len\":" + String(slotLen[i]) + ",\"name\":" + jsonStr(slotName[i]) + "}";
+  j += "],\"irs\":[";
+  for (int i = 0; i < NUM_SLOTS; i++)
+    j += String(i ? "," : "") + "{\"ir\":" + String(irLen[i] ? "true" : "false") + ",\"len\":" + String(slotLen[irSound(i)])
+         + ",\"name\":" + jsonStr(slotName[irSound(i)]) + "}";
   j += "],\"settings\":[";
   bool first = true;
   for (int i = 0; i < S_COUNT; i++) {
@@ -1388,7 +1352,8 @@ void handleCommand(String line) {
   String arg = sp < 0 ? "" : line.substring(sp + 1);
   cmd.toUpperCase();
   int n = arg.toInt();
-  bool okSlot = n >= 0 && n < NUM_SLOTS;
+  bool okSlot = n >= 0 && n < NUM_SLOTS;   // message / IR code number
+  bool okSnd = n >= 0 && n < NUM_SOUNDS;   // sound number
   markActivity();
   needRedraw = true;
 
@@ -1402,7 +1367,6 @@ void handleCommand(String line) {
     releaseKey();
     stopPlay();
     mode = prevMode = n;
-    stepIdx = 0;
     saveSettings();
     ledIdle();
     reply();
@@ -1410,6 +1374,12 @@ void handleCommand(String line) {
     if (!okSlot) return reply("bad slot");
     stopPlay();
     slot = n;
+    saveSettings();
+    ledIdle();
+    reply();
+  } else if (cmd == "IRSLOT") {
+    if (!okSlot) return reply("bad slot");
+    irSlot = n;
     saveSettings();
     ledIdle();
     reply();
@@ -1440,7 +1410,7 @@ void handleCommand(String line) {
     }
     reply("unknown setting");
   } else if (cmd == "PLAY") {
-    if (!okSlot) return reply("bad slot");
+    if (!okSnd) return reply("bad sound");
     stopPlay();
     playSlot(n);
     reply();
@@ -1448,13 +1418,13 @@ void handleCommand(String line) {
     stopPlay();
     reply();
   } else if (cmd == "DEL") {
-    if (!okSlot) return reply("bad slot");
+    if (!okSnd) return reply("bad sound");
     stopPlay();
     slotLen[n] = 0;
     LittleFS.remove(slotPath(n));
     reply();
   } else if (cmd == "NAME") {
-    if (!okSlot) return reply("bad slot");
+    if (!okSnd) return reply("bad sound");
     int sp2 = arg.indexOf(' ');
     String t = sp2 < 0 ? "" : arg.substring(sp2 + 1);
     t.trim();
@@ -1463,11 +1433,11 @@ void handleCommand(String line) {
     prefs.putString(("name" + String(n)).c_str(), t);
     reply();
   } else if (cmd == "UP") {
-    if (!okSlot) return reply("bad slot");
+    if (!okSnd) return reply("bad sound");
     int sp2 = arg.indexOf(' ');
     receiveSlot(n, sp2 < 0 ? 0 : (size_t)arg.substring(sp2 + 1).toInt());
   } else if (cmd == "DOWN") {
-    if (!okSlot) return reply("bad slot");
+    if (!okSnd) return reply("bad sound");
     sendSlot(n);
   } else if (cmd == "CKEY") {
     // CKEY <mods> <usage> <label>   (usage 0 removes the custom key)
@@ -1565,11 +1535,11 @@ void setup() {
   M5.Speaker.setVolume(VOLUMES[volIdx]);
 
   bool havePsram = psramFound();
-  for (int i = 0; i < NUM_SLOTS; i++) {
+  for (int i = 0; i < NUM_SOUNDS; i++) {
     slotBuf[i] = (int16_t*)(havePsram ? ps_malloc(MAX_SAMPLES * 2) : nullptr);
     slotLen[i] = 0;
   }
-  if (!havePsram || !slotBuf[NUM_SLOTS - 1]) {
+  if (!havePsram || !slotBuf[NUM_SOUNDS - 1]) {
     M5.Display.setTextSize(2);
     M5.Display.println("No PSRAM!\nCheck board\nsettings.");
     while (true) delay(1000);

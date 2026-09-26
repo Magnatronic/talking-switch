@@ -41,14 +41,14 @@ Edge** (Firefox and Safari can't talk to USB devices). Plug the StickS3 in, clos
 click **Connect** and pick the switch. The switch is set up over the USB cable – no Wi-Fi – and recordings and
 typed words stay on the computer.
 
-- **Slots:** each of the 4 slots can hold a message, an IR code, a name, or any mix. **Learn IR** / **Test IR** /
-  **Delete IR** per slot (point the remote at the switch to learn).
-- **Messages:** record with the computer's microphone or a headset, upload any audio file, or **type the words**
-  and pick a voice (Cori, Alba, Southern English female, Northern English male) and speed. Silence is trimmed and
-  the level evened out; listen before saving. Name each slot – the name shows on the switch's screen.
-- **Mode, volume, keyboard key** – including a **custom key or shortcut** such as Win+H (dictation).
-- **All settings** from the SETTINGS menu, as drop-downs.
-- **Bluetooth:** the switch's name, and *Forget all paired devices*.
+- **Messages tab:** 4 messages. For each: a name, ▶ Play, **Change** (record with the computer's microphone or a
+  headset, **type the words** and pick a voice – Cori, Alba, Southern English female, Northern English male – or
+  upload an audio file; then listen and save) and Delete. Silence is trimmed and the level evened out.
+- **IR remote tab:** 4 remote-control codes, separate from the messages. For each: a name, **Learn / Test / Delete**,
+  and an optional **sound** (made the same three ways) that the switch says as it sends the code.
+- **Keyboard tab:** the key, including a **custom key or shortcut** such as Win+H (dictation).
+- **Settings tab:** everything from the SETTINGS menu, with explanations; Bluetooth name and *Forget all paired devices*.
+- **Mode and volume** are at the top of the page.
 
 **Typed speech** uses [Piper](https://github.com/rhasspy/piper) voices running in the browser. The engine and
 voices are served by the same GitHub Pages site (`docs/tts/`, about 270MB, fetched by `python tools/fetch_tts.py`),
@@ -66,28 +66,26 @@ To test locally: `python -m http.server 8765 --directory docs`, then open http:/
 
 ## Using it
 
-**Slots:** the switch has 4 slots. Each can hold a recorded message, a learned IR code, a name, or any mix –
-e.g. slot 1 "Bubbles": says "Bubbles please" *and* turns the bubble tube on. B chooses the slot in every mode
-except KEYBOARD. An existing single IR code from older firmware moves into slot 1.
+The switch holds **4 messages** (for SPEAK) and, separately, **4 IR codes** (for IR). Each IR code can have its own
+sound, e.g. IR code 1 "Bubbles" turns the bubble tube on *and* says "Bubbles!". An IR code from older firmware
+becomes IR code 1.
 
 **Student:** press the big switch. What happens depends on the mode.
 
 | Mode | Big switch does | LED glow |
 |---|---|---|
 | SPEAK | Plays the selected message. Keep holding to move on to the next message (every 2s while held). See *Play style* for hold-to-play and latch | message colour: 1 green, 2 blue, 3 purple, 4 orange |
-| STEPS | Goes through the slots in turn, 1→2→3→4→1 – plays each slot's message and/or sends its IR code (e.g. slot 1 = lights on, slot 2 = off) | blue |
 | KEYBOARD | Holds down the chosen key while pressed | purple |
-| IR | Sends the selected slot's IR code. With *Hold to play* it keeps sending while held, like holding a remote's volume button | slot colour |
-| SPEAK+IR | Sends the slot's IR code and plays its message (hold to change slot, as SPEAK) | slot colour |
+| IR | Sends the selected IR code, and says its sound if it has one. Keep holding to move to the next code. With *Hold to play* it keeps sending while held, like holding a remote's volume button | code colour: 1 green, 2 blue, 3 purple, 4 orange |
 | SETTINGS | Keeps doing whatever the previous mode did | as previous mode |
 
 **Staff (StickS3 buttons):**
 
 | Button | Action |
 |---|---|
-| A click | Next mode – SETTINGS is last, then back to SPEAK (changing mode also sends STEPS back to step 1) |
-| A hold | Record while held (release to stop). In IR mode: learn a code into the selected slot – point the remote at the StickS3 from 30cm or more and press within 8s |
-| B click | Choose slot (plays its message as a cue), or choose key in KEYBOARD |
+| A click | Next mode – SETTINGS is last, then back to SPEAK |
+| A hold | SPEAK: record a message while held (release to stop). IR: learn the selected code – point the remote at the end of the StickS3 from 30cm or more and press within 8s |
+| B click | SPEAK: choose message. IR: choose code (plays its sound as a cue). KEYBOARD: choose key |
 | B hold | Volume (4 levels) |
 
 When the screen is dim or off, the first press of A or B only wakes it.
@@ -99,7 +97,7 @@ Click A until the screen says **SETTINGS**. **B click** changes the value, **hol
 
 | Setting | Choices (default **bold**) | What it does |
 |---|---|---|
-| Play style | **Tap**, Hold to play, Latch | SPEAK/STEPS/SPEAK+IR. *Tap*: a press plays the whole message. *Hold to play*: plays (looping) only while the switch is held – classic cause and effect. *Latch*: one press starts it looping, the next press stops it |
+| Play style | **Tap**, Hold to play, Latch | SPEAK. *Tap*: a press plays the whole message. *Hold to play*: plays (looping) only while the switch is held – classic cause and effect. *Latch*: one press starts it looping, the next press stops it |
 | Hold for next msg | Off, 1s, **1.5s**, 2s, 3s | SPEAK: how long the student holds the switch to move to the next message. Turn off for students who can't let go quickly |
 | Press must last | **Instant**, 0.1s, 0.25s, 0.5s, 1s | Filters accidental brushes |
 | Ignore repeats for | Off, 0.2s, **0.4s**, 0.8s, 1.5s | Filters tremor and bounces after a press |
@@ -107,23 +105,23 @@ Click A until the screen says **SETTINGS**. **B click** changes the value, **hol
 | Sleep after | Off, 2 min, **5 min**, 15 min | On battery, with no presses: sleep to save power. The big switch still works (see below) |
 | Auto power off | **Never**, 30 min, 60 min, 2 hours | On battery, with no presses: turn off completely, e.g. at the end of the day |
 | Key action | **Momentary**, Latch | KEYBOARD: *Momentary* holds the key while the switch is held; *Latch* – one press holds the key down, the next lets it go (for students who can't keep the switch pressed). The screen says "Key held" and the LED glows brighter while latched |
-| Press sound | **Off**, Click, Beep | KEYBOARD and IR modes: a sound on each press, as feedback |
+| Press sound | **Off**, Click, Beep | KEYBOARD mode, and IR codes with no sound of their own: a sound on each press, as feedback |
 | Forget BT devices | B, then B again to confirm | Clears every paired computer/tablet. Also remove the switch in that device's Bluetooth settings |
 | Recording boost | Off, Low, **Medium**, High | Makes new recordings louder, at the cost of some harshness |
 
 ### The screen
 
 - **Top bar:** the mode, in its colour, and the battery (% and icon; green bolt = charging, red = low).
-- **Middle:** what the switch will do – the message and its length, the next step (dots: filled = recorded,
-  big = plays next, triangle = the slot B-click edits), the key and whether it's sending by USB or Bluetooth, or the IR code.
+- **Middle:** what the switch will do – the message's name and length, the key and whether it's sending by USB
+  or Bluetooth, or the IR code's name and whether it has a code and sound.
 - **Bottom:** volume bars, USB/BT connection (green = connected) and the press counter.
 - A white frame appears while the big switch is held down.
 
 Recordings are trimmed and boosted automatically, stored in flash, and survive power-off.
 
-**To delete a message:** choose its slot with B, then hold A for a couple of seconds *without speaking* and let go.
+**To delete a message:** choose it with B, then hold A for a couple of seconds *without speaking* and let go.
 The screen says "Nothing heard – msg cleared".
-Mode, slot, key, volume and settings are remembered too.
+Mode, selected message and IR code, key, volume and settings are remembered too.
 
 **Recording tips:** speak 10–15cm from the stick in a normal voice. The recording is cleaned up automatically:
 silence trimmed, hiss between words turned down, level evened out.

@@ -142,16 +142,16 @@ ol { padding-left: 1.2em; margin: 8px 0 0; }
     </nav>
 
     <section id="tab-messages" class="card" role="tabpanel">
-      <p class="muted small" style="margin-top:0">The switch plays the <b>selected</b> message (in STEPS mode, each one in
-        turn). Click <b>Change</b> to record, type or upload a message.</p>
+      <p class="muted small" style="margin-top:0">In <b>SPEAK</b> mode the switch plays the <b>selected</b> message. Click
+        <b>Change</b> to record, type or upload one.</p>
       <div id="msgList" class="slots"></div>
     </section>
 
     <section id="tab-ir" class="card" role="tabpanel">
-      <p class="muted small" style="margin-top:0">Each slot can hold a TV-style remote code. In <b>IR</b> mode the switch sends
-        the selected slot's code; <b>SPEAK+IR</b> plays the message and sends the code together.<br>
-        To learn: click <b>Learn</b>, point the remote at the <b>end</b> of the switch from 30cm–1m away and press its
-        button within 8 seconds.</p>
+      <p class="muted small" style="margin-top:0">In <b>IR</b> mode the switch sends the <b>selected</b> remote-control
+        code. Give a code a <b>sound</b> (e.g. "Bubbles!") and the switch says it as it sends – leave it out for silence.<br>
+        To learn a code: click <b>Learn</b>, point the remote at the <b>end</b> of the switch from 30cm–1m away and press
+        its button within 8 seconds.</p>
       <div id="irList" class="slots"></div>
     </section>
 
@@ -212,13 +212,11 @@ let recState = null;      // microphone recording in progress
 let ttsBusy = false;
 let typed = '';           // words typed in the editor
 
-const MODE_HELP = [
-  'Plays the selected message each time the switch is pressed.',
-  'Plays the messages in turn – 1, 2, 3, 4 – and sends any IR codes they have.',
-  'Acts as a keyboard key (set it on the Keyboard tab).',
-  "Sends the selected slot's IR remote code.",
-  'Plays the selected message and sends its IR code together.',
-];
+const MODE_HELP = {
+  'SPEAK': 'Plays the selected message (Messages tab) each time the switch is pressed.',
+  'KEYBOARD': 'Acts as a keyboard key (set it on the Keyboard tab).',
+  'IR': 'Sends the selected remote-control code, and says its sound if it has one (IR remote tab).',
+};
 
 // ---------------------------------------------------------------- toast
 let toastTimer;
@@ -423,7 +421,9 @@ function segment(box, labels, current, onPick) {
   }, label)));
 }
 
-function slotName(i) { return info.slots[i].name || `Slot ${i + 1}`; }
+// Sound numbers: 0-3 are the messages, 4-7 the IR codes' own sounds.
+const IRS = 4;
+function soundInfo(snd) { return snd < IRS ? info.slots[snd] : info.irs[snd - IRS]; }
 function secs(n) { return (n / info.rate).toFixed(1) + ' s'; }
 
 // ---------------------------------------------------------------- render
@@ -436,7 +436,7 @@ function render() {
   $('btState').textContent = info.bt ? 'connected now' : 'not connected';
 
   segment($('modes'), info.modes, info.mode, (i) => act(() => cmd(`MODE ${i}`)));
-  $('modeHelp').textContent = MODE_HELP[info.mode] || '';
+  $('modeHelp').textContent = MODE_HELP[info.modes[info.mode]] || '';
   segment($('vols'), Array.from({ length: info.vols }, (_, i) => String(i + 1)), info.vol, (i) => act(() => cmd(`VOL ${i}`)));
   segment($('keys'), info.keys, info.key, (i) => act(() => cmd(`KEY ${i}`)));
   renderMessages();
@@ -445,10 +445,10 @@ function render() {
   renderCustomKey();
 }
 
-function selectRadio(i, group) {
-  return el('label', { class: 'sel', title: 'The switch uses the selected slot' },
-    el('input', { type: 'radio', name: group, checked: i === info.slot, onchange: () => act(() => cmd(`SLOT ${i}`)) }),
-    i === info.slot ? 'Selected' : 'Select');
+function selectRadio(i, group, current, command) {
+  return el('label', { class: 'sel', title: 'The switch uses the selected one' },
+    el('input', { type: 'radio', name: group, checked: i === current, onchange: () => act(() => cmd(`${command} ${i}`)) }),
+    i === current ? 'Selected' : 'Select');
 }
 
 // ---------------------------------------------------------------- messages tab
@@ -470,7 +470,7 @@ function renderMessages() {
         el('button', { class: 'danger', disabled: !s.len, onclick: () => {
           if (confirm(`Delete the message in slot ${i + 1}?`)) act(() => cmd(`DEL ${i}`), 'Message deleted');
         } }, 'Delete'),
-        selectRadio(i, 'msgSel')),
+        selectRadio(i, 'msgSel', info.slot, 'SLOT')),
       open ? renderEditor(i) : null);
   }));
 }
@@ -524,10 +524,10 @@ function renderEditor(i) {
 
   if (pending && pending.slot === i) {
     body.push(el('div', { class: 'preview' },
-      el('b', {}, `New message: ${pending.seconds.toFixed(1)} s`),
+      el('b', {}, `New sound: ${pending.seconds.toFixed(1)} s`),
       pending.truncated ? el('span', { class: 'small muted' }, `(cut to ${info.maxSec} s)`) : null,
       el('button', { onclick: () => playPcm(pending.pcm) }, '▶ Listen'),
-      el('button', { class: 'primary', onclick: () => savePending() }, `Save to slot ${i + 1}`),
+      el('button', { class: 'primary', onclick: () => savePending() }, 'Save to the switch'),
       el('button', { onclick: () => { pending = null; render(); } }, 'Discard')));
   }
 
@@ -535,9 +535,9 @@ function renderEditor(i) {
     ...[['1', 'Natural'], ['2', 'Loud'], ['3', 'Extra loud']]
       .map(([v, n]) => el('option', { value: v, selected: v === (store('boost') || '2') }, n)));
   body.push(el('div', { class: 'row small muted' },
-    el('label', {}, 'Loudness for new messages ', loud),
-    info.slots[i].len ? el('button', { class: 'link', onclick: () => saveWav(i) }, 'Download current message (.wav)') : null,
-    info.slots[i].len ? el('button', { class: 'link', onclick: () => listenSaved(i) }, 'Listen to current message here') : null));
+    el('label', {}, 'Loudness ', loud),
+    soundInfo(i).len ? el('button', { class: 'link', onclick: () => listenSaved(i) }, 'Listen to the current sound here') : null,
+    soundInfo(i).len ? el('button', { class: 'link', onclick: () => saveWav(i) }, 'Download it (.wav)') : null));
 
   return el('div', { class: 'editor' },
     el('div', { class: 'how' }, how('record', '● Record'), how('type', 'Aa Type words'), how('upload', '⤒ Upload file')),
@@ -551,7 +551,7 @@ async function savePending() {
     await upload(p.slot, p.pcm);
     pending = null;
     editing = null;
-  }, `Saved to slot ${p.slot + 1}`);
+  }, 'Saved');
 }
 
 async function listenSaved(i) {
@@ -561,7 +561,8 @@ async function listenSaved(i) {
 async function saveWav(i) {
   try {
     const pcm = await download(i);
-    const name = (info.slots[i].name || `slot-${i + 1}`).replace(/[^\w\- ]+/g, '').trim() || `slot-${i + 1}`;
+    const fallback = i < IRS ? `message-${i + 1}` : `ir-code-${i - IRS + 1}`;
+    const name = (soundInfo(i).name || fallback).replace(/[^\w\- ]+/g, '').trim() || fallback;
     const a = el('a', { href: URL.createObjectURL(wavBlob(pcm, info.rate)), download: name + '.wav' });
     a.click();
     setTimeout(() => URL.revokeObjectURL(a.href), 5000);
@@ -571,21 +572,40 @@ async function saveWav(i) {
 // ---------------------------------------------------------------- IR tab
 async function learnIr(i) {
   toast('Point the remote at the end of the switch from 30cm+ and press its button…');
-  await act(() => cmd(`IRLEARN ${i}`, 12000), `IR code learned into slot ${i + 1}`);
+  await act(() => cmd(`IRLEARN ${i}`, 12000), `IR code ${i + 1} learned`);
 }
 
 function renderIr() {
-  $('irList').replaceChildren(...info.slots.map((s, i) => el('div', { class: 'slot' + (i === info.slot ? ' selected' : '') },
-    el('div', { class: 'slot-main' },
-      el('span', { class: 'num' }, String(i + 1)),
-      el('span', { class: 'name' }, slotName(i)),
-      el('span', { class: 'status' + (s.ir ? ' has' : '') }, s.ir ? 'Code saved' : 'No code'),
-      el('button', { onclick: () => learnIr(i) }, s.ir ? 'Learn again' : 'Learn'),
-      el('button', { disabled: !s.ir, onclick: () => act(() => cmd(`IRSEND ${i}`), 'Sent') }, 'Test'),
-      el('button', { class: 'danger', disabled: !s.ir, onclick: () => {
-        if (confirm(`Delete the IR code in slot ${i + 1}?`)) act(() => cmd(`IRDEL ${i}`), 'IR code deleted');
-      } }, 'Delete'),
-      selectRadio(i, 'irSel')))));
+  $('irList').replaceChildren(...info.irs.map((c, i) => {
+    const snd = IRS + i;
+    const open = editing === snd;
+    const name = el('input', {
+      type: 'text', class: 'name', maxLength: 24, value: c.name, placeholder: `Name, e.g. "TV on/off"`,
+      'aria-label': `Name for IR code ${i + 1}`,
+      onchange: () => act(() => cmd(`NAME ${snd} ${name.value.replace(/[\r\n]/g, ' ')}`), 'Name saved'),
+    });
+    return el('div', { class: 'slot' + (i === info.irSlot ? ' selected' : '') },
+      el('div', { class: 'slot-main' },
+        el('span', { class: 'num' }, String(i + 1)),
+        name,
+        el('span', { class: 'status' + (c.ir ? ' has' : '') }, c.ir ? 'Code saved' : 'No code'),
+        el('button', { onclick: () => learnIr(i) }, c.ir ? 'Learn again' : 'Learn'),
+        el('button', { disabled: !c.ir, onclick: () => act(() => cmd(`IRSEND ${i}`), 'Sent') }, 'Test'),
+        el('button', { class: 'danger', disabled: !c.ir, onclick: () => {
+          if (confirm(`Delete IR code ${i + 1}?`)) act(() => cmd(`IRDEL ${i}`), 'IR code deleted');
+        } }, 'Delete'),
+        selectRadio(i, 'irSel', info.irSlot, 'IRSLOT')),
+      el('div', { class: 'slot-main', style: 'margin-top:6px' },
+        el('span', { class: 'num' }),
+        el('span', { class: 'small muted' }, 'Sound:'),
+        el('span', { class: 'status' + (c.len ? ' has' : '') }, c.len ? secs(c.len) : 'None (silent)'),
+        c.len ? el('button', { onclick: () => act(() => cmd(`PLAY ${snd}`)), title: 'Play it on the switch' }, '▶ Play') : null,
+        el('button', { class: open ? 'on' : '', onclick: () => toggleEditor(snd) }, open ? 'Close' : c.len ? 'Change sound' : 'Add sound'),
+        c.len ? el('button', { class: 'danger', onclick: () => {
+          if (confirm(`Remove the sound from IR code ${i + 1}?`)) act(() => cmd(`DEL ${snd}`), 'Sound removed');
+        } }, 'Remove sound') : null),
+      open ? renderEditor(snd) : null);
+  }));
 }
 
 // ---------------------------------------------------------------- settings tab
@@ -595,12 +615,12 @@ const GROUPS = [
   ['Screen and power', ['s_wake', 's_sleep', 's_autooff']],
 ];
 const HELP = {
-  s_play: 'Tap: a press plays the whole message. Hold to play: plays only while the switch is held. Latch: one press starts it, the next stops it.',
+  s_play: 'SPEAK mode. Tap: a press plays the whole message. Hold to play: plays only while the switch is held. Latch: one press starts it, the next stops it.',
   s_hold: 'In SPEAK, holding the switch this long moves to the next message. Turn off for students who can’t let go quickly.',
   s_accept: 'A press must last this long to count – filters accidental brushes.',
   s_lockout: 'Presses this soon after the last one are ignored – filters tremor and bounces.',
   s_keyact: 'KEYBOARD mode. Latch: one press holds the key down, the next lets it go.',
-  s_psound: 'A click or beep on each press in KEYBOARD and IR modes.',
+  s_psound: 'A click or beep on each press in KEYBOARD mode, and for IR codes that have no sound of their own.',
   s_loud: 'Makes messages recorded on the switch itself louder, at some cost in clarity.',
   s_wake: 'Whether presses of the big switch light up the screen.',
   s_sleep: 'On battery, sleeps after this long without presses. The big switch still works and wakes it.',
