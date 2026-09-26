@@ -924,6 +924,19 @@ void drawCentered(lgfx::LovyanGFX& c, const String& s, int y, const lgfx::IFont*
   c.drawString(s, c.width() / 2, y);
 }
 
+// Scanning modes before a scan starts: how many choices, how to start, and
+// where they come from - or, with nothing to choose, what to do about it.
+void drawChoices(lgfx::LovyanGFX& c, int n, const String& what, const String& from, const String& empty) {
+  if (!n) {
+    drawFit(c, "Nothing to choose", 52, TFT_ORANGE);
+    drawCentered(c, empty, 84, &fonts::FreeSans9pt7b, TFT_WHITE);
+  } else {
+    drawFit(c, String(n) + (n == 1 ? what.substring(0, what.length() - 1) : what), 52, TFT_WHITE);
+    drawCentered(c, holdToChoose() ? "Hold to start" : "Press to start", 84, &fonts::FreeSans9pt7b, TFT_GREEN);
+  }
+  drawCentered(c, "From: " + from, 104, &fonts::Font2, TFT_LIGHTGREY);
+}
+
 void drawMain(lgfx::LovyanGFX& c) {
   const int W = c.width();
   const uint16_t hint = TFT_LIGHTGREY;
@@ -949,30 +962,22 @@ void drawMain(lgfx::LovyanGFX& c) {
         drawCentered(c, holdToChoose() ? "Let go to choose" : "Press to choose", 94, &fonts::FreeSansBold9pt7b, TFT_YELLOW);
         break;
       }
+      // what the student will choose from, and how many choices there are
+      int n = 0;
+      String from, what = " messages", empty = "Add them on the setup page";
       if (chooseQuick()) {
-        int n = 0;
         for (int i = 0; i < NUM_QUICK; i++) n += slotLen[i] ? 1 : 0;
-        drawFit(c, "Quick messages", 52, TFT_WHITE);
-        drawCentered(c, String(n) + (n == 1 ? " message" : " messages") + (holdToChoose() ? " - hold to start" : " - press to start"),
-                     84, &fonts::FreeSans9pt7b, n ? TFT_GREEN : TFT_ORANGE);
-        drawCentered(c, "Choosing from the Quick messages", 104, &fonts::Font2, hint);
-        break;
-      }
-      if (topicsByStudent() && !scanInGroup) {
-        int n = 0;
+        from = "Quick messages";
+        empty = "Record them in SPEAK (hold A)";
+      } else if (topicsByStudent() && !scanInGroup) {
         for (int t = 0; t < NUM_TOPICS; t++) n += topicUsed(t);
-        drawFit(c, "Choose a topic", 52, TFT_WHITE);
-        drawCentered(c, String(n) + (n == 1 ? " topic" : " topics") + (holdToChoose() ? " - hold to start" : " - press to start"),
-                     84, &fonts::FreeSans9pt7b, n ? TFT_GREEN : TFT_ORANGE);
+        from = "Topics";
+        what = " topics";
       } else {
-        int n = 0;
         for (int k = 0; k < PER_TOPIC; k++) n += slotLen[topicMsg(group, k)] ? 1 : 0;
-        drawFit(c, topicTitle(group), 52, TFT_WHITE);
-        drawCentered(c, String(n) + (n == 1 ? " message" : " messages") + (holdToChoose() ? " - hold to start" : " - press to start"),
-                     84, &fonts::FreeSans9pt7b, n ? TFT_GREEN : TFT_ORANGE);
+        from = topicTitle(group);
       }
-      drawCentered(c, topicsByStudent() ? String("Student picks the topic")
-                                        : "Topic " + String(group + 1) + " of " + String(NUM_TOPICS), 104, &fonts::Font2, hint);
+      drawChoices(c, n, what, from, empty);
       break;
     }
     case M_KEYBOARD: {
@@ -1006,10 +1011,7 @@ void drawMain(lgfx::LovyanGFX& c) {
       if (irScanning()) {
         int n = 0;
         for (int i = 0; i < NUM_SLOTS; i++) n += irLen[i] ? 1 : 0;
-        drawFit(c, "Choose a code", 52, TFT_WHITE);
-        drawCentered(c, String(n) + " IR codes" + (holdToChoose() ? " - hold to start" : " - press to start"), 84,
-                     &fonts::FreeSans9pt7b, n ? TFT_GREEN : TFT_ORANGE);
-        drawCentered(c, "Student picks the code", 104, &fonts::Font2, hint);
+        drawChoices(c, n, " IR codes", "IR codes", "Learn codes (hold A)");
         break;
       }
       int snd = irSound(irSlot);
