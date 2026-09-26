@@ -7,191 +7,192 @@
 <style>
 :root {
   --bg: #f4f5f7; --card: #ffffff; --text: #1d2330; --muted: #5d6677; --line: #dde1e8;
-  --accent: #1f6feb; --accent-text: #ffffff; --good: #1a7f37; --warn: #b35900; --bad: #c62828;
-  --chip: #eef1f5; --rec: #d32f2f;
+  --accent: #1f6feb; --accent-soft: #e7f0ff; --accent-text: #ffffff;
+  --good: #1a7f37; --bad: #c62828; --chip: #eef1f5; --rec: #d32f2f;
 }
 @media (prefers-color-scheme: dark) {
   :root {
     --bg: #14171c; --card: #1d2129; --text: #e7eaf0; --muted: #9aa3b2; --line: #313745;
-    --accent: #4c8dff; --accent-text: #0b0d10; --good: #4ac26b; --warn: #f0a44b; --bad: #ff6b6b;
-    --chip: #272c36; --rec: #ff5a5a;
+    --accent: #4c8dff; --accent-soft: #1b2a45; --accent-text: #0b0d10;
+    --good: #4ac26b; --bad: #ff6b6b; --chip: #272c36; --rec: #ff5a5a;
   }
 }
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.45 system-ui, "Segoe UI", sans-serif; }
-header { background: var(--card); border-bottom: 1px solid var(--line); padding: 14px 16px; }
-.wrap { max-width: 980px; margin: 0 auto; }
-header .wrap { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
-h1 { font-size: 1.3rem; margin: 0; flex: 1 1 auto; }
-h2 { font-size: 1.1rem; margin: 0 0 10px; }
+.wrap { max-width: 900px; margin: 0 auto; }
+header { background: var(--card); border-bottom: 1px solid var(--line); padding: 12px 16px; }
+header .wrap { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+h1 { font-size: 1.25rem; margin: 0; flex: 1 1 auto; }
+h2 { font-size: 1.05rem; margin: 0 0 8px; }
 main { padding: 16px; }
-section.card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; margin-bottom: 16px; }
 .muted { color: var(--muted); }
-.small { font-size: .88rem; }
+.small { font-size: .9rem; }
+.hidden { display: none !important; }
 button, select, input[type=text] {
   font: inherit; color: var(--text); background: var(--chip); border: 1px solid var(--line);
   border-radius: 8px; padding: 8px 12px; min-height: 40px;
 }
-button { cursor: pointer; }
+button { cursor: pointer; white-space: nowrap; }
 button:hover:not(:disabled) { border-color: var(--accent); }
 button:disabled { opacity: .45; cursor: default; }
 button.primary { background: var(--accent); color: var(--accent-text); border-color: var(--accent); font-weight: 600; }
+button.on { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
 button.danger { color: var(--bad); }
 button.rec { color: var(--rec); font-weight: 600; }
-button.rec.on { background: var(--rec); color: #fff; border-color: var(--rec); }
-button.on { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+button.rec.on { background: var(--rec); border-color: var(--rec); color: #fff; }
+button.link { background: none; border: none; color: var(--accent); padding: 4px; min-height: 0; text-decoration: underline; }
 :focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-.status { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 .pill { background: var(--chip); border-radius: 999px; padding: 4px 10px; font-size: .88rem; }
-.dot { width: 14px; height: 14px; border-radius: 50%; background: var(--line); display: inline-block; vertical-align: middle; transition: background .15s; }
+.dot { width: 12px; height: 12px; border-radius: 50%; background: var(--line); display: inline-block; vertical-align: -1px; transition: background .15s; }
 .dot.lit { background: var(--good); }
-.msgs { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 12px; }
-.msg { border: 1px solid var(--line); border-radius: 10px; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
-.msg.selected { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
-.msg .top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
-.msg input[type=text] { width: 100%; }
-.pending { background: var(--chip); border-radius: 8px; padding: 8px; display: flex; flex-direction: column; gap: 6px; }
-.meter { height: 8px; background: var(--line); border-radius: 4px; overflow: hidden; }
+
+/* mode / volume bar */
+.bar { display: grid; gap: 12px; }
+.seg { display: flex; flex-wrap: wrap; gap: 6px; }
+.label { font-weight: 600; font-size: .9rem; margin-bottom: 4px; }
+
+/* tabs */
+.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin-bottom: 16px; overflow-x: auto; }
+.tabs button { border: none; border-bottom: 3px solid transparent; border-radius: 0; background: none; font-weight: 600; color: var(--muted); padding: 10px 14px; }
+.tabs button[aria-selected=true] { color: var(--text); border-bottom-color: var(--accent); }
+
+/* slot lists */
+.slots { display: flex; flex-direction: column; gap: 8px; }
+.slot { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+.slot.selected { border-color: var(--accent); background: var(--accent-soft); }
+.slot-main { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.slot-main .num { font-weight: 700; width: 1.6em; text-align: center; }
+.slot-main .name { flex: 1 1 160px; min-width: 120px; }
+.slot-main .status { min-width: 90px; font-size: .9rem; color: var(--muted); }
+.slot-main .status.has { color: var(--good); font-weight: 600; }
+.sel { display: flex; align-items: center; gap: 4px; font-size: .85rem; color: var(--muted); cursor: pointer; }
+
+/* message editor */
+.editor { margin-top: 10px; border-top: 1px dashed var(--line); padding-top: 12px; display: flex; flex-direction: column; gap: 12px; }
+.editor .how { display: flex; flex-wrap: wrap; gap: 6px; }
+.editor textarea { font: inherit; color: var(--text); background: var(--chip); border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; width: 100%; min-height: 60px; resize: vertical; }
+.preview { background: var(--chip); border-radius: 8px; padding: 10px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.meter { height: 10px; background: var(--line); border-radius: 5px; overflow: hidden; flex: 1 1 200px; }
 .meter > div { height: 100%; width: 0; background: var(--good); transition: width .05s; }
-.settings { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px 16px; }
-.settings label { display: flex; flex-direction: column; gap: 4px; font-size: .92rem; }
-.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.progress { height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; }
+.progress > div { height: 100%; width: 0; background: var(--accent); }
+
+/* settings */
+.group { margin-bottom: 18px; }
+.setting { display: grid; grid-template-columns: minmax(160px, 1fr) minmax(140px, 200px); gap: 4px 12px; align-items: center; padding: 8px 0; border-top: 1px solid var(--line); }
+.setting .help { grid-column: 1 / -1; font-size: .85rem; color: var(--muted); }
+@media (max-width: 520px) { .setting { grid-template-columns: 1fr; } }
+
 #toast { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); background: var(--text); color: var(--bg);
   padding: 10px 16px; border-radius: 10px; opacity: 0; transition: opacity .2s; pointer-events: none; max-width: 90vw; }
 #toast.show { opacity: 1; }
 #toast.err { background: var(--bad); color: #fff; }
-.hidden { display: none !important; }
-ol { padding-left: 1.2em; margin: 8px 0 0; }
-.tts { display: flex; gap: 8px; align-items: center; }
-.tts input { flex: 1 1 auto; min-width: 0; }
-.tts button { flex: none; white-space: nowrap; }
-.progress { height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; }
-.progress > div { height: 100%; width: 0; background: var(--accent); }
 footer { padding: 0 16px 32px; }
-.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+a { color: var(--accent); }
+ol { padding-left: 1.2em; margin: 8px 0 0; }
 </style>
 </head>
 <body>
 <header>
   <div class="wrap">
     <h1>Talking Switch setup</h1>
-    <div class="status">
-      <span id="devName" class="pill hidden"></span>
-      <span id="battery" class="pill hidden"></span>
-      <span id="btState" class="pill hidden"></span>
-      <span class="pill" title="Lights up when the big switch is pressed"><span id="pressDot" class="dot"></span> Switch</span>
-      <button id="connectBtn" class="primary">Connect</button>
-    </div>
+    <span id="devName" class="pill hidden"></span>
+    <span id="battery" class="pill hidden"></span>
+    <span class="pill hidden" id="pressPill" title="Lights up when the big switch is pressed"><span id="pressDot" class="dot"></span> Switch</span>
+    <button id="connectBtn" class="primary">Connect</button>
   </div>
 </header>
 
 <main class="wrap">
   <section id="noSerial" class="card hidden">
     <h2>Open this page in Chrome or Edge</h2>
-    <p>This browser can't talk to USB devices. Open <b>setup.html</b> in Google Chrome or Microsoft Edge on a Windows, Mac,
-      ChromeOS or Linux computer.</p>
+    <p>This browser can't talk to USB devices. Open the page in Google Chrome or Microsoft Edge on a computer.</p>
   </section>
 
   <section id="intro" class="card">
     <h2>Connect the switch</h2>
     <ol>
-      <li>Plug the StickS3 into this computer with a USB data cable.</li>
-      <li>Close the Arduino IDE Serial Monitor if it's open – only one program can use the switch at a time.</li>
-      <li>Click <b>Connect</b> and choose the switch (usually "USB JTAG/serial debug unit" or "TalkingSwitch").</li>
+      <li>Plug the switch into this computer with a USB cable.</li>
+      <li>Close the Arduino Serial Monitor if it's open.</li>
+      <li>Click <b>Connect</b> and choose the switch from the list.</li>
     </ol>
-    <p class="muted small">The switch is set up over the USB cable – no Wi-Fi. Recordings and typed words stay on this
-      computer; nothing is uploaded anywhere.</p>
+    <p class="muted small">Setup happens over the USB cable – no Wi-Fi. Recordings and typed words stay on this computer.</p>
   </section>
 
   <div id="app" class="hidden">
-    <section class="card">
-      <div class="row" style="justify-content: space-between">
-        <h2>Slots: messages and IR codes</h2>
-        <div class="row small">
-        <label>Voice
-          <select id="voice"></select>
-        </label>
-        <label>Speed
-          <select id="speed">
-            <option value="0.8">Slow</option>
-            <option value="0.9">A bit slow</option>
-            <option value="1" selected>Normal</option>
-            <option value="1.15">Fast</option>
-          </select>
-        </label>
-        <label>Loudness boost
-          <select id="boost">
-            <option value="1">Off</option>
-            <option value="1.5" selected>Low</option>
-            <option value="2">Medium</option>
-            <option value="3">High</option>
-          </select>
-        </label>
-        </div>
+    <section class="card bar">
+      <div>
+        <div class="label">What the switch does</div>
+        <div id="modes" class="seg" role="radiogroup" aria-label="Mode"></div>
+        <div id="modeHelp" class="muted small" style="margin-top:6px"></div>
       </div>
-      <div id="ttsProgress" class="hidden">
-        <span id="ttsProgressText" class="small muted"></span>
-        <div class="progress"><div id="ttsProgressBar"></div></div>
+      <div>
+        <div class="label">Volume</div>
+        <div id="vols" class="seg" role="radiogroup" aria-label="Volume"></div>
       </div>
-      <p class="muted small">Each slot can hold a spoken message, an infrared (IR) remote code, or both. Record with this
-        computer's microphone or a headset, upload any audio file, or <b>type the words</b> and let a voice say them –
-        silence is trimmed and the level evened out automatically. Longest message: <span id="maxSec"></span> seconds.</p>
-      <div id="msgs" class="msgs"></div>
     </section>
 
-    <div class="grid2">
-      <section class="card">
-        <h2>Mode</h2>
-        <div id="modes" class="chips"></div>
-        <h2 style="margin-top:16px">Volume</h2>
-        <div id="vols" class="chips"></div>
-      </section>
+    <nav class="tabs" role="tablist">
+      <button role="tab" data-tab="messages">Messages</button>
+      <button role="tab" data-tab="ir">IR remote</button>
+      <button role="tab" data-tab="keyboard">Keyboard</button>
+      <button role="tab" data-tab="settings">Settings</button>
+    </nav>
 
-      <section class="card">
-        <h2>Keyboard key</h2>
-        <div id="keys" class="chips"></div>
-        <h2 style="margin-top:16px">Custom key or shortcut</h2>
-        <div class="row">
-          <label><input type="checkbox" id="mCtrl"> Ctrl</label>
-          <label><input type="checkbox" id="mShift"> Shift</label>
-          <label><input type="checkbox" id="mAlt"> Alt</label>
-          <label><input type="checkbox" id="mWin"> Win</label>
-          <select id="ckKey" aria-label="Key"></select>
-        </div>
-        <div class="row" style="margin-top:8px">
-          <button id="ckSet">Set <span id="ckPreview"></span></button>
-          <button id="ckDel" class="danger">Remove custom key</button>
-        </div>
-        <p class="muted small">E.g. Win + H starts Windows dictation. The custom key is added to the list the B button
-          cycles through.</p>
-      </section>
-    </div>
-
-    <section class="card">
-      <h2>Settings</h2>
-      <div id="settings" class="settings"></div>
+    <section id="tab-messages" class="card" role="tabpanel">
+      <p class="muted small" style="margin-top:0">The switch plays the <b>selected</b> message (in STEPS mode, each one in
+        turn). Click <b>Change</b> to record, type or upload a message.</p>
+      <div id="msgList" class="slots"></div>
     </section>
 
-    <section class="card">
-      <h2>Bluetooth</h2>
-      <p>This switch appears as <b id="btName"></b> when pairing.</p>
+    <section id="tab-ir" class="card" role="tabpanel">
+      <p class="muted small" style="margin-top:0">Each slot can hold a TV-style remote code. In <b>IR</b> mode the switch sends
+        the selected slot's code; <b>SPEAK+IR</b> plays the message and sends the code together.<br>
+        To learn: click <b>Learn</b>, point the remote at the <b>end</b> of the switch from 30cm–1m away and press its
+        button within 8 seconds.</p>
+      <div id="irList" class="slots"></div>
+    </section>
+
+    <section id="tab-keyboard" class="card" role="tabpanel">
+      <div class="label">Key the switch presses in KEYBOARD mode</div>
+      <div id="keys" class="seg"></div>
+      <div class="label" style="margin-top:20px">Custom key or shortcut</div>
       <div class="row">
+        <label><input type="checkbox" id="mCtrl"> Ctrl</label>
+        <label><input type="checkbox" id="mShift"> Shift</label>
+        <label><input type="checkbox" id="mAlt"> Alt</label>
+        <label><input type="checkbox" id="mWin"> Win</label>
+        <select id="ckKey" aria-label="Key"></select>
+        <button id="ckSet">Use <span id="ckPreview"></span></button>
+        <button id="ckDel" class="danger">Remove</button>
+      </div>
+      <p class="muted small">For example Win + H starts Windows dictation. The custom key is added to the list above.</p>
+      <p class="muted small">Works over USB when plugged into a computer, otherwise over Bluetooth (pair with
+        <b id="btName1"></b>).</p>
+    </section>
+
+    <section id="tab-settings" class="card" role="tabpanel">
+      <div id="settingGroups"></div>
+      <div class="group">
+        <h2>Bluetooth</h2>
+        <p class="small" style="margin:0 0 8px">The switch appears as <b id="btName2"></b> when pairing
+          (<span id="btState"></span>).</p>
         <button id="forgetBtn" class="danger">Forget all paired devices</button>
-        <span class="muted small">Use this to move the switch to a different computer or tablet. Also remove it in that
-          device's Bluetooth settings.</span>
+        <p class="muted small">Use this to move the switch to a different computer or tablet. Also remove it in that
+          device's Bluetooth settings.</p>
       </div>
     </section>
   </div>
 </main>
 <footer class="wrap muted small">
-  Text-to-speech runs on this computer using <a href="https://github.com/rhasspy/piper">Piper</a> (MIT),
+  Typed speech runs on this computer using <a href="https://github.com/rhasspy/piper">Piper</a> (MIT),
   <a href="https://github.com/espeak-ng/espeak-ng">eSpeak NG</a> (GPL-3.0) and
   <a href="https://onnxruntime.ai/">ONNX Runtime Web</a> (MIT). Voices:
   Cori – public domain recordings from <a href="https://librivox.org">LibriVox</a>, model by Bryce Beattie;
   Alba – <a href="https://datashare.ed.ac.uk/handle/10283/3270">University of Edinburgh</a>, CC BY 4.0;
   Southern English female and Northern English male – <a href="http://www.openslr.org/83/">OpenSLR 83</a>, CC BY-SA 4.0.
-  What you type stays on this computer.
 </footer>
 <div id="toast" role="status" aria-live="polite"></div>
 
@@ -201,11 +202,23 @@ const $ = (id) => document.getElementById(id);
 const enc = new TextEncoder();
 const dec = new TextDecoder();
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+function store(k, v) { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch {} return null; }
 
-let info = null;                 // last @INFO from the switch
-const pending = {};              // slot -> {pcm, seconds, truncated} waiting to be saved
-const ttsText = {};              // slot -> words typed for text-to-speech
-let recState = null;             // current microphone recording
+let info = null;          // last @INFO from the switch
+let editing = null;       // slot whose message editor is open
+let editHow = 'record';   // 'record' | 'type' | 'upload'
+let pending = null;       // new message waiting to be saved: {slot, pcm, seconds, truncated}
+let recState = null;      // microphone recording in progress
+let ttsBusy = false;
+let typed = '';           // words typed in the editor
+
+const MODE_HELP = [
+  'Plays the selected message each time the switch is pressed.',
+  'Plays the messages in turn – 1, 2, 3, 4 – and sends any IR codes they have.',
+  'Acts as a keyboard key (set it on the Keyboard tab).',
+  "Sends the selected slot's IR remote code.",
+  'Plays the selected message and sends its IR code together.',
+];
 
 // ---------------------------------------------------------------- toast
 let toastTimer;
@@ -281,7 +294,7 @@ async function readLoop() {
         handleLine(dec.decode(bytes).replace(/\r$/, ''));
       }
     }
-  } catch (e) { /* port closed or unplugged */ }
+  } catch { /* port closed or unplugged */ }
   disconnected();
 }
 
@@ -346,10 +359,11 @@ async function connect() {
       try { await refresh(); break; } catch (e) { if (t === 7) throw e; await sleep(700); }
     }
     $('connectBtn').textContent = 'Disconnect';
+    $('connectBtn').classList.remove('primary');
     $('intro').classList.add('hidden');
     $('app').classList.remove('hidden');
     toast('Connected to ' + info.name);
-  } catch (e) {
+  } catch {
     toast("The switch didn't answer. Is the latest firmware on it, and the Serial Monitor closed?", true);
     await disconnect();
   }
@@ -366,21 +380,23 @@ function disconnected() {
   while (waiters.length) { const w = waiters.shift(); clearTimeout(w.timer); }
   info = null;
   $('connectBtn').textContent = 'Connect';
+  $('connectBtn').classList.add('primary');
   $('app').classList.add('hidden');
   $('intro').classList.remove('hidden');
-  for (const id of ['devName', 'battery', 'btState']) $(id).classList.add('hidden');
+  for (const id of ['devName', 'battery', 'pressPill']) $(id).classList.add('hidden');
 }
 
-// ---------------------------------------------------------------- UI helpers
+// ---------------------------------------------------------------- helpers
 function el(tag, props = {}, ...kids) {
   const e = document.createElement(tag);
   for (const [k, v] of Object.entries(props)) {
+    if (v === undefined || v === null) continue;
     if (k === 'class') e.className = v;
     else if (k.startsWith('on')) e.addEventListener(k.slice(2), v);
     else if (k in e) e[k] = v;
     else e.setAttribute(k, v);
   }
-  for (const k of kids) if (k != null) e.append(k);
+  for (const k of kids) if (k != null && k !== false) e.append(k);
   return e;
 }
 
@@ -401,188 +417,141 @@ async function refresh() {
   render();
 }
 
+function segment(box, labels, current, onPick) {
+  box.replaceChildren(...labels.map((label, i) => el('button', {
+    class: i === current ? 'on' : '', role: 'radio', 'aria-checked': String(i === current), onclick: () => onPick(i),
+  }, label)));
+}
+
+function slotName(i) { return info.slots[i].name || `Slot ${i + 1}`; }
+function secs(n) { return (n / info.rate).toFixed(1) + ' s'; }
+
+// ---------------------------------------------------------------- render
 function render() {
   if (!info) return;
   $('devName').textContent = info.name;
   $('battery').textContent = info.bat >= 0 ? `Battery ${info.bat}%${info.chg ? ' ⚡' : ''}` : 'Battery –';
-  $('btState').textContent = info.bt ? 'Bluetooth connected' : 'Bluetooth not connected';
-  for (const id of ['devName', 'battery', 'btState']) $(id).classList.remove('hidden');
-  $('btName').textContent = info.name;
-  $('maxSec').textContent = info.maxSec;
+  for (const id of ['devName', 'battery', 'pressPill']) $(id).classList.remove('hidden');
+  $('btName1').textContent = $('btName2').textContent = info.name;
+  $('btState').textContent = info.bt ? 'connected now' : 'not connected';
+
+  segment($('modes'), info.modes, info.mode, (i) => act(() => cmd(`MODE ${i}`)));
+  $('modeHelp').textContent = MODE_HELP[info.mode] || '';
+  segment($('vols'), Array.from({ length: info.vols }, (_, i) => String(i + 1)), info.vol, (i) => act(() => cmd(`VOL ${i}`)));
+  segment($('keys'), info.keys, info.key, (i) => act(() => cmd(`KEY ${i}`)));
   renderMessages();
-  renderChips('modes', info.modes, info.mode, (i) => act(() => cmd(`MODE ${i}`)));
-  renderChips('vols', Array.from({ length: info.vols }, (_, i) => String(i + 1)), info.vol, (i) => act(() => cmd(`VOL ${i}`)));
-  renderChips('keys', info.keys, info.key, (i) => act(() => cmd(`KEY ${i}`)));
+  renderIr();
   renderSettings();
-  if (info.ckey && info.ckey.usage) {
-    $('mCtrl').checked = !!(info.ckey.mods & 1);
-    $('mShift').checked = !!(info.ckey.mods & 2);
-    $('mAlt').checked = !!(info.ckey.mods & 4);
-    $('mWin').checked = !!(info.ckey.mods & 8);
-    $('ckKey').value = info.ckey.usage;
-  }
-  $('ckDel').disabled = !(info.ckey && info.ckey.usage);
-  updateCkPreview();
+  renderCustomKey();
 }
 
-function renderChips(id, labels, current, onPick) {
-  const box = $(id);
-  box.replaceChildren(...labels.map((label, i) =>
-    el('button', { class: i === current ? 'on' : '', 'aria-pressed': String(i === current), onclick: () => onPick(i) }, label)));
+function selectRadio(i, group) {
+  return el('label', { class: 'sel', title: 'The switch uses the selected slot' },
+    el('input', { type: 'radio', name: group, checked: i === info.slot, onchange: () => act(() => cmd(`SLOT ${i}`)) }),
+    i === info.slot ? 'Selected' : 'Select');
 }
 
-function renderSettings() {
-  const box = $('settings');
-  box.replaceChildren(...info.settings.map((st) => {
-    const sel = el('select', { onchange: () => act(() => cmd(`SET ${st.key} ${sel.value}`), 'Saved') },
-      ...st.choices.map((c, i) => el('option', { value: i, selected: i === st.cur }, c)));
-    return el('label', {}, st.name, sel);
-  }));
-}
-
-// ---------------------------------------------------------------- messages
-function secs(n) { return (n / info.rate).toFixed(1) + ' s'; }
-
+// ---------------------------------------------------------------- messages tab
 function renderMessages() {
-  const box = $('msgs');
-  box.replaceChildren(...info.slots.map((s, i) => {
-    const selected = i === info.slot;
+  $('msgList').replaceChildren(...info.slots.map((s, i) => {
     const name = el('input', {
-      type: 'text', maxLength: 24, value: s.name, placeholder: `Name (e.g. "Bubbles")`,
+      type: 'text', class: 'name', maxLength: 24, value: s.name, placeholder: `Name, e.g. "Bubbles"`,
       'aria-label': `Name for slot ${i + 1}`,
       onchange: () => act(() => cmd(`NAME ${i} ${name.value.replace(/[\r\n]/g, ' ')}`), 'Name saved'),
     });
-    const file = el('input', { type: 'file', accept: 'audio/*', class: 'hidden',
-      onchange: () => file.files[0] && loadFile(i, file.files[0]) });
-    const recording = recState && recState.slot === i;
-
-    const card = el('div', { class: 'msg' + (selected ? ' selected' : '') },
-      el('div', { class: 'top' },
-        el('b', {}, `Slot ${i + 1}`),
-        el('span', { class: 'muted small' }, (s.len ? secs(s.len) : 'No message') + ' · ' + (s.ir ? 'IR code' : 'No IR'))),
-      name,
-      ttsRow(i, s),
-      el('div', { class: 'row' },
-        el('button', { disabled: !s.len, onclick: () => act(() => cmd(`PLAY ${i}`)) }, '▶ Play on switch'),
-        el('button', { disabled: !s.len, onclick: () => listenSaved(i) }, 'Listen here'),
-        selected ? el('span', { class: 'pill' }, 'Selected')
-                 : el('button', { onclick: () => act(() => cmd(`SLOT ${i}`)) }, 'Select')),
-      el('div', { class: 'row' },
-        el('button', { class: 'rec' + (recording ? ' on' : ''), disabled: !!recState && !recording,
-          onclick: () => (recording ? stopRecording() : startRecording(i)) },
-          recording ? '■ Stop' : '● Record'),
-        el('button', { disabled: !!recState, onclick: () => file.click() }, 'Upload file…'),
-        el('button', { disabled: !s.len, onclick: () => saveWav(i) }, 'Save .wav'),
+    const open = editing === i;
+    return el('div', { class: 'slot' + (i === info.slot ? ' selected' : '') },
+      el('div', { class: 'slot-main' },
+        el('span', { class: 'num' }, String(i + 1)),
+        name,
+        el('span', { class: 'status' + (s.len ? ' has' : '') }, s.len ? secs(s.len) : 'No message'),
+        el('button', { disabled: !s.len, onclick: () => act(() => cmd(`PLAY ${i}`)), title: 'Play it on the switch' }, '▶ Play'),
+        el('button', { class: open ? 'on' : '', onclick: () => toggleEditor(i) }, open ? 'Close' : 'Change'),
         el('button', { class: 'danger', disabled: !s.len, onclick: () => {
           if (confirm(`Delete the message in slot ${i + 1}?`)) act(() => cmd(`DEL ${i}`), 'Message deleted');
-        } }, 'Delete message'),
-        file),
-      el('div', { class: 'row' },
-        el('button', { disabled: !!recState, onclick: () => learnIr(i) }, s.ir ? 'Re-learn IR' : 'Learn IR'),
-        el('button', { disabled: !s.ir, onclick: () => act(() => cmd(`IRSEND ${i}`), 'IR sent') }, 'Test IR'),
-        el('button', { class: 'danger', disabled: !s.ir, onclick: () => {
-          if (confirm(`Delete the IR code in slot ${i + 1}?`)) act(() => cmd(`IRDEL ${i}`), 'IR code deleted');
-        } }, 'Delete IR')),
-    );
-    if (recording) {
-      card.append(el('div', { class: 'meter' }, el('div', { id: 'meterBar' })),
-        el('span', { class: 'small muted', id: 'recTime' }, 'Recording… speak now'));
-    }
-    const p = pending[i];
-    if (p) {
-      card.append(el('div', { class: 'pending' },
-        el('span', { class: 'small' }, `New message: ${p.seconds.toFixed(1)} s` +
-          (p.truncated ? ` (cut to ${info.maxSec} s)` : '')),
-        el('div', { class: 'row' },
-          el('button', { onclick: () => playPcm(p.pcm) }, 'Listen'),
-          el('button', { class: 'primary', onclick: () => savePending(i) }, 'Save to switch'),
-          el('button', { onclick: () => { delete pending[i]; render(); } }, 'Discard'))));
-    }
-    return card;
+        } }, 'Delete'),
+        selectRadio(i, 'msgSel')),
+      open ? renderEditor(i) : null);
   }));
 }
 
-// ---------------------------------------------------------------- text to speech
-let ttsMod = null;
-let ttsBusy = false;
-function ttsAvailable() { return location.protocol !== 'file:'; }
-async function tts() { return (ttsMod ||= await import('./tts/tts.js')); }
-
-function ttsRow(i, s) {
-  const input = el('input', {
-    type: 'text', maxLength: 200, value: ttsText[i] ?? '',
-    placeholder: s.name ? `Words to say (blank = "${s.name}")` : 'Type words to say…',
-    'aria-label': `Words to say for slot ${i + 1}`,
-    oninput: () => (ttsText[i] = input.value),
-    onkeydown: (e) => { if (e.key === 'Enter') makeSpeech(i); },
-  });
-  const btn = el('button', { disabled: ttsBusy || !!recState || !ttsAvailable(), onclick: () => makeSpeech(i),
-    title: ttsAvailable() ? '' : 'Typed speech works when this page is opened from the website, not as a file' }, 'Say it');
-  return el('div', { class: 'tts' }, input, btn);
-}
-
-function showTtsProgress(what, loaded, total) {
-  const box = $('ttsProgress');
-  box.classList.remove('hidden');
-  const pct = total ? Math.round((100 * loaded) / total) : 0;
-  $('ttsProgressText').textContent = `First time only: downloading the ${what} (${(loaded / 1e6).toFixed(0)}` +
-    (total ? ` of ${(total / 1e6).toFixed(0)} MB)` : ' MB)');
-  $('ttsProgressBar').style.width = pct + '%';
-}
-
-async function makeSpeech(i) {
-  const text = (ttsText[i] || info.slots[i].name || '').trim();
-  if (!text) return toast('Type the words to say first', true);
-  if (ttsBusy) return;
-  ttsBusy = true;
+function toggleEditor(i) {
+  if (recState) stopRecording();
+  editing = editing === i ? null : i;
+  pending = null;
   render();
-  try {
-    const t = await tts();
-    const { samples, sampleRate } = await t.synthesize(text, $('voice').value, +$('speed').value, showTtsProgress);
-    const audio = new AudioBuffer({ length: samples.length, sampleRate, numberOfChannels: 1 });
-    audio.copyToChannel(samples, 0);
-    pending[i] = await toSwitchFormat(audio);
-    playPcm(pending[i].pcm);
-  } catch (e) {
-    toast(e.message || "Couldn't make the speech", true);
-  } finally {
-    ttsBusy = false;
-    $('ttsProgress').classList.add('hidden');
-    render();
-  }
 }
 
-async function setupVoices() {
-  const sel = $('voice');
-  if (!ttsAvailable()) {
-    sel.replaceChildren(el('option', {}, 'Open from the website to use'));
-    sel.disabled = true;
-    return;
+function renderEditor(i) {
+  const how = (id, label) => el('button', { class: editHow === id ? 'on' : '', disabled: !!recState || ttsBusy,
+    onclick: () => { editHow = id; pending = null; render(); } }, label);
+  const body = [];
+
+  if (editHow === 'record') {
+    const recording = !!recState;
+    body.push(el('div', { class: 'row' },
+      el('button', { class: 'rec' + (recording ? ' on' : ''), onclick: () => (recording ? stopRecording() : startRecording(i)) },
+        recording ? '■ Stop' : '● Start recording'),
+      recording ? el('div', { class: 'meter' }, el('div', { id: 'meterBar' })) : null,
+      el('span', { id: 'recTime', class: 'small muted' },
+        recording ? 'Recording…' : 'Speak clearly, about 30cm from the microphone or headset.')));
+  } else if (editHow === 'type') {
+    const text = el('textarea', { placeholder: 'Type the words to say…', value: typed, maxLength: 200,
+      'aria-label': 'Words to say', oninput: () => (typed = text.value) });
+    const voice = el('select', { 'aria-label': 'Voice', onchange: () => store('voice', voice.value) },
+      ...VOICES.map((v) => el('option', { value: v.id, selected: v.id === (store('voice') || VOICES[0].id) }, v.name)));
+    const speed = el('select', { 'aria-label': 'Speed', onchange: () => store('speed', speed.value) },
+      ...[['0.8', 'Slow'], ['0.9', 'A bit slow'], ['1', 'Normal'], ['1.15', 'Fast']]
+        .map(([v, n]) => el('option', { value: v, selected: v === (store('speed') || '1') }, n)));
+    if (!ttsAvailable()) {
+      body.push(el('p', { class: 'small muted' }, 'Typed speech works when this page is opened from its web address, not as a file.'));
+    } else {
+      body.push(text, el('div', { class: 'row' },
+        el('label', { class: 'small' }, 'Voice ', voice),
+        el('label', { class: 'small' }, 'Speed ', speed),
+        el('button', { class: 'primary', disabled: ttsBusy, onclick: () => makeSpeech(i, text.value, voice.value, +speed.value) },
+          ttsBusy ? 'Making…' : 'Make speech')),
+      el('div', { id: 'ttsProgress', class: 'hidden' },
+        el('span', { id: 'ttsProgressText', class: 'small muted' }),
+        el('div', { class: 'progress' }, el('div', { id: 'ttsProgressBar' }))));
+    }
+  } else {
+    const file = el('input', { type: 'file', accept: 'audio/*', class: 'hidden',
+      onchange: () => file.files[0] && loadFile(i, file.files[0]) });
+    body.push(el('div', { class: 'row' }, el('button', { onclick: () => file.click() }, 'Choose an audio file…'),
+      el('span', { class: 'small muted' }, 'MP3, WAV, M4A and most other sound files.'), file));
   }
-  try {
-    const t = await tts();
-    let saved = null;
-    try { saved = localStorage.getItem('voice'); } catch {}
-    sel.replaceChildren(...t.VOICES.map((v) => el('option', { value: v.id, selected: v.id === saved }, v.name)));
-    sel.addEventListener('change', () => { try { localStorage.setItem('voice', sel.value); } catch {} });
-  } catch {
-    sel.replaceChildren(el('option', {}, 'Not available'));
-    sel.disabled = true;
+
+  if (pending && pending.slot === i) {
+    body.push(el('div', { class: 'preview' },
+      el('b', {}, `New message: ${pending.seconds.toFixed(1)} s`),
+      pending.truncated ? el('span', { class: 'small muted' }, `(cut to ${info.maxSec} s)`) : null,
+      el('button', { onclick: () => playPcm(pending.pcm) }, '▶ Listen'),
+      el('button', { class: 'primary', onclick: () => savePending() }, `Save to slot ${i + 1}`),
+      el('button', { onclick: () => { pending = null; render(); } }, 'Discard')));
   }
+
+  const loud = el('select', { 'aria-label': 'Loudness', onchange: () => store('boost', loud.value) },
+    ...[['1', 'Natural'], ['2', 'Loud'], ['3', 'Extra loud']]
+      .map(([v, n]) => el('option', { value: v, selected: v === (store('boost') || '2') }, n)));
+  body.push(el('div', { class: 'row small muted' },
+    el('label', {}, 'Loudness for new messages ', loud),
+    info.slots[i].len ? el('button', { class: 'link', onclick: () => saveWav(i) }, 'Download current message (.wav)') : null,
+    info.slots[i].len ? el('button', { class: 'link', onclick: () => listenSaved(i) }, 'Listen to current message here') : null));
+
+  return el('div', { class: 'editor' },
+    el('div', { class: 'how' }, how('record', '● Record'), how('type', 'Aa Type words'), how('upload', '⤒ Upload file')),
+    ...body);
 }
 
-async function learnIr(i) {
-  toast('Point the remote at the switch from 30cm or more and press the button (8 seconds)…');
-  await act(() => cmd(`IRLEARN ${i}`, 12000), `IR code learned into slot ${i + 1}`);
-}
-
-async function savePending(i) {
-  const p = pending[i];
+async function savePending() {
+  const p = pending;
   await act(async () => {
-    toast('Sending to switch…');
-    await upload(i, p.pcm);
-    delete pending[i];
-  }, `Saved into slot ${i + 1}`);
+    toast('Sending to the switch…');
+    await upload(p.slot, p.pcm);
+    pending = null;
+    editing = null;
+  }, `Saved to slot ${p.slot + 1}`);
 }
 
 async function listenSaved(i) {
@@ -592,11 +561,66 @@ async function listenSaved(i) {
 async function saveWav(i) {
   try {
     const pcm = await download(i);
-    const name = (info.slots[i].name || `slot-${i + 1}`).replace(/[^\w\- ]+/g, '').trim() || `message-${i + 1}`;
+    const name = (info.slots[i].name || `slot-${i + 1}`).replace(/[^\w\- ]+/g, '').trim() || `slot-${i + 1}`;
     const a = el('a', { href: URL.createObjectURL(wavBlob(pcm, info.rate)), download: name + '.wav' });
     a.click();
     setTimeout(() => URL.revokeObjectURL(a.href), 5000);
   } catch (e) { toast(e.message, true); }
+}
+
+// ---------------------------------------------------------------- IR tab
+async function learnIr(i) {
+  toast('Point the remote at the end of the switch from 30cm+ and press its button…');
+  await act(() => cmd(`IRLEARN ${i}`, 12000), `IR code learned into slot ${i + 1}`);
+}
+
+function renderIr() {
+  $('irList').replaceChildren(...info.slots.map((s, i) => el('div', { class: 'slot' + (i === info.slot ? ' selected' : '') },
+    el('div', { class: 'slot-main' },
+      el('span', { class: 'num' }, String(i + 1)),
+      el('span', { class: 'name' }, slotName(i)),
+      el('span', { class: 'status' + (s.ir ? ' has' : '') }, s.ir ? 'Code saved' : 'No code'),
+      el('button', { onclick: () => learnIr(i) }, s.ir ? 'Learn again' : 'Learn'),
+      el('button', { disabled: !s.ir, onclick: () => act(() => cmd(`IRSEND ${i}`), 'Sent') }, 'Test'),
+      el('button', { class: 'danger', disabled: !s.ir, onclick: () => {
+        if (confirm(`Delete the IR code in slot ${i + 1}?`)) act(() => cmd(`IRDEL ${i}`), 'IR code deleted');
+      } }, 'Delete'),
+      selectRadio(i, 'irSel')))));
+}
+
+// ---------------------------------------------------------------- settings tab
+const GROUPS = [
+  ['How the switch responds', ['s_play', 's_hold', 's_accept', 's_lockout', 's_keyact', 's_psound']],
+  ['Recording on the switch', ['s_loud']],
+  ['Screen and power', ['s_wake', 's_sleep', 's_autooff']],
+];
+const HELP = {
+  s_play: 'Tap: a press plays the whole message. Hold to play: plays only while the switch is held. Latch: one press starts it, the next stops it.',
+  s_hold: 'In SPEAK, holding the switch this long moves to the next message. Turn off for students who can’t let go quickly.',
+  s_accept: 'A press must last this long to count – filters accidental brushes.',
+  s_lockout: 'Presses this soon after the last one are ignored – filters tremor and bounces.',
+  s_keyact: 'KEYBOARD mode. Latch: one press holds the key down, the next lets it go.',
+  s_psound: 'A click or beep on each press in KEYBOARD and IR modes.',
+  s_loud: 'Makes messages recorded on the switch itself louder, at some cost in clarity.',
+  s_wake: 'Whether presses of the big switch light up the screen.',
+  s_sleep: 'On battery, sleeps after this long without presses. The big switch still works and wakes it.',
+  s_autooff: 'On battery, turns off completely after this long without presses.',
+};
+
+function renderSettings() {
+  const byKey = Object.fromEntries(info.settings.map((s) => [s.key, s]));
+  const used = new Set();
+  const groups = GROUPS.map(([title, keys]) => [title, keys.filter((k) => byKey[k] && used.add(k))]);
+  const rest = info.settings.map((s) => s.key).filter((k) => !used.has(k));
+  if (rest.length) groups.push(['Other', rest]);
+  $('settingGroups').replaceChildren(...groups.filter(([, keys]) => keys.length).map(([title, keys]) =>
+    el('div', { class: 'group' }, el('h2', {}, title), ...keys.map((k) => {
+      const st = byKey[k];
+      const sel = el('select', { id: 'set-' + k, onchange: () => act(() => cmd(`SET ${k} ${sel.value}`), 'Saved') },
+        ...st.choices.map((c, i) => el('option', { value: i, selected: i === st.cur }, c)));
+      return el('div', { class: 'setting' }, el('label', { for: 'set-' + k }, st.name), sel,
+        HELP[k] ? el('div', { class: 'help' }, HELP[k]) : null);
+    }))));
 }
 
 // ---------------------------------------------------------------- audio
@@ -627,8 +651,9 @@ function wavBlob(pcm, rate) {
   return new Blob([buf], { type: 'audio/wav' });
 }
 
-// Any decoded audio -> the switch's format: mono, info.rate Hz, 16-bit,
-// low rumble removed, silence trimmed, level evened out.
+// Any decoded audio -> the switch's format: mono, info.rate Hz, 16-bit.
+// Bass the small speaker can't play is removed, silence trimmed, and the
+// level brought up to full with optional soft-clip "loudness".
 async function toSwitchFormat(audio) {
   const rate = info.rate;
   const off = new OfflineAudioContext(1, Math.max(1, Math.ceil(audio.duration * rate)), rate);
@@ -638,10 +663,12 @@ async function toSwitchFormat(audio) {
   src.start();
   let x = (await off.startRendering()).getChannelData(0).slice();
 
-  // high-pass ~80Hz
-  const a = 1 / (1 + 2 * Math.PI * 80 / rate);
-  let py = 0, px = 0;
-  for (let k = 0; k < x.length; k++) { const y = a * (py + x[k] - px); px = x[k]; x[k] = py = y; }
+  // high-pass ~200Hz, twice (the switch's speaker can't reproduce deep bass)
+  const a = 1 / (1 + 2 * Math.PI * 200 / rate);
+  for (let pass = 0; pass < 2; pass++) {
+    let py = 0, px = x[0];
+    for (let k = 0; k < x.length; k++) { const y = a * (py + x[k] - px); px = x[k]; x[k] = py = y; }
+  }
 
   // trim silence using 10ms blocks
   const B = Math.round(rate / 100);
@@ -662,11 +689,11 @@ async function toSwitchFormat(audio) {
   if (truncated) end = start + limit;
   x = x.slice(start, end);
 
-  // normalise, optional soft-clip boost, short fades
+  // normalise, soft-clip loudness, short fades
   let peak = 0;
   for (const v of x) peak = Math.max(peak, Math.abs(v));
   const gain = Math.min(30, 0.97 / peak);
-  const drive = +$('boost').value;
+  const drive = +(store('boost') || '2');
   const norm = drive > 1 ? 1 / Math.tanh(drive) : 1;
   const fade = Math.round(rate * 0.01);
   const pcm = new Int16Array(x.length);
@@ -679,18 +706,20 @@ async function toSwitchFormat(audio) {
   return { pcm, seconds: pcm.length / rate, truncated };
 }
 
-async function useAudio(slot, arrayBuffer) {
+async function useAudio(slot, audio) {
   try {
-    const audio = await audioCtx().decodeAudioData(arrayBuffer);
-    pending[slot] = await toSwitchFormat(audio);
+    pending = { slot, ...(await toSwitchFormat(audio)) };
+    playPcm(pending.pcm);
   } catch (e) {
-    toast(e.message && !/decode/i.test(e.message) ? e.message : "Couldn't read that audio", true);
+    toast(e.message || "Couldn't use that sound", true);
   }
   render();
 }
 
 async function loadFile(slot, f) {
-  await useAudio(slot, await f.arrayBuffer());
+  try {
+    await useAudio(slot, await audioCtx().decodeAudioData(await f.arrayBuffer()));
+  } catch { toast("Couldn't read that file – try an MP3 or WAV", true); }
 }
 
 async function startRecording(slot) {
@@ -712,12 +741,15 @@ async function startRecording(slot) {
   ctx.createMediaStreamSource(stream).connect(an);
   const buf = new Float32Array(an.fftSize);
   const t0 = performance.now();
-  recState = { slot, rec, stream, t0 };
+  pending = null;
+  recState = { slot, rec, stream };
   rec.onstop = async () => {
     stream.getTracks().forEach((t) => t.stop());
     cancelAnimationFrame(recState.raf);
     recState = null;
-    await useAudio(slot, await new Blob(chunks).arrayBuffer());
+    try {
+      await useAudio(slot, await ctx.decodeAudioData(await new Blob(chunks).arrayBuffer()));
+    } catch { toast("Couldn't use that recording", true); render(); }
   };
   rec.start();
   render();
@@ -730,7 +762,7 @@ async function startRecording(slot) {
     if (bar) bar.style.width = Math.min(100, p * 140) + '%';
     const t = (performance.now() - t0) / 1000;
     const lbl = $('recTime');
-    if (lbl) lbl.textContent = `Recording… ${t.toFixed(1)} s – click Stop when done`;
+    if (lbl) lbl.textContent = `Recording… ${t.toFixed(1)} s`;
     if (t > info.maxSec + 5) return stopRecording();  // silence gets trimmed, so allow a little extra
     recState.raf = requestAnimationFrame(tick);
   };
@@ -739,6 +771,46 @@ async function startRecording(slot) {
 
 function stopRecording() {
   if (recState && recState.rec.state !== 'inactive') recState.rec.stop();
+}
+
+// ---------------------------------------------------------------- typed speech
+const VOICES = [
+  { id: 'en_GB-cori-medium', name: 'Cori – English, female' },
+  { id: 'en_GB-alba-medium', name: 'Alba – Scottish, female' },
+  { id: 'en_GB-southern_english_female-low', name: 'Southern English, female' },
+  { id: 'en_GB-northern_english_male-medium', name: 'Northern English, male' },
+];
+let ttsMod = null;
+function ttsAvailable() { return location.protocol !== 'file:'; }
+
+function showTtsProgress(what, loaded, total) {
+  const box = $('ttsProgress');
+  if (!box) return;
+  box.classList.remove('hidden');
+  $('ttsProgressText').textContent = `First time only: downloading the ${what} (${(loaded / 1e6).toFixed(0)}` +
+    (total ? ` of ${(total / 1e6).toFixed(0)} MB)` : ' MB)');
+  $('ttsProgressBar').style.width = (total ? Math.round((100 * loaded) / total) : 0) + '%';
+}
+
+async function makeSpeech(slot, text, voice, speed) {
+  text = text.trim();
+  typed = text;
+  if (!text) return toast('Type the words to say first', true);
+  ttsBusy = true;
+  pending = null;
+  render();
+  try {
+    ttsMod ||= await import('./tts/tts.js');
+    const { samples, sampleRate } = await ttsMod.synthesize(text, voice, speed, showTtsProgress);
+    const audio = new AudioBuffer({ length: samples.length, sampleRate, numberOfChannels: 1 });
+    audio.copyToChannel(samples, 0);
+    ttsBusy = false;
+    await useAudio(slot, audio);
+  } catch (e) {
+    ttsBusy = false;
+    toast(e.message || "Couldn't make the speech", true);
+    render();
+  }
 }
 
 // ---------------------------------------------------------------- custom key
@@ -766,10 +838,32 @@ function ckLabel() {
   return parts.join('+');
 }
 function updateCkPreview() { $('ckPreview').textContent = ckLabel(); }
+function renderCustomKey() {
+  const ck = info.ckey;
+  if (ck && ck.usage && !renderCustomKey.done) {
+    $('mCtrl').checked = !!(ck.mods & 1);
+    $('mShift').checked = !!(ck.mods & 2);
+    $('mAlt').checked = !!(ck.mods & 4);
+    $('mWin').checked = !!(ck.mods & 8);
+    $('ckKey').value = ck.usage;
+    renderCustomKey.done = true;
+  }
+  $('ckDel').disabled = !(ck && ck.usage);
+  updateCkPreview();
+}
 for (const id of ['mCtrl', 'mShift', 'mAlt', 'mWin', 'ckKey']) $(id).addEventListener('change', updateCkPreview);
 $('ckSet').addEventListener('click', () =>
   act(() => cmd(`CKEY ${ckMods()} ${$('ckKey').value} ${ckLabel()}`), `Custom key set: ${ckLabel()}`));
 $('ckDel').addEventListener('click', () => act(() => cmd('CKEY 0 0'), 'Custom key removed'));
+
+// ---------------------------------------------------------------- tabs
+function showTab(name) {
+  for (const b of document.querySelectorAll('.tabs button')) b.setAttribute('aria-selected', String(b.dataset.tab === name));
+  for (const t of ['messages', 'ir', 'keyboard', 'settings']) $('tab-' + t).classList.toggle('hidden', t !== name);
+  store('tab', name);
+}
+for (const b of document.querySelectorAll('.tabs button')) b.addEventListener('click', () => showTab(b.dataset.tab));
+showTab(store('tab') || 'messages');
 
 // ---------------------------------------------------------------- wiring
 $('forgetBtn').addEventListener('click', () => {
@@ -777,7 +871,6 @@ $('forgetBtn').addEventListener('click', () => {
     act(() => cmd('FORGET'), 'Paired devices forgotten');
 });
 $('connectBtn').addEventListener('click', () => (port ? disconnect() : connect()));
-setupVoices();
 
 if (!('serial' in navigator)) {
   $('noSerial').classList.remove('hidden');
@@ -787,8 +880,8 @@ if (!('serial' in navigator)) {
   navigator.serial.addEventListener('disconnect', (e) => { if (e.target === port) disconnect(); });
   // keep battery / mode in step with changes made on the switch itself
   setInterval(() => {
-    const typing = ['INPUT', 'SELECT'].includes(document.activeElement && document.activeElement.tagName);
-    if (info && !recState && !document.hidden && !typing) refresh().catch(() => {});
+    const typing = ['INPUT', 'SELECT', 'TEXTAREA'].includes(document.activeElement && document.activeElement.tagName);
+    if (info && editing === null && !document.hidden && !typing) refresh().catch(() => {});
   }, 15000);
 }
 </script>

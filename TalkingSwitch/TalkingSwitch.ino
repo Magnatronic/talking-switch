@@ -96,6 +96,8 @@ static const uint8_t  MIC_PGA     = 8;     // mic analogue gain, 3dB steps (0-10
 static const char*    BLE_NAME      = "Talking Switch"; // Bluetooth name; the last 4 characters of the
                                                         // stick's address are added, e.g. "Talking Switch 7B70"
 static const uint8_t  VOLUMES[]     = {128, 180, 220, 255}; // output power is volume squared: ~25/50/75/100%
+static const uint8_t  SPK_GAIN      = 8;   // speaker magnification: 8 = volume 4 is exactly full scale
+                                           // (M5Unified's StickS3 default of 1 is 18dB quieter)
 static const int      IR_REPEATS    = 2;   // extra copies of the IR code (helps at the edge of range)
 static const float    IR_DUTY       = 0.5f; // carrier duty: 0.5 = most energy per pulse (remotes often use 0.33)
 static const uint32_t IR_REPEAT_MS  = 110; // IR mode, Hold to play: resend this often while held
@@ -355,6 +357,17 @@ void tidyRecording(int i) {
   int16_t* b = slotBuf[i];
   size_t n = slotLen[i];
   if (n == 0) return;
+  // Remove bass the small speaker can't reproduce, so the level goes into
+  // sound it can play (two one-pole high-pass filters, ~200Hz)
+  for (int pass = 0; pass < 2; pass++) {
+    float px = b[0], py = 0;
+    for (size_t k = 0; k < n; k++) {
+      float y = 0.927f * (py + b[k] - px);
+      px = b[k];
+      py = y;
+      b[k] = (int16_t)y;
+    }
+  }
   const int16_t gate = 600;
   size_t start = 0, end = n;
   while (start < n && abs(b[start]) < gate) start++;
@@ -1523,6 +1536,13 @@ void setup() {
   auto mic = M5.Mic.config();
   mic.over_sampling = 4;  // average more readings per sample: less hiss
   M5.Mic.config(mic);
+  // M5Unified gives the StickS3 speaker a magnification of 1, which plays a
+  // full-scale sound at about 12% (-18dB). Applied at the next begin().
+  M5.Speaker.end();
+  auto spk = M5.Speaker.config();
+  spk.magnification = SPK_GAIN;
+  M5.Speaker.config(spk);
+  M5.Speaker.begin();
   Serial.setRxBufferSize(16384);  // room for recordings sent from the setup page
   Serial.begin(115200);
 
