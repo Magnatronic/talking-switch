@@ -249,6 +249,10 @@ const MODE_HELP = {
 };
 const TABS = ['speak', 'choose', 'keyboard', 'ir', 'voice', 'settings'];
 function tabOfMode(i) { return (info.modes[i] || '').toLowerCase(); }
+function tabOn(tab) {
+  const m = info && info.modes.findIndex((x) => x.toLowerCase() === tab);
+  return !info || !info.modesOn || m < 0 || info.modesOn[m];
+}
 
 // ---------------------------------------------------------------- toast
 let toastTimer;
@@ -457,12 +461,14 @@ function segment(box, labels, current, onPick) {
 // Numbers shared with the switch.
 //   Sounds: 0-3 Quick, 4-19 topic messages (topic t, item k = 4 + t*4 + k), 20-23 IR codes' sounds,
 //           24-39 topic message prompts, 40-43 topic prompts, 44-47 IR prompts, 48 "Back",
-//           49-52 Quick message prompts, 53 "Stop".
+//           49-52 Quick message prompts, 53 "Stop", 54 "Control", 55 "My device".
 //   Names:  0-3 Quick, 4-19 topic messages, 20-23 IR codes, 24-27 topics (BACK and STOP only have a prompt).
-const PER = 4, TOPIC0 = 4, IRS = 20, TOPICN = 24, BACK = 48, STOP = 53;
+const PER = 4, TOPIC0 = 4, IRS = 20, TOPICN = 24, BACK = 48, STOP = 53, IRMENU = 54, TALKER = 55;
+// Prompts with fixed words (no name of their own)
+const FIXED_PROMPTS = { [BACK]: 'Back', [STOP]: 'Stop', [IRMENU]: 'Control', [TALKER]: 'My device' };
 function topicMsg(t, k) { return TOPIC0 + t * PER + k; }
 function promptOf(n) {
-  if (n === BACK || n === STOP) return n;
+  if (FIXED_PROMPTS[n]) return n;
   if (n < TOPIC0) return 49 + n;
   return n < IRS ? 24 + (n - TOPIC0) : n < TOPICN ? 44 + (n - IRS) : 40 + (n - TOPICN);
 }
@@ -486,7 +492,11 @@ function render() {
   $('btName').textContent = info.name;
   $('btState').textContent = info.bt ? 'connected now' : 'not connected';
 
-  for (const b of document.querySelectorAll('.tabs button')) b.classList.toggle('inuse', b.dataset.tab === tabOfMode(info.mode));
+  for (const b of document.querySelectorAll('.tabs button')) {
+    b.classList.toggle('inuse', b.dataset.tab === tabOfMode(info.mode));
+    b.classList.toggle('hidden', !tabOn(b.dataset.tab));  // modes turned off in Settings: Modes
+  }
+  if (!tabOn(currentTab)) showTab('speak');
   renderQuick();
   renderTopics();
   renderIr();
@@ -694,7 +704,7 @@ async function renameItem(n, value) {
 let promptChain = Promise.resolve();
 function makePrompt(n) {
   promptChain = promptChain.then(async () => {
-    const name = info && (n === BACK ? 'Back' : n === STOP ? 'Stop' : (soundInfo(n).name || '').trim());
+    const name = info && (FIXED_PROMPTS[n] || (soundInfo(n).name || '').trim());
     if (!name || !ttsAvailable()) return;
     try {
       const v = VOICES.find((x) => x.id === savedVoice());
@@ -722,6 +732,9 @@ function promptItems() {
   ].filter(([, x]) => x.name).map(([n, x]) => [n, x.pr]);
   if (setCur('s_topics') === 1) list.push([BACK, info.back.pr]);
   if (setCur('s_stop') === 1 && info.stop) list.push([STOP, info.stop.pr]);
+  const extra = setCur('s_topics') === 1 ? setCur('s_extra') : 0;
+  if (extra & 1 && info.irmenu) list.push([IRMENU, info.irmenu.pr]);
+  if (extra & 2 && info.talker) list.push([TALKER, info.talker.pr]);
   return list;
 }
 
@@ -803,11 +816,13 @@ const HELP = {
   s_access: 'Press twice: a press starts the offers, the next press chooses. Hold & release: hold to step through, let go to choose.',
   s_scanspd: 'How long each choice is offered. Go at the student’s pace.',
   s_scanrnd: 'Times round the choices before it stops by itself.',
+  s_extra: 'More choices next to the topics. Control: the IR codes (from the IR tab), chosen like a topic’s messages. My device: changes to KEYBOARD so the student can use their AAC device or computer – staff (or No USB) bring it back.',
   s_stop: 'Offers “Stop” last, so the student can choose none of them.',
   s_irmode: 'Staff pick: sends the selected code. Repeat held: keeps sending while held, like a remote’s volume button. Student scans: the student chooses the code.',
   s_nousb: 'With no USB connection (e.g. the AAC device isn’t there): Bluetooth sends keys over Bluetooth. SPEAK or CHOOSE: after 10 s the switch talks instead, with Bluetooth off to save battery, and goes back to KEYBOARD when USB is connected again.',
   s_keyact: 'Momentary: the key is held while the switch is. Latch: one press holds the key down, the next lets it go.',
   s_psound: 'A click or beep on each press (IR: only for codes with no sound of their own).',
+  s_modes: 'Turn KEYBOARD and/or IR off for a switch that only talks: the stick’s A button and this page skip them. Their key and IR codes are kept.',
   s_accept: 'A press must last this long to count – filters accidental brushes.',
   s_lockout: 'Presses this soon after the last one are ignored – filters tremor and bounces.',
   s_sleep: 'On battery, sleeps after this long without presses. The big switch still works and wakes it.',
@@ -821,7 +836,7 @@ const TAB_SETTINGS = {  // [setting, shown only when]
   speak: [['s_spkmode'], ['s_play', () => !speakScanning()], ['s_hold', () => !speakScanning() && setCur('s_play') === 0],
     ['s_access', speakScanning], ['s_scanspd', speakScanning], ['s_scanrnd', () => speakScanning() && pressTwice()],
     ['s_stop', speakScanning]],
-  choose: [['s_topics'], ['s_access'], ['s_scanspd'], ['s_scanrnd', pressTwice], ['s_stop']],
+  choose: [['s_topics'], ['s_extra', () => setCur('s_topics') === 1], ['s_access'], ['s_scanspd'], ['s_scanrnd', pressTwice], ['s_stop']],
   keyboard: [['s_keyact'], ['s_psound'], ['s_nousb', () => info.usbhid]],
   ir: [['s_irmode'], ['s_access', irScanning], ['s_scanspd', irScanning],
     ['s_scanrnd', () => irScanning() && pressTwice()], ['s_stop', irScanning], ['s_psound']],
@@ -863,12 +878,13 @@ function renderSettings() {
     if (confirm('Forget every paired computer and tablet? You will need to pair again.'))
       act(() => cmd('FORGET'), 'Paired devices forgotten');
   } }, 'Forget all');
-  $('set-settings').replaceChildren(
+  $('set-settings').replaceChildren(...[
     settingRow('Volume', Array.from({ length: info.vols }, (_, i) => String(i + 1)), info.vol,
       (i) => act(() => cmd(`VOL ${i}`)), 'How loud messages play. 4 is the loudest the switch can go.'),
-    ...['s_accept', 's_lockout', 's_wake', 's_sleep', 's_autooff', 's_loud'].map(switchSetting).filter(Boolean),
-    el('div', { class: 'setting' }, el('div', { class: 'name' }, 'Forget BT devices'), el('div', {}, forget),
-      el('div', { class: 'help' }, 'To pair the switch with a different computer or tablet. Also remove it in that device’s Bluetooth settings.')));
+    ...['s_modes', 's_accept', 's_lockout', 's_wake', 's_sleep', 's_autooff', 's_loud'].map(switchSetting),
+    tabOn('keyboard') && el('div', { class: 'setting' }, el('div', { class: 'name' }, 'Forget BT devices'), el('div', {}, forget),
+      el('div', { class: 'help' }, 'To pair the switch with a different computer or tablet. Also remove it in that device’s Bluetooth settings.')),
+  ].filter(Boolean));
   $('set-voice').replaceChildren(...renderVoiceSetting());
 }
 

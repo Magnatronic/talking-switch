@@ -109,6 +109,11 @@ up to 5 seconds. Each IR code can have its own sound, e.g. IR code 1 "Bubbles" t
 | IR | Sends the selected IR code, and says its sound if it has one. *IR codes* setting: Staff pick / Repeat held (keeps sending while held, like a remote's volume button) / Student scans (the student chooses by scanning) | code colour |
 | SETTINGS | Keeps doing whatever the previous mode did | as previous mode |
 
+### Just a talking switch
+
+For a student who only needs it to talk, set SETTINGS **Modes: Talking only**: A then goes SPEAK → CHOOSE →
+SETTINGS, and the setup page shows only SPEAK, CHOOSE, Voice and Settings.
+
 ### Backup mode: a switch for the AAC device, and a talker when it isn't there
 
 With KEYBOARD's **No USB** set to SPEAK or CHOOSE, the switch works the student's AAC device over USB, and when
@@ -143,6 +148,11 @@ and the student picks one, which then plays in full (or, in IR, is sent).
   topic* on the setup page), e.g. "Snack time".
 - **CHOOSE, Choose from: All topics** – it offers the **topics** first ("Snack time"… "Music"…), then the chosen topic's
   messages and **"Back"** (to return to the topics).
+- **Also offer** (with All topics) – more choices next to the topics, so CHOOSE can be the student's home:
+  **Control** offers the IR codes like a topic's messages (then Back), so the student can turn on the bubble tube
+  or TV themselves; **My device** changes the switch to KEYBOARD so they can use their AAC device or computer.
+  Once in KEYBOARD every press goes to the device, so the switch can't offer a way back: staff bring it back (A,
+  or the setup page), or with *No USB: CHOOSE* it comes back by itself when USB is unplugged.
 - **Choosing: Press twice** – a press starts the offers, the next press chooses. With no choice it stops after the
   set number of *Scan rounds*.
 - **Choosing: Hold & release** – hold the switch to step through the offers, let go to choose. After choosing a
@@ -167,6 +177,7 @@ All of these are on the setup page too, on each mode's tab and the Settings tab.
 | Where | Setting | Choices (default **bold**) | What it does |
 |---|---|---|---|
 | General | Volume | 1, 2, **3**, 4 | How loud messages play |
+| General | Modes | **All**, Talking + IR, Talking + KEYBOARD, Talking only | Turn KEYBOARD and/or IR off for a switch that only talks: A skips them, the setup page hides their tabs, and their settings (and Also offer's choices) go too. Their key and IR codes are kept |
 | General | Press must last | **Instant**, 0.1s, 0.25s, 0.5s, 1s | Filters accidental brushes |
 | General | Ignore repeats for | Off, 0.2s, **0.4s**, 0.8s, 1.5s | Filters tremor and bounces after a press |
 | General | Switch wakes screen | **No**, Yes | Whether student presses light up the screen |
@@ -178,6 +189,7 @@ All of these are on the setup page too, on each mode's tab and the Settings tab.
 | SPEAK | Play style | **Tap**, Hold to play, Latch | *Tap*: a press plays the whole message. *Hold to play*: plays (looping) only while the switch is held – classic cause and effect. *Latch*: one press starts it looping, the next press stops it |
 | SPEAK | Hold for next msg | Off, 1s, **1.5s**, 2s, 3s | With Tap: how long the student holds the switch to move to the next Quick message. Turn off for students who can't let go quickly |
 | CHOOSE | Choose from | **One topic**, All topics | See above |
+| CHOOSE | Also offer | **None**, Control, My device, Both | With All topics: more choices next to the topics, see above |
 | SPEAK, CHOOSE, IR | Choosing | **Press twice**, Hold & release | See above |
 | SPEAK, CHOOSE, IR | Scan speed | 1.5s, 2s, **3s**, 4s, 5s | How long each choice is offered |
 | SPEAK, CHOOSE, IR | Scan rounds | 1, **2**, 3 | Press twice: how many times round before it stops by itself |

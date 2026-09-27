@@ -10,7 +10,9 @@
 //    CHOOSE    The Topics, by scanning. Choose from:
 //                One topic - the messages in the topic staff selected;
 //                All topics - the topics first, then that topic's messages
-//                  plus "Back".
+//                  plus "Back". "Also offer" adds "Control" (the IR
+//                  codes, like a topic) and "My device" (changes to KEYBOARD
+//                  so the student can use their AAC device) to the topics.
 //  Scanning: the switch offers the choices one at a time (LED colour, name
 //  on screen, a quiet spoken prompt) and the student picks one, which then
 //  plays. Choosing: Press twice - a press starts, the next chooses;
@@ -33,7 +35,9 @@
 //  4 Quick messages (SPEAK), 4 Topics of 4 messages (CHOOSE) and 4 IR codes,
 //  each up to 5 s and each with an optional name. The setup page turns the
 //  names into the short spoken prompts used when scanning.
-//    SETTINGS  General settings (volume, press timing, power, Bluetooth).
+//    SETTINGS  General settings (volume, modes, press timing, power, Bluetooth).
+//              "Modes" can turn KEYBOARD and/or IR off for a talking-only switch:
+//              A then skips them (their key and codes are kept).
 //              Each mode has its own settings too, as the last item B steps to.
 //              The big switch keeps doing the previous mode's job.
 //
@@ -114,11 +118,12 @@ static const int      NUM_SLOTS   = 4;     // IR codes (and the 4 item colours)
 //   0-3 Quick messages, 4-19 topic messages (topic t, item k = 4 + t*4 + k),
 //   20-23 IR codes' sounds, 24-39 topic message prompts, 40-43 topic prompts,
 //   44-47 IR code prompts, 48 the "Back" prompt, 49-52 Quick message prompts,
-//   53 the "Stop" prompt
+//   53 the "Stop" prompt, 54 "Control", 55 "My device"
 static const int SND_TOPIC = NUM_QUICK, SND_IR = SND_TOPIC + NUM_TOPICS * PER_TOPIC, SND_PMSG = SND_IR + NUM_SLOTS,
                  SND_PTOPIC = SND_PMSG + NUM_TOPICS * PER_TOPIC, SND_PIR = SND_PTOPIC + NUM_TOPICS,
                  SND_PBACK = SND_PIR + NUM_SLOTS, SND_PQUICK = SND_PBACK + 1,
-                 SND_PSTOP = SND_PQUICK + NUM_QUICK, NUM_SOUNDS = SND_PSTOP + 1;
+                 SND_PSTOP = SND_PQUICK + NUM_QUICK, SND_PIRMENU = SND_PSTOP + 1, SND_PTALKER = SND_PIRMENU + 1,
+                 NUM_SOUNDS = SND_PTALKER + 1;
 // Name numbers: 0-3 Quick, 4-19 topic messages, 20-23 IR codes (as sounds), 24-27 topics
 static const int NAME_TOPIC = SND_PMSG, NUM_NAMES = NAME_TOPIC + NUM_TOPICS;
 static const uint8_t  MIC_PGA     = 8;     // mic analogue gain, 3dB steps (0-10). Lower if loud voices distort
@@ -162,7 +167,7 @@ static const bool HEADER_DARK_TEXT[M_COUNT] = {false, false, false, true, false}
 enum KbOut : uint8_t { OUT_NONE, OUT_BLE, OUT_USB };  // where keyboard presses go
 enum PlayStyle : uint8_t { PLAY_TAP, PLAY_HOLD, PLAY_LATCH };
 // A choice offered while scanning (declared here, before any function)
-enum ScanKind : uint8_t { SK_GROUP, SK_MSG, SK_BACK, SK_IR, SK_STOP };
+enum ScanKind : uint8_t { SK_GROUP, SK_MSG, SK_BACK, SK_IR, SK_STOP, SK_IRMENU, SK_TALKER };
 struct ScanItem { uint8_t kind, idx; };
 
 enum Arrow : uint8_t { A_NONE, A_UP, A_DOWN, A_LEFT, A_RIGHT };
@@ -179,7 +184,7 @@ static const int NUM_KEYS = sizeof(KEYS) / sizeof(KEYS[0]);
 //  and remembered after power-off. Each has a fixed list of choices.
 // ---------------------------------------------------------------------
 enum SettingId : uint8_t {
-  S_VOLUME, S_SPEAK_CHOOSE, S_PLAY, S_HOLD, S_CHOOSE_FROM, S_IR_CHOOSE, S_ACCESS, S_SCAN_SPEED, S_SCAN_ROUNDS, S_STOP,
+  S_VOLUME, S_MODES, S_SPEAK_CHOOSE, S_PLAY, S_HOLD, S_CHOOSE_FROM, S_EXTRA, S_IR_CHOOSE, S_ACCESS, S_SCAN_SPEED, S_SCAN_ROUNDS, S_STOP,
   S_KEY_ACTION, S_PRESS_SOUND, S_NO_USB,
   S_ACCEPT, S_LOCKOUT, S_WAKE, S_SLEEP, S_AUTOOFF, S_LOUD, S_FORGET,
   S_COUNT
@@ -196,6 +201,8 @@ struct Setting {
 };
 static const Setting SETTINGS[S_COUNT] = {
   {"Volume",              "vol",       4, 2, {0, 1, 2, 3}, {"1", "2", "3", "4"}, G_GENERAL},
+  // which modes this switch uses (SPEAK and CHOOSE always)
+  {"Modes",               "s_modes",   4, 0, {0, 1, 2, 3}, {"All", "Talking + IR", "Talking + KEYBOARD", "Talking only"}, G_GENERAL},
   // SPEAK: play the Quick message staff selected, or the student chooses one by scanning
   {"Messages",            "s_spkmode", 2, 0, {0, 1}, {"Staff pick", "Student scans"}, G_SPEAK},
   // SPEAK: Tap = a press plays the whole message; Hold to play = plays (looping)
@@ -206,6 +213,8 @@ static const Setting SETTINGS[S_COUNT] = {
   // CHOOSE: the messages in the topic staff selected (B button); or the topics
   // first, then a topic's messages
   {"Choose from",         "s_topics",  2, 0, {0, 1}, {"One topic", "All topics"}, G_CHOOSE},
+  // CHOOSE, All topics: also offer the IR codes ("Control") and/or "My device" (KEYBOARD)
+  {"Also offer",          "s_extra",   4, 0, {0, 1, 2, 3}, {"None", "Control", "My device", "Both"}, G_CHOOSE},
   // IR: send the selected code; the same, repeating while held; or the student chooses by scanning
   {"IR codes",            "s_irmode",  3, 0, {0, 1, 2}, {"Staff pick", "Repeat held", "Student scans"}, G_IR},
   // scanning: press to start, press to choose; or hold to step, let go to choose
@@ -264,10 +273,11 @@ KbOut    keyDownOut = OUT_NONE; // where the current key-down went (the key-up g
 bool     keyLatched = false;    // Latch key action: key is being held down
 bool     playLatched = false;   // Latch play style: message is looping
 // Scanning (CHOOSE, and IR with "Student scans")
-ScanItem scanItems[PER_TOPIC + 2];  // the choices on offer: topics, messages (+ Back) or IR codes, + Stop
+ScanItem scanItems[NUM_TOPICS + 3];  // the choices on offer: topics, messages (+ Back) or IR codes, + Stop
 int      scanCount = 0;
 bool     scanning = false;      // offering choices now
 bool     scanInGroup = false;   // CHOOSE: offering a topic's messages (true) or the topics (false)
+bool     scanInIr = false;      // ...and with scanInGroup, the "Control" IR codes instead of a topic
 bool     gateShown = false;     // staff have stepped (B) to the mode's "Settings" item
 bool     modeSettingsOpen = false; // ...and opened it (hold A)
 int8_t   scanPos = 0;           // choice being offered
@@ -335,6 +345,8 @@ const uint8_t* scanColour(const ScanItem& it) {
   static const uint8_t WHITE[3] = {30, 30, 30}, RED[3] = {40, 0, 0};
   switch (it.kind) {
     case SK_STOP: return RED;
+    case SK_IRMENU: return MODE_RGB[M_IR];
+    case SK_TALKER: return MODE_RGB[M_KEYBOARD];
     case SK_GROUP:
     case SK_IR: return SLOT_RGB[it.idx];
     case SK_MSG: return SLOT_RGB[it.idx < SND_TOPIC ? it.idx : (it.idx - SND_TOPIC) % PER_TOPIC];
@@ -427,6 +439,7 @@ void loadSettings() {
     }
     prefs.remove("s_choose");
   }
+  if (!modeOn(mode)) mode = M_SPEAK;
 }
 
 void loadSlots() {
@@ -824,8 +837,17 @@ KbOut kbOutput() {
   return bleConnected ? OUT_BLE : OUT_NONE;
 }
 
+// Whether a mode is in use ("Modes" setting). SPEAK, CHOOSE and SETTINGS always are.
+bool modeOn(uint8_t m) {
+  const uint8_t c = setting(S_MODES);
+  if (m == M_KEYBOARD) return c == 0 || c == 2;
+  if (m == M_IR) return c == 0 || c == 1;
+  return true;
+}
+
 // The mode KEYBOARD changes to with no USB (M_COUNT = none: use Bluetooth).
 uint8_t backupMode() {
+  if (!modeOn(M_KEYBOARD)) return M_COUNT;
 #if HAS_USB_HID
   switch (setting(S_NO_USB)) {
     case 1: return M_SPEAK;
@@ -1112,9 +1134,13 @@ void drawMain(lgfx::LovyanGFX& c) {
       int n = 0;
       String from, what = " messages", empty = "Add them on the setup page";
       if (topicsByStudent() && !scanInGroup) {
-        for (int t = 0; t < NUM_TOPICS; t++) n += topicUsed(t);
+        n = topCount();
         from = "Topics";
-        what = " topics";
+        what = offerIrMenu() || offerTalker() ? " choices" : " topics";
+      } else if (scanInIr && topicsByStudent()) {
+        for (int i = 0; i < NUM_SLOTS; i++) n += irLen[i] ? 1 : 0;
+        from = "Control";
+        what = " IR codes";
       } else {
         for (int k = 0; k < PER_TOPIC; k++) n += slotLen[topicMsg(group, k)] ? 1 : 0;
         from = topicTitle(group);
@@ -1209,7 +1235,9 @@ bool settingShown(int i) {
     case S_ACCESS: case S_SCAN_SPEED: return scan;
     case S_SCAN_ROUNDS: return scan && !holdToChoose();
     case S_STOP: return scan;
+    case S_EXTRA: return topicsByStudent() && (modeOn(M_IR) || modeOn(M_KEYBOARD));
     case S_NO_USB: return HAS_USB_HID;  // needs USB Mode: USB-OTG (TinyUSB)
+    case S_FORGET: return modeOn(M_KEYBOARD);  // Bluetooth is only for KEYBOARD
   }
   return true;
 }
@@ -1434,6 +1462,8 @@ String scanTitle(const ScanItem& it) {
     case SK_MSG: return titleOf(it.idx);
     case SK_BACK: return "Back";
     case SK_STOP: return "Stop";
+    case SK_IRMENU: return "Control";
+    case SK_TALKER: return "My device";
     default: return titleOf(irSound(it.idx));
   }
 }
@@ -1445,6 +1475,8 @@ void playPrompt(const ScanItem& it) {
     case SK_MSG:   p = it.idx < SND_TOPIC ? SND_PQUICK + it.idx : SND_PMSG + (it.idx - SND_TOPIC); break;
     case SK_BACK:  p = SND_PBACK; break;
     case SK_STOP:  p = SND_PSTOP; break;
+    case SK_IRMENU: p = SND_PIRMENU; break;
+    case SK_TALKER: p = SND_PTALKER; break;
     default:       p = slotLen[SND_PIR + it.idx] ? SND_PIR + it.idx : irSound(it.idx);  // IR code's own sound is short
   }
   // no prompt made yet (e.g. set up on the stick): the message itself, quietly - the
@@ -1475,16 +1507,38 @@ void fillScanList() {
   }
   int topics = 0;
   for (int t = 0; t < NUM_TOPICS; t++) topics += topicUsed(t);
-  if (!topicsByStudent()) scanInGroup = true;
-  if (!scanInGroup && topics == 1)  // only one topic: go straight to its messages
-    for (int t = 0; t < NUM_TOPICS; t++) if (topicUsed(t)) { group = t; scanInGroup = true; }
+  const int top = topCount();
+  if (!topicsByStudent()) { scanInGroup = true; scanInIr = false; }
+  if (!scanInGroup && top == 1 && topics == 1)  // only one topic: go straight to its messages
+    for (int t = 0; t < NUM_TOPICS; t++) if (topicUsed(t)) { group = t; scanInGroup = true; scanInIr = false; }
   if (!scanInGroup) {
     for (int t = 0; t < NUM_TOPICS; t++) if (topicUsed(t)) scanItems[scanCount++] = {SK_GROUP, (uint8_t)t};
+    if (offerIrMenu()) scanItems[scanCount++] = {SK_IRMENU, 0};
+    if (offerTalker()) scanItems[scanCount++] = {SK_TALKER, 0};
     return;
   }
-  for (int k = 0; k < PER_TOPIC; k++)
-    if (slotLen[topicMsg(group, k)]) scanItems[scanCount++] = {SK_MSG, (uint8_t)topicMsg(group, k)};
-  if (topicsByStudent() && topics > 1 && scanCount) scanItems[scanCount++] = {SK_BACK, 0};
+  if (scanInIr) {
+    for (int i = 0; i < NUM_SLOTS; i++) if (irLen[i]) scanItems[scanCount++] = {SK_IR, (uint8_t)i};
+  } else {
+    for (int k = 0; k < PER_TOPIC; k++)
+      if (slotLen[topicMsg(group, k)]) scanItems[scanCount++] = {SK_MSG, (uint8_t)topicMsg(group, k)};
+  }
+  if (topicsByStudent() && top > 1 && scanCount) scanItems[scanCount++] = {SK_BACK, 0};
+}
+
+// CHOOSE, All topics, "Also offer": the IR codes (if any are learned) and "My device"
+bool offerIrMenu() {
+  if (!topicsByStudent() || !(setting(S_EXTRA) & 1) || !modeOn(M_IR)) return false;
+  for (int i = 0; i < NUM_SLOTS; i++) if (irLen[i]) return true;
+  return false;
+}
+bool offerTalker() { return topicsByStudent() && (setting(S_EXTRA) & 2) && modeOn(M_KEYBOARD); }
+
+// How many choices the top of CHOOSE offers (topics and extras)
+int topCount() {
+  int n = offerIrMenu() + offerTalker();
+  for (int t = 0; t < NUM_TOPICS; t++) n += topicUsed(t);
+  return n;
 }
 
 void stopScan() {
@@ -1514,9 +1568,11 @@ void startScan() {
 void choose(ScanItem it) {
   stopScan();
   switch (it.kind) {
+    case SK_IRMENU:
     case SK_GROUP:
-      group = it.idx;
+      if (it.kind == SK_GROUP) group = it.idx;
       scanInGroup = true;
+      scanInIr = it.kind == SK_IRMENU;
       saveSettings();
       buildScanList();
       if (holdToChoose()) scanWaitUntil = millis() + 10000;  // wait for the next hold
@@ -1526,6 +1582,14 @@ void choose(ScanItem it) {
       scanInGroup = false;
       buildScanList();
       if (!holdToChoose() && scanCount) startScan();
+      break;
+    case SK_TALKER:  // over to the student's AAC device
+      scanInGroup = false;
+      backupOn = false;
+      setStudentMode(M_KEYBOARD);
+      saveSettings();
+      ledIdle();
+      beep(1200, 60); beep(1800, 60);
       break;
     case SK_STOP:  // none of them: the next press starts again from the top
       if (topicsByStudent()) scanInGroup = false;
@@ -1538,6 +1602,7 @@ void choose(ScanItem it) {
       playSlot(it.idx);
       break;
     case SK_IR:
+      if (topicsByStudent()) scanInGroup = false;  // CHOOSE's Control: next time, start from the top
       irSlot = it.idx;
       saveSettings();
       ledIdle();
@@ -1692,8 +1757,20 @@ void pollStudentSwitch() {
 void settingChanged(int i) {
   if (i == S_KEY_ACTION) releaseKey();
   if (i == S_PLAY) stopPlay();
-  if (i == S_CHOOSE_FROM || i == S_ACCESS || i == S_IR_CHOOSE || i == S_SPEAK_CHOOSE || i == S_STOP) { stopScan(); scanInGroup = false; }
+  if (i == S_CHOOSE_FROM || i == S_ACCESS || i == S_IR_CHOOSE || i == S_SPEAK_CHOOSE || i == S_STOP || i == S_EXTRA) { stopScan(); scanInGroup = false; }
   if (i == S_VOLUME) { M5.Speaker.setVolume(volume()); M5.Speaker.tone(1000, 100); }
+  if (i == S_MODES) {
+    stopScan();
+    scanInGroup = false;
+    if (!modeOn(prevMode)) prevMode = M_SPEAK;
+    if (!modeOn(mode)) {  // the mode it was in is now off
+      releaseKey();
+      backupOn = false;
+      mode = M_SPEAK;
+      saveSettings();
+      ledIdle();
+    }
+  }
 }
 
 // Next setting shown on the current settings screen after `from` (wrapping).
@@ -1792,7 +1869,7 @@ void pollStaffButtons() {
     releaseKey();
     stopPlay();
     if (!inSettings()) prevMode = mode;
-    mode = (mode + 1) % M_COUNT;
+    do mode = (mode + 1) % M_COUNT; while (!modeOn(mode));
     if (!inSettings()) backupOn = false;  // staff chose a mode
     gateShown = false;
     if (inSettings()) settingIdx = nextSettingInView(S_COUNT - 1);
@@ -1847,6 +1924,8 @@ void sendInfo() {
   j += ",\"voice\":" + jsonStr(voiceId) + ",\"vspeed\":" + jsonStr(voiceSpeed);
   j += ",\"modes\":[";
   for (int i = 0; i < M_SETTINGS; i++) j += (i ? "," : "") + jsonStr(MODE_NAMES[i]);
+  j += "],\"modesOn\":[";
+  for (int i = 0; i < M_SETTINGS; i++) j += (i ? "," : "") + yes(modeOn(i));
   j += "],\"keys\":[";
   for (int i = 0; i < NUM_KEYS; i++) j += (i ? "," : "") + jsonStr(KEYS[i].name);
   if (customUsage) j += "," + jsonStr(customName);
@@ -1868,6 +1947,7 @@ void sendInfo() {
     j += String(i ? "," : "") + "{\"ir\":" + yes(irLen[i]) + ",\"len\":" + String(slotLen[irSound(i)])
          + ",\"pr\":" + yes(slotLen[SND_PIR + i]) + ",\"name\":" + jsonStr(slotName[irSound(i)]) + words(irSound(i)) + "}";
   j += "],\"back\":{\"pr\":" + yes(slotLen[SND_PBACK]) + "},\"stop\":{\"pr\":" + yes(slotLen[SND_PSTOP]) + "}";
+  j += ",\"irmenu\":{\"pr\":" + yes(slotLen[SND_PIRMENU]) + "},\"talker\":{\"pr\":" + yes(slotLen[SND_PTALKER]) + "}";
   j += ",\"settings\":[";
   bool first = true;
   for (int i = 0; i < S_COUNT; i++) {
@@ -1953,6 +2033,7 @@ void handleCommand(String line) {
     sendInfo();
   } else if (cmd == "MODE") {
     if (n < 0 || n >= M_SETTINGS) return reply("bad mode");
+    if (!modeOn(n)) return reply("that mode is turned off (Settings: Modes)");
     releaseKey();
     stopPlay();
     mode = prevMode = n;
