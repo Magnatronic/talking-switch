@@ -49,8 +49,8 @@ modes on the switch. The tab of the mode the switch is in has a green dot; any o
 to it. Each mode's tab has that mode's settings at the top, in the same order as on the switch (settings that do
 nothing with the current choices are hidden), and what it uses below.
 
-- **QUICK:** Messages (Staff pick / Student scans), then Play style and Hold for next, or the scanning settings
-  when the student scans; the 4 Quick messages. For each: a name, ▶ Play, **Add / Change** (**type the words** –
+- **QUICK:** Messages (Staff pick / Student chooses), then Play style and Hold for next, or Choosing (Press twice /
+  Hold & release / Count presses) with its settings; the 4 Quick messages. For each: a name, ▶ Play, **Add / Change** (**type the words** –
   spoken in the switch's voice; Enter makes the speech – record with the computer's microphone or a headset, or
   upload an audio file; it plays straight away, then *Save to the switch*), Delete, and *Select* (the one QUICK
   plays). Typing starts from the message's words, or its name; a typed message with no name is named after its
@@ -106,7 +106,7 @@ up to 5 seconds. Each IR code can have its own sound, e.g. IR code 1 "Bubbles" t
 
 | Mode | Big switch does | LED glow |
 |---|---|---|
-| QUICK | *Messages* setting: **Staff pick** – plays the selected Quick message (see *Play style* for hold-to-play and latch; with Tap, keep holding to move to the next Quick message). **Student scans** – the student chooses one of the Quick messages by scanning (see below) | message colour: 1 green, 2 blue, 3 purple, 4 orange |
+| QUICK | *Messages* setting (and QUICK's *Choosing*): **Staff pick** – plays the selected Quick message (see *Play style* for hold-to-play and latch; with Tap, keep holding to move to the next Quick message). **Student chooses** – by scanning (see below), or by counting presses: 1–4 presses for message 1–4 | message colour: 1 green, 2 blue, 3 purple, 4 orange |
 | TOPICS | The student **chooses** from the Topics by scanning, see below | colour of the choice on offer |
 | KEYBOARD | Holds down the chosen key while pressed. With *No USB* set to QUICK or TOPICS it's also a **backup**: see below | purple |
 | CONTROL | Sends the selected IR code, and says its sound if it has one. *IR codes* setting: Staff pick / Repeat held (keeps sending while held, like a remote's volume button) / Student scans (the student chooses by scanning) | code colour |
@@ -144,11 +144,11 @@ When the screen is dim or off, the first press of A or B only wakes it.
 
 ### Scanning: choice-making with one switch
 
-With QUICK or CONTROL set to **Student scans**, and in TOPICS, the switch offers the choices one at a time – each with
+With QUICK set to **Student chooses** (Press twice or Hold & release) or CONTROL to **Student scans**, and in TOPICS, the switch offers the choices one at a time – each with
 its LED colour, its name on screen and a short **spoken prompt** played quietly ("Toast"… "Crisps"… "Yoghurt") –
 and the student picks one, which then plays in full (or, in CONTROL, is sent).
 
-- **QUICK, Messages: Student scans** – it offers the 4 Quick messages. The simplest start.
+- **QUICK, Messages: Student chooses** – it offers the 4 Quick messages. The simplest start.
 - **TOPICS, Choose from: One topic** (default) – it offers the messages in the topic staff selected (B on the switch, or *Use this
   topic* on the setup page), e.g. "Snack time".
 - **TOPICS, Choose from: All topics** – it offers the **topics** first ("Snack time"… "Music"…), then the chosen topic's
@@ -170,7 +170,7 @@ and the student picks one, which then plays in full (or, in CONTROL, is sent).
 Only topics and messages that are set up are offered, so two messages make a simple two-way choice. Prompts are
 made by the setup page from the **names**. A message without a prompt – e.g. one just recorded on the stick – plays
 itself quietly as its prompt (cut short by the next offer), so scanning works straight away with no setup page:
-record the Quick messages (QUICK, hold A) and set QUICK's *Messages: Student scans*.
+record the Quick messages (QUICK, hold A) and set QUICK's *Messages: Student chooses*.
 
 ### Settings
 
@@ -193,7 +193,8 @@ All of these are on the setup page too, on each mode's tab and the Settings tab.
 | General | Recording boost | Off, Low, **Medium**, High | Makes recordings made on the switch louder, at the cost of some harshness |
 | General | Forget BT devices | hold A, then again to confirm | Clears every paired computer/tablet. Also remove the switch in that device's Bluetooth settings |
 | General | About | – | The firmware version, how much recording storage is used, and student presses since it was turned on |
-| QUICK | Messages | **Staff pick**, Student scans, Count presses | *Staff pick*: plays the selected Quick message. *Student scans*: the student chooses one by scanning (then Choosing, Scan speed and Scan rounds apply instead of Play style and Hold for next msg). *Count presses*: press 1–4 times quickly for message 1–4 – each press ticks and the LED shows that message's colour; the message plays after the Press gap. Not for students with tremor or accidental double presses |
+| QUICK | Messages | **Staff pick**, Student chooses | *Staff pick*: plays the selected Quick message (Play style and Hold for next msg apply). *Student chooses*: the student picks one – see QUICK's Choosing |
+| QUICK | Choosing | **Press twice**, Hold & release, Count presses | Kept in step with TOPICS and CONTROL's Choosing (change Press twice / Hold & release in one and the other follows); only Count presses is QUICK's own – TOPICS and CONTROL (and the Quick choice inside TOPICS) always scan. *Press twice* / *Hold & release*: scanning, see above (Scan speed, Scan rounds, Stop choice apply). *Count presses*: press 1–4 times quickly for message 1–4 – each press ticks and the LED shows that message's colour; the message plays after the Press gap. Not for students with tremor or accidental double presses |
 | QUICK | Press gap | 0.5s, **0.8s**, 1.2s, 1.6s, 2s | Count presses: how long without a press ends the count – longer for students who are slower to release and press again (every message waits this long before playing). Ignore repeats only filters bounces under 0.15s in this mode |
 | QUICK | Play style | **Tap**, Hold to play, Latch | *Tap*: a press plays the whole message. *Hold to play*: plays (looping) only while the switch is held – classic cause and effect. *Latch*: one press starts it looping, the next press stops it |
 | QUICK | Hold for next msg | Off, 1s, **1.5s**, 2s, 3s | With Tap: how long the student holds the switch to move to the next Quick message. Turn off for students who can't let go quickly |
@@ -201,7 +202,7 @@ All of these are on the setup page too, on each mode's tab and the Settings tab.
 | TOPICS | Offer Quick | **Off**, On | With All topics: offers "Quick" (the Quick messages) next to the topics, see above |
 | TOPICS | Offer Control | **Off**, On | With All topics: offers "Control" (the IR codes) next to the topics |
 | TOPICS | Offer My device | **Off**, On | With All topics: offers "My device" (changes to KEYBOARD) next to the topics |
-| QUICK, TOPICS, CONTROL | Choosing | **Press twice**, Hold & release | See above |
+| TOPICS, CONTROL | Choosing | **Press twice**, Hold & release | See above |
 | QUICK, TOPICS, CONTROL | Scan speed | 1.5s, 2s, **3s**, 4s, 5s | How long each choice is offered |
 | QUICK, TOPICS, CONTROL | Scan rounds | 1, **2**, 3 | Press twice: how many times round before it stops by itself |
 | QUICK, TOPICS, CONTROL | Stop choice | **Off**, On | Offers "Stop" last, so the student can choose none of them |

@@ -487,7 +487,8 @@ function soundInfo(n) {
 }
 function setCur(key) { const st = info.settings.find((x) => x.key === key); return st ? st.cur : 0; }
 function irScanning() { return setCur('s_irmode') === 2; }
-function speakScanning() { return setCur('s_spkmode') === 1; }
+function speakScanning() { return setCur('s_spkmode') === 1 && setCur('s_qhow') !== 2; }
+function countingPresses() { return setCur('s_spkmode') === 1 && setCur('s_qhow') === 2; }
 function secs(n) { return (n / info.rate).toFixed(1) + ' s'; }
 
 // ---------------------------------------------------------------- render
@@ -849,7 +850,8 @@ function renderIr() {
 const HELP = {
   s_play: 'Tap: a press plays the whole message. Hold to play: plays only while held. Latch: one press starts it, the next stops it.',
   s_hold: 'Keep holding the switch this long to move to the next Quick message. Off for students who can’t let go quickly.',
-  s_spkmode: 'Staff pick: each press plays the selected message. Student scans: the student chooses one of the messages. Count presses: press 1 to 4 times quickly for message 1 to 4 (a tick and the LED colour for each press).',
+  s_spkmode: 'Staff pick: each press plays the selected message. Student chooses: the student picks one of the messages.',
+  s_qhow: 'Press twice: a press starts the offers, the next press chooses. Hold & release: hold to step through, let go to choose (these two are the same as TOPICS and CONTROL’s Choosing). Count presses, QUICK only: press 1 to 4 times quickly for message 1 to 4 (a tick and the LED colour for each press) – not for students with tremor or accidental double presses.',
   s_gap: 'Count presses: this long without a press ends the count and plays the message. With Count presses, Ignore repeats only filters bounces under 0.15 s.',
   s_topics: 'One topic: the messages in the topic marked “In use”. All topics: the student picks a topic first, then a message.',
   s_access: 'Press twice: a press starts the offers, the next press chooses. Hold & release: hold to step through, let go to choose.',
@@ -876,9 +878,9 @@ const HELP = {
 const pressTwice = () => setCur('s_access') === 0;
 const allTopics = () => setCur('s_topics') === 1;
 const TAB_SETTINGS = {  // [setting, shown only when]
-  quick: [['s_spkmode'], ['s_gap', () => setCur('s_spkmode') === 2],
+  quick: [['s_spkmode'], ['s_qhow', () => setCur('s_spkmode') === 1], ['s_gap', countingPresses],
     ['s_play', () => setCur('s_spkmode') === 0], ['s_hold', () => setCur('s_spkmode') === 0 && setCur('s_play') === 0],
-    ['s_access', speakScanning], ['s_scanspd', speakScanning], ['s_scanrnd', () => speakScanning() && pressTwice()],
+    ['s_scanspd', speakScanning], ['s_scanrnd', () => speakScanning() && setCur('s_qhow') === 0],
     ['s_stop', speakScanning]],
   topics: [['s_topics'], ['s_offq', allTopics], ['s_offctl', () => allTopics() && tabOn('control')],
     ['s_offdev', () => allTopics() && tabOn('keyboard')], ['s_access'], ['s_scanspd'], ['s_scanrnd', pressTwice], ['s_stop']],
@@ -914,7 +916,7 @@ function renderSettings() {
   $('speakIntro').replaceChildren(...(speakScanning()
     ? ['The switch offers these messages one at a time and the student chooses one. Click ', el('b', {}, 'Add'), ' or ', el('b', {}, 'Change'),
       ' to type, record or upload a message.']
-    : setCur('s_spkmode') === 2
+    : countingPresses()
     ? ['Press the switch 1 to 4 times quickly to play message 1 to 4. Click ', el('b', {}, 'Add'), ' or ', el('b', {}, 'Change'),
       ' to type, record or upload a message.']
     : ['The switch plays the ', el('b', {}, 'selected'), ' message. Click ', el('b', {}, 'Add'), ' or ', el('b', {}, 'Change'),

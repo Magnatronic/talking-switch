@@ -6,9 +6,10 @@
 //                Staff pick - plays the selected one (BIGmack style). Play
 //                  style: Tap / Hold to play / Latch. With Tap, keep holding
 //                  the switch to move on to the next Quick message.
-//                Student scans - the student chooses one by scanning (below).
-//                Count presses - press 1 to 4 times quickly for message 1 to 4;
-//                  after the "Press gap" with no press, that message plays.
+//                Student chooses - by scanning (below), with QUICK's own
+//                  "Choosing": Press twice / Hold & release / Count presses -
+//                  press 1 to 4 times quickly for message 1 to 4; after the
+//                  "Press gap" with no press, that message plays.
 //    TOPICS    The 4 Topics of 4 messages, by scanning. Choose from:
 //                One topic - the messages in the topic staff selected;
 //                All topics - the topics first, then that topic's messages
@@ -196,7 +197,7 @@ static const int NUM_KEYS = sizeof(KEYS) / sizeof(KEYS[0]);
 //  and remembered after power-off. Each has a fixed list of choices.
 // ---------------------------------------------------------------------
 enum SettingId : uint8_t {
-  S_VOLUME, S_MODES, S_SPEAK_CHOOSE, S_GAP, S_PLAY, S_HOLD, S_CHOOSE_FROM, S_OFFER_QUICK, S_OFFER_CONTROL, S_OFFER_DEVICE, S_IR_CHOOSE, S_ACCESS, S_SCAN_SPEED, S_SCAN_ROUNDS, S_STOP,
+  S_VOLUME, S_MODES, S_SPEAK_CHOOSE, S_QUICK_HOW, S_GAP, S_PLAY, S_HOLD, S_CHOOSE_FROM, S_OFFER_QUICK, S_OFFER_CONTROL, S_OFFER_DEVICE, S_IR_CHOOSE, S_ACCESS, S_SCAN_SPEED, S_SCAN_ROUNDS, S_STOP,
   S_KEY_ACTION, S_PRESS_SOUND, S_NO_USB,
   S_ACCEPT, S_LOCKOUT, S_BRIGHT, S_WAKE, S_SLEEP, S_AUTOOFF, S_LOUD, S_FORGET, S_ABOUT,
   S_COUNT
@@ -216,7 +217,10 @@ static const Setting SETTINGS[S_COUNT] = {
   // which modes this switch uses (QUICK and TOPICS always)
   {"Modes",               "s_modes",   4, 0, {0, 1, 2, 3}, {"All", "No KEYBOARD", "No CONTROL", "Talking only"}, G_GENERAL},
   // QUICK: play the Quick message staff selected, or the student chooses one by scanning
-  {"Messages",            "s_spkmode", 3, 0, {0, 1, 2}, {"Staff pick", "Student scans", "Count presses"}, G_SPEAK},
+  {"Messages",            "s_spkmode", 2, 0, {0, 1}, {"Staff pick", "Student chooses"}, G_SPEAK},
+  // QUICK, Student chooses: how - scanning (Press twice / Hold & release, as TOPICS
+  // and CONTROL's Choosing), or Count presses (1-4 presses = message 1-4)
+  {"Choosing",            "s_qhow",    3, 0, {0, 1, 2}, {"Press twice", "Hold & release", "Count presses"}, G_SPEAK},
   // QUICK, Count presses: this long without a press ends the count
   {"Press gap",           "s_gap",     5, 1, {500, 800, 1200, 1600, 2000}, {"0.5 s", "0.8 s", "1.2 s", "1.6 s", "2 s"}, G_SPEAK},
   // QUICK: Tap = a press plays the whole message; Hold to play = plays (looping)
@@ -235,7 +239,7 @@ static const Setting SETTINGS[S_COUNT] = {
   // IR: send the selected code; the same, repeating while held; or the student chooses by scanning
   {"IR codes",            "s_irmode",  3, 0, {0, 1, 2}, {"Staff pick", "Repeat held", "Student scans"}, G_IR},
   // scanning: press to start, press to choose; or hold to step, let go to choose
-  {"Choosing",            "s_access",  2, 0, {0, 1}, {"Press twice", "Hold & release"}, G_SPEAK | G_CHOOSE | G_IR},
+  {"Choosing",            "s_access",  2, 0, {0, 1}, {"Press twice", "Hold & release"}, G_CHOOSE | G_IR},
   // scanning: how long each choice is offered, and how many times round before stopping
   {"Scan speed",          "s_scanspd", 5, 2, {1500, 2000, 3000, 4000, 5000}, {"1.5 s", "2 s", "3 s", "4 s", "5 s"}, G_SPEAK | G_CHOOSE | G_IR},
   {"Scan rounds",         "s_scanrnd", 3, 1, {1, 2, 3}, {"1", "2", "3"}, G_SPEAK | G_CHOOSE | G_IR},
@@ -454,6 +458,11 @@ void loadSettings() {
     prefs.remove(old.c_str());
   }
   for (int i = 0; i < NUM_NAMES; i++) slotName[i] = prefs.getString(nameKey(i).c_str(), "");
+  if (!prefs.isKey("s_qhow")) prefs.putUChar("s_qhow", prefs.getUChar("s_access", 0));  // QUICK's own Choosing starts the same
+  if (prefs.getUChar("s_spkmode", 0) == 2) {  // older firmware's "Messages: Count presses"
+    prefs.putUChar("s_spkmode", 1);
+    prefs.putUChar("s_qhow", 2);
+  }
   for (int i = 0; i < S_COUNT; i++) {
     if (!SETTINGS[i].key) { settingChoice[i] = 0; continue; }
     settingChoice[i] = prefs.getUChar(SETTINGS[i].key, SETTINGS[i].def);
@@ -1186,7 +1195,7 @@ void drawMain(lgfx::LovyanGFX& c) {
       else if (slotLen[slot]) line2(c, String(slotLen[slot] / (float)SAMPLE_RATE, 1) + " s recorded", C_READY);
       else line2(c, "Empty - hold A to record", C_PROBLEM);
       detailLine(c, speakScanning() ? "Student scans " + plural(countQuick(), "message", "messages")
-                    : countPresses() ? "Press 1-4 times - Quick " + String(slot + 1)
+                    : countPresses() ? "Count 1-4 presses - Quick " + String(slot + 1)
                                      : "Quick " + String(slot + 1) + " of " + String(NUM_QUICK)
                                       + (slotLen[slot] ? " - hold B to hear" : ""));
       break;
@@ -1303,6 +1312,7 @@ bool settingShown(int i) {
   switch (i) {
     case S_PLAY: return speakPick();
     case S_HOLD: return speakPick() && setting(S_PLAY) == PLAY_TAP;
+    case S_QUICK_HOW: return !speakPick();
     case S_GAP: return countPresses();
     case S_ACCESS: case S_SCAN_SPEED: return scan;
     case S_SCAN_ROUNDS: return scan && !holdToChoose();
@@ -1528,10 +1538,11 @@ void managePower(uint32_t now) {
 static const uint8_t PROMPT_VOLUME = 150;  // channel volume for prompts (255 = as loud as messages)
 
 bool speakPick() { return setting(S_SPEAK_CHOOSE) == 0; }
-bool speakScanning() { return setting(S_SPEAK_CHOOSE) == 1; }
-bool countPresses() { return setting(S_SPEAK_CHOOSE) == 2; }
+bool speakScanning() { return setting(S_SPEAK_CHOOSE) == 1 && setting(S_QUICK_HOW) != 2; }
+bool countPresses() { return setting(S_SPEAK_CHOOSE) == 1 && setting(S_QUICK_HOW) == 2; }
 bool topicsByStudent() { return setting(S_CHOOSE_FROM) == 1; }
-bool holdToChoose() { return setting(S_ACCESS) == 1; }
+// Scanning by holding: QUICK has its own Choosing, TOPICS and CONTROL share one
+bool holdToChoose() { return (studentMode() == M_SPEAK ? setting(S_QUICK_HOW) : setting(S_ACCESS)) == 1; }
 bool irScanning() { return setting(S_IR_CHOOSE) == 2; }
 bool irRepeat() { return setting(S_IR_CHOOSE) == 1; }
 bool scanModeActive() {
@@ -1857,10 +1868,20 @@ void pollStudentSwitch() {
 void settingChanged(int i) {
   if (i == S_KEY_ACTION) releaseKey();
   if (i == S_PLAY) stopPlay();
-  if (i == S_CHOOSE_FROM || i == S_ACCESS || i == S_IR_CHOOSE || i == S_SPEAK_CHOOSE || i == S_STOP
+  if (i == S_CHOOSE_FROM || i == S_ACCESS || i == S_IR_CHOOSE || i == S_SPEAK_CHOOSE || i == S_QUICK_HOW || i == S_STOP
       || i == S_OFFER_QUICK || i == S_OFFER_CONTROL || i == S_OFFER_DEVICE) { stopScan(); scanInGroup = false; }
   if (i == S_VOLUME) { M5.Speaker.setVolume(volume()); M5.Speaker.tone(1000, 100); }
   if (i == S_BRIGHT && scr == SCR_ON) M5.Display.setBrightness(setting(S_BRIGHT));
+  // QUICK's Choosing and the shared one stay in step (a student scans the same way
+  // everywhere); only Count presses is QUICK's own
+  if (i == S_ACCESS && settingChoice[S_QUICK_HOW] != 2) {
+    settingChoice[S_QUICK_HOW] = settingChoice[S_ACCESS];
+    prefs.putUChar(SETTINGS[S_QUICK_HOW].key, settingChoice[S_QUICK_HOW]);
+  }
+  if (i == S_QUICK_HOW && settingChoice[S_QUICK_HOW] != 2) {
+    settingChoice[S_ACCESS] = settingChoice[S_QUICK_HOW];
+    prefs.putUChar(SETTINGS[S_ACCESS].key, settingChoice[S_ACCESS]);
+  }
   if (i == S_MODES) {
     stopScan();
     scanInGroup = false;
