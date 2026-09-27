@@ -75,7 +75,7 @@ nothing with the current choices are hidden), and what it uses below.
   screen, Sleep after, Auto power off, Recording boost, Forget BT devices. Recording boost also sets the loudness
   of messages made on the page.
 - **Names become prompts:** naming a message, topic or IR code makes its short spoken prompt for scanning, in
-  the switch's voice (plus a "Back" prompt when students choose topics).
+  the switch's voice (plus "Back" when students choose topics, and "Stop" with Stop choice on).
 
 **Typed speech** runs in the browser with two engines. **Kokoro** (the default) sounds much more natural and
 takes a few seconds per phrase; **Piper** is almost instant but flatter. Both, and their voices, are served by the
@@ -136,6 +136,9 @@ and the student picks one, which then plays in full (or, in IR, is sent).
   set number of *Scan rounds*.
 - **Choosing: Hold & release** – hold the switch to step through the offers, let go to choose. After choosing a
   topic, hold again for its messages.
+- **Stop choice: On** – every scan ends with **"Stop"** (LED red): the topics, a topic's messages (after "Back"),
+  and SPEAK's and IR's choices. Choosing it ends the scan without doing anything; the next press starts again
+  from the top. It lets the student say "none of these". Staff can also stop a scan with A or B on the stick.
 
 Only topics and messages that are set up are offered, so two messages make a simple two-way choice. Prompts are
 made by the setup page from the **names**. A message without a prompt – e.g. one just recorded on the stick – plays
@@ -167,6 +170,7 @@ All of these are on the setup page too, on each mode's tab and the Settings tab.
 | SPEAK, CHOOSE, IR | Choosing | **Press twice**, Hold & release | See above |
 | SPEAK, CHOOSE, IR | Scan speed | 1.5s, 2s, **3s**, 4s, 5s | How long each choice is offered |
 | SPEAK, CHOOSE, IR | Scan rounds | 1, **2**, 3 | Press twice: how many times round before it stops by itself |
+| SPEAK, CHOOSE, IR | Stop choice | **Off**, On | Offers "Stop" last, so the student can choose none of them |
 | KEYBOARD | Key action | **Momentary**, Latch | *Momentary* holds the key while the switch is held; *Latch* – one press holds the key down, the next lets it go. The screen says "Key held" and the LED glows brighter while latched |
 | KEYBOARD, IR | Press sound | **Off**, Click, Beep | A sound on each press, as feedback (IR: only for codes with no sound of their own) |
 | IR | IR codes | **Staff pick**, Repeat held, Student scans | See the IR mode above |

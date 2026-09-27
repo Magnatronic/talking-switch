@@ -456,12 +456,12 @@ function segment(box, labels, current, onPick) {
 // Numbers shared with the switch.
 //   Sounds: 0-3 Quick, 4-19 topic messages (topic t, item k = 4 + t*4 + k), 20-23 IR codes' sounds,
 //           24-39 topic message prompts, 40-43 topic prompts, 44-47 IR prompts, 48 "Back",
-//           49-52 Quick message prompts.
-//   Names:  0-3 Quick, 4-19 topic messages, 20-23 IR codes, 24-27 topics (BACK only has a prompt).
-const PER = 4, TOPIC0 = 4, IRS = 20, TOPICN = 24, BACK = 48;
+//           49-52 Quick message prompts, 53 "Stop".
+//   Names:  0-3 Quick, 4-19 topic messages, 20-23 IR codes, 24-27 topics (BACK and STOP only have a prompt).
+const PER = 4, TOPIC0 = 4, IRS = 20, TOPICN = 24, BACK = 48, STOP = 53;
 function topicMsg(t, k) { return TOPIC0 + t * PER + k; }
 function promptOf(n) {
-  if (n === BACK) return BACK;
+  if (n === BACK || n === STOP) return n;
   if (n < TOPIC0) return 49 + n;
   return n < IRS ? 24 + (n - TOPIC0) : n < TOPICN ? 44 + (n - IRS) : 40 + (n - TOPICN);
 }
@@ -693,7 +693,7 @@ async function renameItem(n, value) {
 let promptChain = Promise.resolve();
 function makePrompt(n) {
   promptChain = promptChain.then(async () => {
-    const name = info && (n === BACK ? 'Back' : (soundInfo(n).name || '').trim());
+    const name = info && (n === BACK ? 'Back' : n === STOP ? 'Stop' : (soundInfo(n).name || '').trim());
     if (!name || !ttsAvailable()) return;
     try {
       const v = VOICES.find((x) => x.id === savedVoice());
@@ -720,6 +720,7 @@ function promptItems() {
     ...info.irs.map((x, i) => [IRS + i, x]),
   ].filter(([, x]) => x.name).map(([n, x]) => [n, x.pr]);
   if (setCur('s_topics') === 1) list.push([BACK, info.back.pr]);
+  if (setCur('s_stop') === 1 && info.stop) list.push([STOP, info.stop.pr]);
   return list;
 }
 
@@ -801,6 +802,7 @@ const HELP = {
   s_access: 'Press twice: a press starts the offers, the next press chooses. Hold & release: hold to step through, let go to choose.',
   s_scanspd: 'How long each choice is offered. Go at the student’s pace.',
   s_scanrnd: 'Times round the choices before it stops by itself.',
+  s_stop: 'Offers “Stop” last, so the student can choose none of them.',
   s_irmode: 'Staff pick: sends the selected code. Repeat held: keeps sending while held, like a remote’s volume button. Student scans: the student chooses the code.',
   s_keyact: 'Momentary: the key is held while the switch is. Latch: one press holds the key down, the next lets it go.',
   s_psound: 'A click or beep on each press (IR: only for codes with no sound of their own).',
@@ -815,11 +817,12 @@ const HELP = {
 const pressTwice = () => setCur('s_access') === 0;
 const TAB_SETTINGS = {  // [setting, shown only when]
   speak: [['s_spkmode'], ['s_play', () => !speakScanning()], ['s_hold', () => !speakScanning() && setCur('s_play') === 0],
-    ['s_access', speakScanning], ['s_scanspd', speakScanning], ['s_scanrnd', () => speakScanning() && pressTwice()]],
-  choose: [['s_topics'], ['s_access'], ['s_scanspd'], ['s_scanrnd', pressTwice]],
+    ['s_access', speakScanning], ['s_scanspd', speakScanning], ['s_scanrnd', () => speakScanning() && pressTwice()],
+    ['s_stop', speakScanning]],
+  choose: [['s_topics'], ['s_access'], ['s_scanspd'], ['s_scanrnd', pressTwice], ['s_stop']],
   keyboard: [['s_keyact'], ['s_psound']],
   ir: [['s_irmode'], ['s_access', irScanning], ['s_scanspd', irScanning],
-    ['s_scanrnd', () => irScanning() && pressTwice()], ['s_psound']],
+    ['s_scanrnd', () => irScanning() && pressTwice()], ['s_stop', irScanning], ['s_psound']],
 };
 
 async function setSetting(k, v) {
