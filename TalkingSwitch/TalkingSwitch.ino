@@ -390,6 +390,7 @@ VL53L1X  tof;
 bool     sensorOn = false;      // a sensor was found at start-up: it's the switch
 bool     sensorPressed = false; // the sensor's "press" (the student switch reads this)
 bool     sensorTest = false;    // staff are looking at SETTINGS "Sensor test"
+bool     aboutOpen = false;     // ...or at SETTINGS "About"
 uint32_t testPresses = 0;       // ...presses counted there (they do nothing else)
 uint32_t senseStreamUntil = 0;  // the setup page is showing the live graph until then
 bool     backupOn = false;     // in the backup mode because KEYBOARD has no USB
@@ -1461,6 +1462,31 @@ void drawSensorTest(lgfx::LovyanGFX& c) {
         sensorPressed ? C_READY : C_DETAIL);
 }
 
+// SETTINGS "About": the switch's details, a label and a value on each line.
+void drawAbout(lgfx::LovyanGFX& c) {
+  const int W = c.width();
+  struct Row { const char* label; String value; uint16_t col; };
+  Row rows[] = {
+    {"Version", FW_VERSION, TFT_WHITE},
+    {"Name", bleName, TFT_WHITE},
+    {"Storage", String(storagePercent()) + "% used" + (storageNearlyFull() ? " - nearly full" : ""),
+     storageNearlyFull() ? C_PROBLEM : TFT_WHITE},
+    {"Presses", String(pressCount) + " since turned on", TFT_WHITE},
+    {"Input", sensorOn ? "ToF sensor" : "Switch (Unit Key or jack)", TFT_WHITE},
+  };
+  c.setFont(&fonts::Font2);
+  for (int i = 0; i < 5; i++) {
+    int y = HEADER_H + 10 + i * 15;
+    c.setTextDatum(middle_left);
+    c.setTextColor(C_DETAIL);
+    c.drawString(rows[i].label, 8, y);
+    String v = rows[i].value;  // the value in a column after the labels, shortened to fit
+    if (c.textWidth(v) > W - 80) { while (v.length() && c.textWidth(v + "..") > W - 80) v.remove(v.length() - 1); v += ".."; }
+    c.setTextColor(rows[i].col);
+    c.drawString(v, 72, y);
+  }
+}
+
 void drawStatus(lgfx::LovyanGFX& c) {
   const int W = c.width();
   c.fillRoundRect(6, HEADER_H + 5, W - 12, FOOTER_Y - HEADER_H - 10, 8, statusColor);
@@ -1520,10 +1546,9 @@ void drawSettings(lgfx::LovyanGFX& c) {
     if (settingShown(i)) { n++; if (i <= settingIdx) pos++; }
   // the setting's name, its value (big), then where you are
   drawFitIn(c, st.name, LINE1_Y, TFT_WHITE, {&fonts::FreeSansBold12pt7b, &fonts::FreeSansBold9pt7b}, c.width() - 12);
-  if (settingIdx == S_ABOUT) {
-    drawFit(c, FW_VERSION, LINE2_Y, C_DO);
-    line3(c, "Storage " + String(storagePercent()) + "% used - " + plural(pressCount, "press", "presses"),
-          storageNearlyFull() ? C_PROBLEM : C_DETAIL);
+  if (settingIdx == S_ABOUT || settingIdx == S_SENSE_TEST) {  // things to open, not values
+    line2(c, "Hold A to open", C_DO);
+    line3(c, "Switch does " + String(MODE_NAMES[prevMode]) + " - " + String(pos) + " of " + String(n));
     return;
   }
   bool confirm = settingIdx == S_FORGET && forgetConfirmUntil;
@@ -1536,9 +1561,10 @@ void drawSettings(lgfx::LovyanGFX& c) {
 // What the buttons do on this screen (the same words everywhere).
 String buttonGuide() {
   if (sensorTest) return "B restart count  A close";
+  if (aboutOpen) return "A close";
   if (settingsView()) {
     if (settingIdx == S_FORGET) return "B next  hold A forget  A " + String(inSettings() ? "mode" : "close");
-    if (settingIdx == S_ABOUT) return "B next  A " + String(inSettings() ? "mode" : "close");
+    if (settingIdx == S_ABOUT) return "B next  hold A open  A " + String(inSettings() ? "mode" : "close");
     if (settingIdx == S_SENSE_TEST) return "B next  hold A open  A " + String(inSettings() ? "mode" : "close");
     return "B next  hold A change  A " + String(inSettings() ? "mode" : "close");
   }
@@ -1578,6 +1604,7 @@ void drawScreen() {
 
   if (statusMsg.length() && millis() < statusUntil) drawStatus(c);
   else if (sensorTest) drawSensorTest(c);
+  else if (aboutOpen) drawAbout(c);
   else if (settingsView()) drawSettings(c);
   else drawMain(c);
   drawFooter(c);
@@ -2109,6 +2136,8 @@ void settingsButtons() {
     } else {
       forgetConfirmUntil = millis() + 4000;
     }
+  } else if (M5.BtnA.wasHold() && settingIdx == S_ABOUT) {
+    aboutOpen = true;
   } else if (M5.BtnA.wasHold() && settingIdx == S_SENSE_TEST) {
     sensorTest = true;
     senseReset();
@@ -2168,6 +2197,11 @@ void pollStaffButtons() {
   markActivity();
   stopScan();
   if (wakeScreen()) return;  // screen was dim/off: this press only wakes it
+  if (aboutOpen) {  // A: back to the settings
+    if (M5.BtnA.wasClicked()) aboutOpen = false;
+    needRedraw = true;
+    return;
+  }
   if (sensorTest) {  // A: back to the settings; B: start the count again
     if (M5.BtnA.wasClicked()) sensorTest = false;
     if (M5.BtnB.wasClicked()) senseReset();
@@ -2654,6 +2688,7 @@ void loop() {
   if (now - lastRefresh > 5000) { lastRefresh = now; readBattery(); }
   if (forgetConfirmUntil && now >= forgetConfirmUntil) { forgetConfirmUntil = 0; needRedraw = true; }
   if (sensorTest && now - lastInteraction > 300000) { sensorTest = false; needRedraw = true; }
+  if (aboutOpen && now - lastInteraction > SETTINGS_EXIT_MS) { aboutOpen = false; needRedraw = true; }
   if (inSettings() && !sensorTest && now - lastInteraction > SETTINGS_EXIT_MS) { mode = prevMode; ledIdle(); needRedraw = true; }
   if ((modeSettingsOpen || gateShown || topicOpen) && !sensorTest && now - lastInteraction > SETTINGS_EXIT_MS) {
     modeSettingsOpen = gateShown = topicOpen = false;
