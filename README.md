@@ -291,6 +291,14 @@ Most student settings are in the SETTINGS mode above. At the top of `TalkingSwit
 - **Quiet playback:** B-hold for volume; for a noisy classroom add a small external speaker.
 - **Using a standard 3.5mm switch instead:** wire the jack's tip to `PIN_KEY` and sleeve to GND on the Grove connector.
 
+## ToF sensor test (touch-free switch)
+
+`ToFTest/ToFTest.ino` is a separate test sketch for the M5Stack **Unit ToF4M** (VL53L1X) on the Grove port, to try it as
+a touch-free switch (a hand, head or foot moving closer than a set distance) and to watch a student's movement. It
+needs the **VL53L1X** library by Pololu (Library Manager). Unplug the Unit Key and any switch on the mono jack first –
+they share the Grove pins. A = next trigger distance (5–50 cm), B = reset, hold B = Short / Long range. Readings go to
+the serial port as `tof,<ms>,<mm>,<pressed>` for the Serial Plotter.
+
 ## Notes
 
 - Compile-checked against esp32 core 3.3.11 with M5Unified 0.2.23 / M5GFX 0.2.30, in both USB modes.
