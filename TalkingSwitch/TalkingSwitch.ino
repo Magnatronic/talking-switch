@@ -113,7 +113,6 @@ USBHIDKeyboard UsbKeyboard;
 
 // ToF sensor settings that are the same for everyone
 static const int SENSE_MIN_MM = 40;        // closer than this isn't reliable: counts as pressed
-static const int SENSE_STILL_MM = 6;       // Settle: "still" = readings within this much (or half the Movement)
 static const int SENSE_LOST_LET_GO = 10;   // while pressed, this many unreliable readings in a row (~150 ms) let go
 static const int SENSE_GRAPH_W = 224;      // Sensor test graph: one reading per pixel (~3.5 s)
 
@@ -276,7 +275,7 @@ static const Setting SETTINGS[S_COUNT] = {
   {"Distance",            "s_sline",   8, 3, {50, 60, 80, 100, 150, 200, 300, 500},
                                              {"5 cm", "6 cm", "8 cm", "10 cm", "15 cm", "20 cm", "30 cm", "50 cm"}, G_GENERAL},
   {"Movement",            "s_smove",   6, 1, {5, 8, 10, 15, 20, 30}, {"5 mm", "8 mm", "10 mm", "15 mm", "20 mm", "30 mm"}, G_GENERAL},
-  // Move: pressed and still this long -> the new resting place (so it can't stay stuck pressed)
+  // Move: pressed this long -> where the hand is becomes the resting place (so it can't stay stuck pressed)
   {"Settle",              "s_settle",  5, 2, {0, 1000, 2000, 3000, 5000}, {"Off", "1 s", "2 s", "3 s", "5 s"}, G_GENERAL},
   // Move: how quickly the resting place follows drift (per 1000 readings)
   {"Follow",              "s_follow",  3, 1, {8, 20, 50}, {"Slow", "Medium", "Fast"}, G_GENERAL},
@@ -545,7 +544,8 @@ void loadSlots() {
 //  ToF distance sensor (touch-free switch)
 //  Line: pressed closer than the Distance. Move: pressed on a movement of
 //  the Movement size towards the sensor from the resting place, which is
-//  learnt while not pressed (Follow) and reset by Settle. One reading past
+//  learnt while not pressed (Follow); after being pressed for the Settle
+//  time, where the hand is becomes the resting place. One reading past
 //  the line presses (a quick wave counts); two readings back past a margin
 //  let go. Short range, 15 ms readings (~65 a second), full field of view.
 // ---------------------------------------------------------------------
@@ -554,10 +554,8 @@ float    senseRest = -1;        // Move: the resting distance (-1 = not learnt)
 int      senseDist = -1;        // latest reading used (-1 = nothing there)
 bool     senseClose = false;    // ...closer than the sensor can measure
 int      senseStreak = 0;
-int      senseStillLo = -1, senseStillHi = -1;  // Settle: the readings' range while still...
-long     senseStillSum = 0;
-int      senseStillN = 0;
-uint32_t senseStillSince = 0;                   // ...since this time
+uint32_t sensePressedAt = 0;   // Settle: when the press started...
+float    senseHoldAvg = -1;     // ...and where the hand has been lately (a short average)
 int      senseLostRun = 0;                      // unreliable readings in a row
 uint32_t senseReadings = 0, senseLost = 0;
 int16_t  senseHist[SENSE_GRAPH_W], senseHistLine[SENSE_GRAPH_W];
@@ -567,7 +565,7 @@ int      senseHistPos = 0;
 void senseReset() {
   senseRest = -1;
   senseStreak = 0;
-  senseStillN = 0;
+  senseHoldAvg = -1;
   senseLostRun = 0;
   senseReadings = senseLost = 0;
   testPresses = 0;
@@ -638,26 +636,22 @@ void pollSensor() {
   if (senseStreak >= (sensorPressed ? 2 : 1)) {
     senseStreak = 0;
     sensorPressed = !sensorPressed;
-    senseStillN = 0;
+    sensePressedAt = millis();
+    senseHoldAvg = -1;
   }
-  // Move: pressed and still for the Settle time -> the new resting place (the
-  // average while still), let go. "Still" = all the readings since then within
-  // SENSE_STILL_MM (or half the Movement) of each other - sensor noise allowed for.
-  if (senseMove() && sensorPressed && here && setting(S_SETTLE)) {
-    const int tol = max(SENSE_STILL_MM, (int)setting(S_SENSE_MOVE) / 2);
-    if (senseStillN && max(senseStillHi, mm) - min(senseStillLo, mm) > tol) senseStillN = 0;  // moved: start again
-    if (!senseStillN) { senseStillLo = senseStillHi = mm; senseStillSum = 0; senseStillSince = millis(); }
-    senseStillLo = min(senseStillLo, mm);
-    senseStillHi = max(senseStillHi, mm);
-    senseStillSum += mm;
-    senseStillN++;
-    if (millis() - senseStillSince >= setting(S_SETTLE)) {
-      sensorPressed = false;
-      senseStreak = 0;
-      senseRest = (float)senseStillSum / senseStillN;
-      senseStillN = 0;
-      if (sensorTest) M5.Speaker.tone(600, 30);  // Sensor test: a quiet low tick, settled
-    }
+  // Move: pressed for the Settle time -> where the hand is now (a short average,
+  // so one wobbly reading doesn't count) becomes the resting place, and it lets
+  // go. A relaxed finger creeps and the sensor wobbles, so it doesn't wait for
+  // the hand to be still - just for the time.
+  if (senseMove() && sensorPressed && here)
+    senseHoldAvg = senseHoldAvg < 0 ? mm : senseHoldAvg + (mm - senseHoldAvg) * 0.15f;
+  if (senseMove() && sensorPressed && setting(S_SETTLE) && senseHoldAvg >= 0
+      && millis() - sensePressedAt >= setting(S_SETTLE)) {
+    sensorPressed = false;
+    senseStreak = 0;
+    senseRest = senseHoldAvg;
+    senseHoldAvg = -1;
+    if (sensorTest) M5.Speaker.tone(600, 30);  // Sensor test: a quiet low tick, settled
   }
 
   senseHist[senseHistPos] = mm;

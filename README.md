@@ -126,7 +126,8 @@ switch – every mode, scanning, Press must last and Ignore repeats work as with
 - **Line:** a press is coming closer than the *Distance*.
 - **Move:** a press is a movement of the *Movement* size towards the sensor from where the hand or finger rests –
   the resting place is learnt as it goes (*Follow*), so it suits small movements like a finger and copes with the
-  student shifting. If it stays pressed and still for the *Settle* time, that becomes the new resting place.
+  student shifting. After it has been pressed for the *Settle* time, where the finger is becomes the new resting
+  place and it lets go.
 - One reading past the line presses (a quick wave counts); it reads about 65 times a second.
 - **Setting it up:** SETTINGS → *Sensor test* shows a live graph on the stick, and the setup page's Settings tab
   has a bigger live graph next to the sensor settings, with **Record** to download the readings as a spreadsheet
@@ -213,7 +214,7 @@ All of these are on the setup page too, on each mode's tab and the Settings tab.
 | General (sensor) | Sensor mode | Line, **Move** | Only with a ToF sensor plugged in – see *Touch-free: the ToF sensor* |
 | General (sensor) | Distance | 5, 6, 8, **10**, 15, 20, 30, 50 cm | Line: closer than this counts as a press |
 | General (sensor) | Movement | 5, **8**, 10, 15, 20, 30 mm | Move: a movement this big towards the sensor counts as a press |
-| General (sensor) | Settle | Off, 1, **2**, 3, 5 s | Move: pressed and still this long becomes the new resting place and lets go |
+| General (sensor) | Settle | Off, 1, **2**, 3, 5 s | Move: after being pressed this long, where the finger is becomes the new resting place and it lets go. Off for students who hold presses on purpose |
 | General (sensor) | Follow | Slow, **Medium**, Fast | Move: how quickly the resting place follows drift |
 | General (sensor) | Ignore beyond | Off, 20, **30**, 50 cm | Anything further away counts as nothing there |
 | General (sensor) | Sensor test | hold A | A live graph of the sensor with a press count; presses only beep there. B restarts the count, A closes |
@@ -341,7 +342,7 @@ graph that zooms to fit, with the trigger line. A = size, hold A = LINE / MOVE, 
 | Mode | LINE, **MOVE** | How a press is detected |
 | Distance | 5, 6, 8, **10**, 15, 20, 30, 50 cm | LINE: press closer than this |
 | Movement | 5, **8**, 10, 15, 20, 30 mm | MOVE: press on a movement this big towards the sensor |
-| Settle | Off, 1, **2**, 3, 5 s | MOVE: pressed and still this long becomes the new resting place (so it can't stay stuck pressed) |
+| Settle | Off, 1, **2**, 3, 5 s | MOVE: after being pressed this long, where the finger is becomes the new resting place (so it can't stay stuck pressed) |
 | Follow | Slow, **Medium**, Fast | MOVE: how quickly the resting place follows drift. Slow catches slow presses; Fast copes with a restless student |
 | Ignore beyond | **Off**, 20, 30, 50 cm | Anything further away counts as nothing there – stops people passing by from pressing |
 | Field of view | **Wide**, Medium, Narrow | Narrower ignores movement at the sides, but the finger must be right in front |

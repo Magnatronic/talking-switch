@@ -13,9 +13,9 @@
 //             where the hand or finger is resting. The resting distance
 //             is learnt while not pressed ("Follow" speed), so it copes
 //             with the student shifting position - for small movements
-//             like a finger. If it stays pressed and still for the
-//             "Settle" time, that becomes the new resting place and it
-//             lets go (without another press), so a finger that relaxes
+//             like a finger. After it has been pressed for the "Settle"
+//             time, where the finger is becomes the new resting place and
+//             it lets go (without another press), so a finger that relaxes
 //             closer doesn't leave it stuck pressed.
 //  The screen shows the distance, a scrolling graph of the last few
 //  seconds (it zooms to fit, so small movements show) with the trigger
@@ -61,7 +61,7 @@ Setting SETTINGS[T_COUNT] = {
   {"Distance",      8, 3, {50, 60, 80, 100, 150, 200, 300, 500}, {"5 cm", "6 cm", "8 cm", "10 cm", "15 cm", "20 cm", "30 cm", "50 cm"}},
   // MOVE: press on a movement this big towards the sensor (mm)
   {"Movement",      6, 1, {5, 8, 10, 15, 20, 30}, {"5 mm", "8 mm", "10 mm", "15 mm", "20 mm", "30 mm"}},
-  // MOVE: pressed and still this long -> the new resting place (ms)
+  // MOVE: pressed this long -> where the hand is becomes the resting place (ms)
   {"Settle",        5, 2, {0, 1000, 2000, 3000, 5000}, {"Off", "1 s", "2 s", "3 s", "5 s"}},
   // MOVE: how quickly the resting distance follows drift (per 1000 readings)
   {"Follow",        3, 1, {8, 20, 50}, {"Slow", "Medium", "Fast"}},
@@ -87,7 +87,6 @@ bool shown(int i) {  // settings that do something with the current choices
 
 static const int PRESS_READINGS = 1;    // readings in a row past the line to press (1 catches a quick wave)
 static const int RELEASE_READINGS = 2;  // ...and back to let go (so one stray reading can't)
-static const int STILL_MM = 6;          // Settle: "still" = readings within this much (or half the Movement)
 static const int LOST_LET_GO = 10;      // while pressed, this many unreliable readings in a row (~150 ms) let go
 static const int MIN_MM = 40;           // closer than this isn't reliable ("Too close")
 static const int GRAPH_W = 224;         // readings shown, one per pixel (~3.5-4.5 s)
@@ -104,10 +103,8 @@ bool tooClose = false;       // ...closer than the sensor can measure
 float restMm = -1;           // MOVE: the resting distance (-1 = not learnt yet)
 bool pressed = false;
 int streak = 0;              // readings in a row on the other side of the line
-int stillLo = -1, stillHi = -1;  // MOVE, pressed: the readings' range while still...
-long stillSum = 0;
-int stillN = 0;
-uint32_t stillSince = 0;     // ...since this time
+uint32_t pressedAt = 0;      // MOVE, Settle: when the press started...
+float holdAvg = -1;          // ...and where the hand has been lately (a short average)
 int lostRun = 0;             // unreliable readings in a row
 int recent[3], recentN = 0;  // Smoothing: the last 3 readings
 uint32_t presses = 0;
@@ -149,7 +146,7 @@ void resetStats() {
   restMm = -1;
   pressed = false;
   streak = 0;
-  stillN = 0;
+  holdAvg = -1;
   lostRun = 0;
   recentN = 0;
   for (int i = 0; i < GRAPH_W; i++) { history[i] = historyLine[i] = -1; historyPressed[i] = false; }
@@ -376,27 +373,20 @@ void loop() {
     if (streak >= (pressed ? RELEASE_READINGS : PRESS_READINGS)) {
       streak = 0;
       pressed = !pressed;
-      stillN = 0;
+      pressedAt = millis();
+      holdAvg = -1;
       if (pressed) { presses++; M5.Speaker.tone(1500, 60); }
     }
-    // MOVE: pressed and still for the settle time -> the new resting place (the
-    // average while still): let go, without counting a press. "Still" = all the
-    // readings since then within STILL_MM (or half the movement) of each other.
-    if (moveMode() && pressed && here && val(T_SETTLE)) {
-      const int tol = max(STILL_MM, val(T_MOVE) / 2);
-      if (stillN && max(stillHi, mm) - min(stillLo, mm) > tol) stillN = 0;  // moved: start again
-      if (!stillN) { stillLo = stillHi = mm; stillSum = 0; stillSince = millis(); }
-      stillLo = min(stillLo, mm);
-      stillHi = max(stillHi, mm);
-      stillSum += mm;
-      stillN++;
-      if (millis() - stillSince >= (uint32_t)val(T_SETTLE)) {
-        pressed = false;
-        streak = 0;
-        restMm = (float)stillSum / stillN;
-        stillN = 0;
-        M5.Speaker.tone(600, 30);  // a quiet low tick: settled
-      }
+    // MOVE: pressed for the settle time -> where the hand is now (a short
+    // average) becomes the resting place: let go, without counting a press. It
+    // doesn't wait for the hand to be still - a relaxed finger creeps.
+    if (moveMode() && pressed && here) holdAvg = holdAvg < 0 ? mm : holdAvg + (mm - holdAvg) * 0.15f;
+    if (moveMode() && pressed && val(T_SETTLE) && holdAvg >= 0 && millis() - pressedAt >= (uint32_t)val(T_SETTLE)) {
+      pressed = false;
+      streak = 0;
+      restMm = holdAvg;
+      holdAvg = -1;
+      M5.Speaker.tone(600, 30);  // a quiet low tick: settled
     }
 
     history[historyPos] = distMm;
