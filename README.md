@@ -300,8 +300,9 @@ Most student settings are in the SETTINGS mode above. At the top of `TalkingSwit
 `ToFTest/ToFTest.ino` is a separate test sketch for the M5Stack **Unit ToF4M** (VL53L1X) on the Grove port, to try it as
 a touch-free switch (a hand, head or foot moving closer than a set distance) and to watch a student's movement. It
 needs the **VL53L1X** library by Pololu (Library Manager). Unplug the Unit Key and any switch on the mono jack first –
-they share the Grove pins. A = next trigger distance (5–50 cm), B = reset, hold B = Short / Long range. Readings go to
-the serial port as `tof,<ms>,<mm>,<pressed>` for the Serial Plotter.
+they share the Grove pins. The screen shows a scrolling graph of the last few seconds with the trigger line. A = next trigger distance
+(5–50 cm), B = reset, hold B = Short (~50 readings a second, catches quick waves) / Long range. Readings also go to
+the serial port for the Serial Plotter – open it after the stick has started.
 
 ## Notes
 

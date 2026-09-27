@@ -5,19 +5,21 @@
 //  into the StickS3's Grove port instead of the Unit Key (not both, and not
 //  a switch on the mono jack - they share the Grove pins) and upload this.
 //
-//  The screen shows the distance, a bar with the trigger line, and how
-//  many "presses" it has counted. Moving closer than the trigger distance
-//  counts as a press (with a beep); moving back out lets go. The switch's
-//  header turns green while "pressed".
+//  The screen shows the distance, a scrolling graph of the last few
+//  seconds with the trigger line (yellow), and how many "presses" it has
+//  counted. One reading closer than the trigger distance counts as a press
+//  (with a beep); two readings back out let go. The header turns green
+//  while "pressed".
 //
 //    A click .... next trigger distance (5, 10, 15, 20, 30, 50 cm)
-//    B click .... reset the count and the nearest / furthest readings
+//    B click .... reset the count, the graph and the "lost" figure
 //    Hold B ..... Short range (up to ~1.3 m, better in sunlight) / Long
 //                 (up to ~4 m)
 //
-//  Readings are also sent on the USB serial port (115200) as
-//    tof,<ms since boot>,<mm or -1>,<pressed 0/1>
-//  so they can be logged or plotted (Arduino IDE Serial Plotter).
+//  Readings also go to the USB serial port (115200) for the Arduino IDE's
+//  Serial Plotter, as  distance_cm:<cm>,trigger_cm:<cm>,pressed:<0 or 10>
+//  (open the plotter after the stick has started - its USB port disappears
+//  while it restarts).
 //
 //  Needs the "VL53L1X" library by Pololu (Arduino Library Manager).
 //  Board settings: the same as the ChatterSwitch firmware.
@@ -33,8 +35,9 @@ M5Canvas canvas(&M5.Display);
 static const int TRIGGERS_CM[] = {5, 10, 15, 20, 30, 50};
 static const int NUM_TRIGGERS = sizeof(TRIGGERS_CM) / sizeof(TRIGGERS_CM[0]);
 static const int HYSTERESIS_MM = 15;  // move this much further out to let go (stops flicker at the line)
-static const int CONFIRM = 2;         // readings in a row needed to press / let go
-static const int BAR_MAX_CM = 100;    // the bar's full width
+static const int PRESS_READINGS = 1;  // readings in a row inside the line to press (1 catches a quick wave)
+static const int RELEASE_READINGS = 2; // ...and outside it to let go (so one stray reading can't)
+static const int GRAPH_MAX_CM = 100;  // the graph's top
 
 int triggerIdx = 1;          // 10 cm
 bool longRange = false;
@@ -46,11 +49,17 @@ uint32_t presses = 0;
 int nearest = -1, furthest = -1;
 uint32_t readings = 0, invalid = 0, rateCount = 0, rateStart = 0;
 float rateHz = 0;
+static const int GRAPH_W = 224;       // readings shown (one per pixel, ~4.5 s at 50/s)
+int16_t history[GRAPH_W];             // mm, -1 = none
+bool historyPressed[GRAPH_W];
+int historyPos = 0;
 
 void setRange() {
   tof.setDistanceMode(longRange ? VL53L1X::Long : VL53L1X::Short);
-  tof.setMeasurementTimingBudget(longRange ? 50000 : 33000);  // microseconds per reading
-  tof.startContinuous(longRange ? 50 : 35);                   // ms between readings
+  // Short: 20 ms readings, ~50 a second, so quick movements aren't missed.
+  // Long needs longer readings to reach further.
+  tof.setMeasurementTimingBudget(longRange ? 33000 : 20000);  // microseconds per reading
+  tof.startContinuous(longRange ? 33 : 20);                   // ms between readings
 }
 
 bool startSensor() {
@@ -68,56 +77,63 @@ void resetStats() {
   presses = 0;
   nearest = furthest = -1;
   readings = invalid = 0;
+  for (int i = 0; i < GRAPH_W; i++) { history[i] = -1; historyPressed[i] = false; }
 }
 
 void draw() {
-  const int W = canvas.width(), H = canvas.height();
+  const int W = canvas.width();
   canvas.fillScreen(TFT_BLACK);
-  // header: green while pressed
-  canvas.fillRect(0, 0, W, 30, pressed ? TFT_GREEN : canvas.color565(90, 90, 90));
+  // header: green while pressed; the range and readings per second on the right
+  canvas.fillRect(0, 0, W, 24, pressed ? TFT_GREEN : canvas.color565(90, 90, 90));
   canvas.setTextColor(pressed ? TFT_BLACK : TFT_WHITE);
   canvas.setFont(&fonts::FreeSansBold9pt7b);
   canvas.setTextDatum(middle_left);
-  canvas.drawString(pressed ? "PRESSED" : "ToF TEST", 6, 15);
+  canvas.drawString(pressed ? "PRESSED" : "ToF TEST", 6, 12);
+  canvas.setFont(&fonts::Font2);
   canvas.setTextDatum(middle_right);
-  canvas.drawString(longRange ? "Long" : "Short", W - 6, 15);
+  canvas.drawString(String(longRange ? "Long " : "Short ") + String(rateHz, 0) + "/s", W - 6, 12);
 
   canvas.setTextDatum(middle_center);
   if (!sensorOk) {
     canvas.setTextColor(TFT_ORANGE);
     canvas.setFont(&fonts::FreeSansBold12pt7b);
-    canvas.drawString("No sensor", W / 2, 58);
+    canvas.drawString("No sensor", W / 2, 56);
     canvas.setFont(&fonts::Font2);
     canvas.setTextColor(TFT_LIGHTGREY);
-    canvas.drawString("Plug the ToF4M into Grove, then restart", W / 2, 88);
+    canvas.drawString("Plug the ToF4M into Grove, then restart", W / 2, 86);
     return;
   }
 
   // the distance, big
   canvas.setFont(&fonts::FreeSansBold18pt7b);
   canvas.setTextColor(distMm < 0 ? TFT_DARKGREY : TFT_WHITE);
-  canvas.drawString(distMm < 0 ? "--" : String(distMm / 10.0f, 1) + " cm", W / 2, 50);
+  canvas.drawString(distMm < 0 ? "--" : String(distMm / 10.0f, 1) + " cm", W / 2, 41);
 
-  // bar: 0 to BAR_MAX_CM, with the trigger line
-  const int bx = 8, by = 72, bw = W - 16, bh = 10;
-  canvas.drawRect(bx, by, bw, bh, TFT_DARKGREY);
-  if (distMm >= 0) {
-    int fill = min(bw - 2, (int)((long)distMm * (bw - 2) / (BAR_MAX_CM * 10)));
-    canvas.fillRect(bx + 1, by + 1, fill, bh - 2, pressed ? TFT_GREEN : TFT_CYAN);
+  // the graph: the last few seconds, oldest on the left; closer = lower
+  const int gx = (W - GRAPH_W) / 2, gy = 58, gh = 40;
+  canvas.drawRect(gx - 1, gy - 1, GRAPH_W + 2, gh + 2, TFT_DARKGREY);
+  auto yOf = [&](int mm) { return gy + gh - 1 - min(gh - 1, (int)((long)mm * (gh - 1) / (GRAPH_MAX_CM * 10))); };
+  int ty = yOf(TRIGGERS_CM[triggerIdx] * 10);
+  canvas.drawFastHLine(gx, ty, GRAPH_W, TFT_YELLOW);
+  int prevY = -1;
+  for (int i = 0; i < GRAPH_W; i++) {
+    int k = (historyPos + i) % GRAPH_W;  // oldest first
+    if (history[k] < 0) { prevY = -1; continue; }
+    int y = yOf(history[k]);
+    uint16_t col = historyPressed[k] ? TFT_GREEN : TFT_CYAN;
+    if (prevY >= 0) canvas.drawLine(gx + i - 1, prevY, gx + i, y, col);
+    else canvas.drawPixel(gx + i, y, col);
+    prevY = y;
   }
-  int tx = bx + 1 + TRIGGERS_CM[triggerIdx] * (bw - 2) / BAR_MAX_CM;
-  canvas.fillRect(tx - 1, by - 4, 3, bh + 8, TFT_YELLOW);
 
-  // details
+  // details and buttons
   canvas.setFont(&fonts::Font2);
   canvas.setTextColor(TFT_YELLOW);
-  canvas.drawString("Trigger " + String(TRIGGERS_CM[triggerIdx]) + " cm - " + String(presses) + " presses", W / 2, 96);
-  canvas.setTextColor(TFT_LIGHTGREY);
-  String range = nearest < 0 ? String("--") : String(nearest / 10.0f, 1) + "-" + String(furthest / 10.0f, 1) + " cm";
   int bad = readings ? (int)(invalid * 100 / readings) : 0;
-  canvas.drawString(range + "  " + String(rateHz, 0) + "/s  " + String(bad) + "% lost", W / 2, 112);
+  canvas.drawString("Trigger " + String(TRIGGERS_CM[triggerIdx]) + " cm - " + String(presses) + " presses - "
+                    + String(bad) + "% lost", W / 2, 108);
   canvas.setTextColor(TFT_DARKGREY);
-  canvas.drawString("A trigger  B reset  hold B range", W / 2, 127);
+  canvas.drawString("A trigger  B reset  hold B range", W / 2, 125);
 }
 
 void setup() {
@@ -131,6 +147,7 @@ void setup() {
   M5.BtnB.setHoldThresh(800);
   canvas.setColorDepth(16);
   canvas.createSprite(M5.Display.width(), M5.Display.height());
+  resetStats();
   sensorOk = startSensor();
   rateStart = millis();
 }
@@ -156,12 +173,17 @@ void loop() {
     const int line = TRIGGERS_CM[triggerIdx] * 10;
     bool other = pressed ? (!valid || mm > line + HYSTERESIS_MM) : (valid && mm < line);
     streak = other ? streak + 1 : 0;
-    if (streak >= CONFIRM) {
+    if (streak >= (pressed ? RELEASE_READINGS : PRESS_READINGS)) {
       streak = 0;
       pressed = !pressed;
       if (pressed) { presses++; M5.Speaker.tone(1500, 60); }
     }
-    Serial.printf("tof,%lu,%d,%d\n", (unsigned long)millis(), distMm, pressed ? 1 : 0);
+    history[historyPos] = distMm;
+    historyPressed[historyPos] = pressed;
+    historyPos = (historyPos + 1) % GRAPH_W;
+    // for the Serial Plotter: name:value pairs (pressed is drawn as 0 or 10)
+    Serial.printf("distance_cm:%.1f,trigger_cm:%d,pressed:%d\n", distMm < 0 ? 0.0f : distMm / 10.0f,
+                  TRIGGERS_CM[triggerIdx], pressed ? 10 : 0);
   }
   if (millis() - rateStart >= 1000) {
     rateHz = rateCount * 1000.0f / (millis() - rateStart);
