@@ -933,14 +933,14 @@ function renderSettings() {
   $('set-voice').replaceChildren(...renderVoiceSetting());
 }
 
-// The switch's name, for Bluetooth and USB (only on this page).
+// A name in front of the switch's own ("Sam ChatterSwitch 7B70"), for Bluetooth and USB (only on this page).
 function nameRow() {
-  const input = el('input', { type: 'text', maxLength: 16, value: info.devname || '',
-    placeholder: info.defname.replace(/ \S+$/, ''), 'aria-label': 'Switch name' });
+  const input = el('input', { type: 'text', maxLength: 10, value: info.devname || '',
+    placeholder: 'e.g. Sam', 'aria-label': 'Name in front of the switch’s name' });
   const save = el('button', { onclick: () => act(() => cmd(`DEVNAME ${input.value.trim()}`),
     'Name saved – unplug the switch and plug it in again for computers to see it') }, 'Save');
   return el('div', { class: 'setting' }, el('div', { class: 'name' }, 'Switch name'), el('div', { class: 'row' }, input, save),
-    el('div', { class: 'help' }, `Shown for Bluetooth and in this page’s Connect list, with the switch’s ID on the end – e.g. “Sam’s switch ${info.defname.split(' ').pop()}”. Leave empty for “${info.defname}”. Windows may keep showing the old name until the switch is removed in Device Manager.`));
+    el('div', { class: 'help' }, `Goes in front of the switch’s name for Bluetooth and in this page’s Connect list: “Sam” shows as “Sam ${info.defname}”. Leave empty for just “${info.defname}”. Windows may keep showing the old name until the switch is removed in Device Manager.`));
 }
 
 // ---------------------------------------------------------------- audio

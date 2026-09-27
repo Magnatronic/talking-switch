@@ -70,8 +70,9 @@ nothing with the current choices are hidden), and what it uses below.
   change).
 - **Settings:** the switch's SETTINGS in the same order – Volume, B button sound, Modes, Press must last, Ignore repeats,
   Brightness, Switch wakes screen, Sleep after, Auto power off, Recording boost, Forget BT devices. Recording boost
-  also sets the loudness of messages made on the page. Then **Switch name**: the name for Bluetooth and in the
-  setup page's Connect list, with the switch's ID on the end, e.g. "Sam's switch 7B70" (empty = "ChatterSwitch XXXX"). Unplug and plug the switch in
+  also sets the loudness of messages made on the page. Then **Switch name**: a name (up to 10 characters) put in front of the
+  switch's own for Bluetooth and the setup page's Connect list, e.g. "Sam" shows as "Sam ChatterSwitch 7B70" (it's always
+  "ChatterSwitch" and the stick's ID). Unplug and plug the switch in
   again for computers to see a new name; Windows may keep the old one until the switch is removed in Device
   Manager. **About this switch** shows the firmware version, storage used (red when nearly full – delete sounds
   you don't use), student presses since it was turned on, and whether it can be a USB keyboard. If the page and
@@ -234,7 +235,8 @@ set switch input to the key shown on screen.
 
 - **USB:** plug into the computer with a data cable. Nothing to pair, and it charges at the same time.
 - **Bluetooth:** the StickS3 appears as **"ChatterSwitch XXXX"** – each stick has its own 4-character ID, shown on the
-  KEYBOARD screen, so you can tell switches apart – or the *Switch name* given on the setup page. Pair it from Windows, iPad or Android like a keyboard.
+  KEYBOARD screen, so you can tell switches apart – with any *Switch name* from the setup page in front, e.g.
+  "Sam ChatterSwitch 7B70". Pair it from Windows, iPad or Android like a keyboard.
   To move it to a different computer or tablet, use *Forget BT devices* in SETTINGS.
 
 It picks automatically: when a computer is using it as a USB keyboard, keys go over USB only;
