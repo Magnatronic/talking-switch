@@ -302,7 +302,8 @@ a touch-free switch (a hand, head or foot moving closer than a set distance) and
 needs the **VL53L1X** library by Pololu (Library Manager). Unplug the Unit Key and any switch on the mono jack first –
 they share the Grove pins. Two ways to press: **LINE** – closer than a set distance (5–50 cm); **MOVE** – a movement of 5–30 mm towards the
 sensor from where the hand or finger rests (the resting distance is learnt as it goes; best for small movements like
-a finger). The screen shows a scrolling graph that zooms to fit, with the trigger line. A = trigger size, hold A =
+a finger; if it stays pressed and still for the *settle* time – Off, 1, 2, 3 or 5 s, B to change – that becomes the
+new resting place and it lets go, so a relaxed finger doesn't leave it stuck). The screen shows a scrolling graph that zooms to fit, with the trigger line. A = trigger size, hold A =
 LINE / MOVE, B = reset, hold B = Short (~65 readings a second) / Long range. The sensor isn't reliable closer than
 about 4 cm, and a finger works best 5–10 cm away (further off it's only part of what the sensor sees). Readings also
 go to the serial port for the Serial Plotter – open it after the stick has started.

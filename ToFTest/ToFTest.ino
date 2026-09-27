@@ -13,7 +13,10 @@
 //             where the hand or finger is resting. The resting distance
 //             is learnt slowly while not pressed, so it copes with the
 //             student shifting position - for small movements like a
-//             finger.
+//             finger. If it stays pressed and still for the "settle" time
+//             (Off, 1, 2, 3 or 5 s), that becomes the new resting place and
+//             it lets go (without another press), so a finger that relaxes
+//             closer doesn't leave it stuck pressed.
 //  The screen shows the distance, a scrolling graph of the last few
 //  seconds (it zooms to fit, so small movements show) with the trigger
 //  line in yellow, and how many presses it has counted. The header turns
@@ -21,7 +24,8 @@
 //
 //    A click .... next trigger size (distance in LINE, movement in MOVE)
 //    Hold A ..... LINE / MOVE
-//    B click .... reset the count, the graph and the "lost" figure
+//    B click .... MOVE: next settle time. LINE: reset the count, the graph
+//                 and the "lost" figure (changing mode or size resets too)
 //    Hold B ..... Short range (up to ~1.3 m, faster, better in sunlight) /
 //                 Long (up to ~4 m, slower)
 //
@@ -53,12 +57,18 @@ static const int NUM_MOVES = sizeof(MOVES_MM) / sizeof(MOVES_MM[0]);
 static const int PRESS_READINGS = 1;    // readings in a row past the line to press (1 catches a quick wave)
 static const int RELEASE_READINGS = 2;  // ...and back to let go (so one stray reading can't)
 static const float REST_FOLLOW = 0.02f; // MOVE: how quickly the resting distance follows (per reading)
+static const int SETTLES_MS[] = {0, 1000, 2000, 3000, 5000};  // MOVE: pressed and still this long -> new resting place
+static const int NUM_SETTLES = sizeof(SETTLES_MS) / sizeof(SETTLES_MS[0]);
+static const int STILL_MM = 4;          // ...still = within this much
 static const int GRAPH_W = 224;         // readings shown, one per pixel (~3.5-4.5 s)
 static const int GRAPH_MIN_SPAN = 30;   // the graph shows at least this many mm top to bottom
 
 bool moveMode = false;
 int lineIdx = 3;             // 10 cm
 int moveIdx = 1;             // 8 mm
+int settleIdx = 2;           // 2 s
+int stillMm = -1;            // MOVE, pressed: where the finger has been still since...
+uint32_t stillSince = 0;     // ...this time
 bool longRange = false;
 bool sensorOk = false;
 int distMm = -1;             // latest reading (-1 = nothing in range / unreliable)
@@ -111,7 +121,10 @@ int lineMm() {
 // LINE; half the movement in MOVE.
 int marginMm() { return moveMode ? MOVES_MM[moveIdx] / 2 : max(4, LINES_CM[lineIdx]); }
 
-String sizeText() { return moveMode ? String(MOVES_MM[moveIdx]) + " mm move" : String(LINES_CM[lineIdx]) + " cm"; }
+String settleText() { return SETTLES_MS[settleIdx] ? "settle " + String(SETTLES_MS[settleIdx] / 1000) + " s" : "settle off"; }
+String sizeText() {
+  return moveMode ? String(MOVES_MM[moveIdx]) + " mm move, " + settleText() : String(LINES_CM[lineIdx]) + " cm";
+}
 
 void draw() {
   const int W = canvas.width();
@@ -124,7 +137,8 @@ void draw() {
   canvas.drawString(pressed ? "PRESSED" : moveMode ? "MOVE" : "LINE", 6, 12);
   canvas.setFont(&fonts::Font2);
   canvas.setTextDatum(middle_right);
-  canvas.drawString(String(longRange ? "Long " : "Short ") + String(rateHz, 0) + "/s", W - 6, 12);
+  int bad = readings ? (int)(lost * 100 / readings) : 0;
+  canvas.drawString(String(longRange ? "Long " : "Short ") + String(rateHz, 0) + "/s  " + String(bad) + "% lost", W - 6, 12);
 
   canvas.setTextDatum(middle_center);
   if (!sensorOk) {
@@ -182,10 +196,10 @@ void draw() {
   canvas.setTextDatum(middle_center);
   canvas.setFont(&fonts::Font2);
   canvas.setTextColor(TFT_YELLOW);
-  int bad = readings ? (int)(lost * 100 / readings) : 0;
-  canvas.drawString(sizeText() + " - " + String(presses) + " presses - " + String(bad) + "% lost", W / 2, 108);
+  canvas.drawString(sizeText() + " - " + String(presses) + " presses", W / 2, 108);
   canvas.setTextColor(TFT_DARKGREY);
-  canvas.drawString("A size  hold A mode  B reset  hold B range", W / 2, 125);
+  canvas.drawString(moveMode ? "A size  hold A mode  B settle" : "A size  hold A mode  B reset",
+                    W / 2, 125);
 }
 
 void setup() {
@@ -210,9 +224,13 @@ void loop() {
   if (M5.BtnA.wasClicked()) {
     if (moveMode) moveIdx = (moveIdx + 1) % NUM_MOVES;
     else lineIdx = (lineIdx + 1) % NUM_LINES;
+    resetStats();
   }
   if (M5.BtnA.wasHold()) { moveMode = !moveMode; resetStats(); }
-  if (M5.BtnB.wasClicked()) resetStats();
+  if (M5.BtnB.wasClicked()) {
+    if (moveMode) settleIdx = (settleIdx + 1) % NUM_SETTLES;
+    resetStats();
+  }
   if (M5.BtnB.wasHold() && sensorOk) { longRange = !longRange; setRange(); resetStats(); }
 
   if (sensorOk && tof.dataReady()) {
@@ -239,7 +257,19 @@ void loop() {
     if (streak >= (pressed ? RELEASE_READINGS : PRESS_READINGS)) {
       streak = 0;
       pressed = !pressed;
-      if (pressed) { presses++; M5.Speaker.tone(1500, 60); }
+      if (pressed) { presses++; M5.Speaker.tone(1500, 60); stillMm = -1; }
+    }
+    // MOVE: pressed and still for the settle time -> that's the new resting
+    // place: let go, without counting a press
+    if (moveMode && pressed && valid && SETTLES_MS[settleIdx]) {
+      if (stillMm < 0 || abs(mm - stillMm) > STILL_MM) { stillMm = mm; stillSince = millis(); }
+      else if (millis() - stillSince >= (uint32_t)SETTLES_MS[settleIdx]) {
+        pressed = false;
+        streak = 0;
+        restMm = mm;
+        stillMm = -1;
+        M5.Speaker.tone(600, 30);  // a quiet low tick: settled
+      }
     }
 
     history[historyPos] = distMm;
