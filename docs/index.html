@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Talking Switch Setup</title>
+<title>ChatterSwitch Setup</title>
 <style>
 :root {
   --bg: #f4f5f7; --card: #ffffff; --text: #1d2330; --muted: #5d6677; --line: #dde1e8;
@@ -124,7 +124,7 @@ ol { padding-left: 1.2em; margin: 8px 0 0; }
 <body>
 <header>
   <div class="wrap">
-    <h1>Talking Switch setup</h1>
+    <h1>ChatterSwitch setup</h1>
     <span id="devName" class="pill hidden"></span>
     <span id="battery" class="pill hidden"></span>
     <span class="pill hidden" id="pressPill" title="Lights up when the big switch is pressed"><span id="pressDot" class="dot"></span> Switch</span>
@@ -673,7 +673,7 @@ function renderAbout() {
   if (!match) warn.replaceChildren(el('h2', {}, 'Update the switch'),
     el('p', { class: 'small', style: 'margin:0' }, info.api > PAGE_API
       ? 'The switch has newer firmware than this page knows about. Reload the page (Ctrl+F5) to get the latest version.'
-      : 'This page is for newer firmware than the switch has, so some settings may be missing or not work. Upload the latest TalkingSwitch firmware from the Arduino IDE.'));
+      : 'This page is for newer firmware than the switch has, so some settings may be missing or not work. Upload the latest ChatterSwitch firmware (TalkingSwitch.ino) from the Arduino IDE.'));
 
   const mb = (b) => (b / 1048576).toFixed(1);
   const row = (name, value, help) => el('div', { class: 'setting' }, el('div', { class: 'name' }, name), value,

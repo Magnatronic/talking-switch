@@ -1,4 +1,4 @@
-# TalkingSwitch – M5StickS3 + Unit Key
+# ChatterSwitch – M5StickS3 + Unit Key
 
 Firmware for a big-button accessibility switch: a talking switch (Quick messages), choice-making with Topics,
 a Bluetooth/USB keyboard key for an AAC device, and an IR remote (Control), all in one.
@@ -24,7 +24,7 @@ a Bluetooth/USB keyboard key for an AAC device, and an IR remote (Control), all 
 | PSRAM | OPI PSRAM |
 | USB Mode | **USB-OTG (TinyUSB)** (wired USB keyboard + Bluetooth). *Hardware CDC and JTAG* also works, but then the keyboard is Bluetooth only |
 
-Open `TalkingSwitch/TalkingSwitch.ino` (Arduino needs the sketch folder and
+Open `TalkingSwitch/TalkingSwitch.ino` (the sketch keeps its original name; Arduino needs the sketch folder and
 `.ino` to share a name). The `partitions.csv` in that folder replaces the
 partition layout automatically (2MB for the firmware, ~5.9MB for recordings). Keep it next to the `.ino`.
 
@@ -71,7 +71,7 @@ nothing with the current choices are hidden), and what it uses below.
 - **Settings:** the switch's SETTINGS in the same order – Volume, B button sound, Modes, Press must last, Ignore repeats,
   Brightness, Switch wakes screen, Sleep after, Auto power off, Recording boost, Forget BT devices. Recording boost
   also sets the loudness of messages made on the page. Then **Switch name**: the name for Bluetooth and in the
-  setup page's Connect list, e.g. "Sam's switch" (empty = "Talking Switch XXXX"). Unplug and plug the switch in
+  setup page's Connect list, e.g. "Sam's switch" (empty = "ChatterSwitch XXXX"). Unplug and plug the switch in
   again for computers to see a new name; Windows may keep the old one until the switch is removed in Device
   Manager. **About this switch** shows the firmware version, storage used (red when nearly full – delete sounds
   you don't use), student presses since it was turned on, and whether it can be a USB keyboard. If the page and
@@ -233,7 +233,7 @@ Keys: **Space, Enter, Up, Down, Left, Right** (B-click to choose). In Grid 3 / M
 set switch input to the key shown on screen.
 
 - **USB:** plug into the computer with a data cable. Nothing to pair, and it charges at the same time.
-- **Bluetooth:** the StickS3 appears as **"Talking Switch XXXX"** – each stick has its own 4-character ID, shown on the
+- **Bluetooth:** the StickS3 appears as **"ChatterSwitch XXXX"** – each stick has its own 4-character ID, shown on the
   KEYBOARD screen, so you can tell switches apart – or the *Switch name* given on the setup page. Pair it from Windows, iPad or Android like a keyboard.
   To move it to a different computer or tablet, use *Forget BT devices* in SETTINGS.
 
@@ -272,7 +272,7 @@ Most student settings are in the SETTINGS mode above. At the top of `TalkingSwit
 | `MAX_SECONDS` | 10 | Longest recording per message |
 | `MIC_PGA` | 8 | Microphone analogue gain (3dB steps, 0–10). Lower it if loud voices sound distorted |
 | `SCREEN_DIM_MS` / `SCREEN_OFF_MS` | 30000 / 120000 | Screen dims, then switches off, when idle |
-| `BLE_NAME` | "Talking Switch" | Default name (Bluetooth and USB); each stick's own ID is added to it |
+| `BLE_NAME` | "ChatterSwitch" | Default name (Bluetooth and USB); each stick's own ID is added to it |
 | `FW_VERSION` / `FW_API` | "27 Sep 2026" / 1 | Version shown in About. Raise `FW_API` (and `PAGE_API` in `docs/index.html`) when the page and firmware must change together |
 
 ## Troubleshooting

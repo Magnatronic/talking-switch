@@ -1,5 +1,5 @@
 // =====================================================================
-//  TalkingSwitch - M5StickS3 + M5Stack Unit Key accessibility switch
+//  ChatterSwitch - M5StickS3 + M5Stack Unit Key accessibility switch
 // ---------------------------------------------------------------------
 //  One big switch, four jobs (modes), named after what they hold:
 //    QUICK     The 4 Quick messages. "Messages" setting:
@@ -134,8 +134,8 @@ static const int SND_TOPIC = NUM_QUICK, SND_IR = SND_TOPIC + NUM_TOPICS * PER_TO
 static const int NAME_TOPIC = SND_PMSG, NUM_NAMES = NAME_TOPIC + NUM_TOPICS;
 static const uint8_t  MIC_PGA     = 8;     // mic analogue gain, 3dB steps (0-10). Lower if loud voices distort
 
-static const char*    BLE_NAME      = "Talking Switch"; // Bluetooth name; the last 4 characters of the
-                                                        // stick's address are added, e.g. "Talking Switch 7B70"
+static const char*    BLE_NAME      = "ChatterSwitch";  // default name (Bluetooth, USB); the last 4 characters of the
+                                                        // stick's address are added, e.g. "ChatterSwitch 7B70"
 static const uint8_t  VOLUMES[]     = {128, 180, 220, 255}; // output power is volume squared: ~25/50/75/100%
 static const uint8_t  SPK_GAIN      = 8;   // speaker magnification: 8 = volume 4 is exactly full scale
                                            // (M5Unified's StickS3 default of 1 is 18dB quieter)
