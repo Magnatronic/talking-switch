@@ -1,1 +1,1 @@
-default_fqbn: esp32:esp32:esp32s3:CDCOnBoot=cdc,FlashSize=8M,PartitionScheme=huge_app,PSRAM=opi,USBMode=default
+default_fqbn: esp32:esp32:esp32s3:CDCOnBoot=default,FlashSize=8M,PartitionScheme=huge_app,PSRAM=opi,USBMode=default

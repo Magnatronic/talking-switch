@@ -251,7 +251,7 @@ let ttsBusy = false;
 let typed = '';           // words typed in the editor
 
 const MODE_HELP = {
-  'QUICK': 'The 4 Quick messages: each press plays the selected one, or the student chooses one by scanning.',
+  'QUICK': 'The 4 Quick messages: each press plays the selected one, or the student chooses one – by scanning or by counting presses.',
   'TOPICS': 'The student chooses from the Topics by scanning.',
   'KEYBOARD': 'Each press presses a keyboard key, over USB or Bluetooth.',
   'CONTROL': 'Each press sends the selected remote-control code, and says its sound if it has one.',
@@ -690,6 +690,8 @@ function renderAbout() {
       el('div', { class: 'usage' + (storageFull() ? ' full' : '') }, el('div', { style: `width:${pct}%` }))),
       storageFull() ? 'Nearly full – delete messages, sounds or topics you don’t use.' : 'Recordings, typed messages and spoken prompts.') : null,
     row('Presses', el('div', {}, String(info.presses ?? '–')), 'Student presses since the switch was turned on.'),
+    row('Input', el('div', {}, info.sensor ? 'ToF sensor' : 'Switch (Unit Key or jack)'),
+      'A ToF sensor is found when the switch turns on.'),
     row('USB keyboard', el('div', {}, info.usbhid ? 'Yes' : 'No – Bluetooth only'),
       info.usbhid ? null : 'The firmware was built with USB Mode: Hardware CDC. Use USB-OTG (TinyUSB) for a USB keyboard and No USB.'),
   );
@@ -879,7 +881,7 @@ const HELP = {
   s_bright: 'Screen brightness while in use. Low saves battery. The screen still dims, then turns off, when it isn’t being used.',
   s_accept: 'A press must last this long to count – filters accidental brushes.',
   s_lockout: 'Presses this soon after the last one are ignored – filters tremor and bounces.',
-  s_sleep: 'On battery, sleeps after this long without presses. The big switch still works and wakes it.',
+  s_sleep: 'On battery, sleeps after this long without presses. The big switch still works and wakes it. (Not with the ToF sensor, which can’t wake it.)',
   s_autooff: 'On battery, turns off completely after this long without presses.',
   s_wake: 'Whether presses of the big switch light up the screen.',
   s_loud: 'Louder messages, at some cost in clarity – for recordings, typed and uploaded messages.',

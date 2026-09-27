@@ -39,28 +39,32 @@
 //  Each Quick message, topic message and IR code is up to 5 s, with an
 //  optional name. The setup page turns the names into the short spoken
 //  prompts used when scanning.
-//    SETTINGS  General settings (volume, modes, press timing, screen, power,
-//              Bluetooth). "Modes" can turn KEYBOARD and/or CONTROL off for a
-//              talking-only switch: A then skips them (key and codes are kept).
+//    SETTINGS  General settings (volume, modes, press timing, the ToF sensor,
+//              screen, power, Bluetooth, About). "Modes" can turn KEYBOARD
+//              and/or CONTROL off for a talking-only switch: A then skips them
+//              (key and codes are kept).
 //              Each mode has its own settings too, as the last item B steps to.
 //              The big switch keeps doing the previous mode's job.
 //
 //  Staff controls on the StickS3 - one rule everywhere (the bottom line of
 //  the screen always shows what they do; when the screen is dim or off, the
 //  first press only wakes it):
-//    A click .... next mode (in a mode's settings: close them)
+//    A click .... next mode (in a mode's settings, an open topic, About or
+//                 Sensor test: close it)
 //    B click .... next: Quick message / topic / key / IR code, then the
 //                 mode's "Settings" item; in settings, the next setting
 //    Hold A ..... do it: QUICK record the message, CONTROL learn the code,
 //                 TOPICS open the topic (B then steps through its messages,
 //                 A closes it), on "Settings" open them, in settings change
-//                 the value
-//    Hold B ..... hear it: QUICK the message, CONTROL the code's sound
+//                 the value (or open About / Sensor test)
+//    Hold B ..... hear it: QUICK the message, an open topic's message,
+//                 CONTROL the code's sound
 //                 (B itself is silent, to save battery)
 //
 //  Power saving: the screen dims, then switches off, when idle. Bluetooth
 //  only runs in KEYBOARD mode. On battery, after the "Sleep after" time
-//  with no presses, it sleeps (except in Bluetooth KEYBOARD mode); the
+//  with no presses, it sleeps (except in Bluetooth KEYBOARD mode or with the
+//  ToF sensor, which can't wake it); the
 //  big switch still works and wakes it. Optionally it can also power off
 //  completely after a longer time (press the power button to restart).
 //
@@ -82,7 +86,8 @@
 //      settings appear in SETTINGS; "Sensor test" shows a live graph.
 //      Needs the "VL53L1X" library by Pololu.
 //
-//  Arduino IDE settings: see README.md next to this folder.
+//  Arduino IDE settings: sketch.yaml / README.md (USB CDC On Boot: Disabled,
+//  so the USB device gets the switch's name - see UsbSerial below).
 // =====================================================================
 
 #include <M5Unified.h>
@@ -109,6 +114,17 @@
 USBHIDKeyboard UsbKeyboard;
 #else
 #define HAS_USB_HID 0
+#endif
+
+#if HAS_USB_HID && !ARDUINO_USB_CDC_ON_BOOT
+// "USB CDC On Boot: Disabled": this sketch starts the USB serial port itself,
+// after giving the USB device the switch's name. (With it Enabled, the core
+// starts USB before setup() under the board's name, "ESP32S3_DEV".)
+#include "USBCDC.h"
+USBCDC UsbSerial(0);
+#define Serial UsbSerial
+#elif HAS_USB_HID
+#warning "Set Tools > USB CDC On Boot: Disabled, so the USB device gets the switch's name"
 #endif
 
 // ToF sensor settings that are the same for everyone

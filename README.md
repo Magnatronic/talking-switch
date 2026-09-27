@@ -6,7 +6,8 @@ a Bluetooth/USB keyboard key for an AAC device, and an IR remote (Control), all 
 ## What you need
 
 - M5StickS3
-- M5Stack Unit Key (U144) on the StickS3's Grove port
+- M5Stack Unit Key (U144) on the StickS3's Grove port – or a 3.5mm switch socket, or a Unit ToF4M distance sensor
+  (see *Using a standard 3.5mm switch* and *Touch-free: the ToF sensor*)
 - The printed base and cap (`unit-key-big-cap.scad`)
 - Arduino IDE 2.x
 
@@ -19,7 +20,7 @@ a Bluetooth/USB keyboard key for an AAC device, and an IR remote (Control), all 
 
 | Setting | Value |
 |---|---|
-| USB CDC On Boot | Enabled |
+| USB CDC On Boot | **Disabled** – the firmware starts the USB serial port itself, after giving the USB device the switch's name (with *Enabled*, the setup page's Connect list shows "ESP32S3_DEV"). With USB Mode *Hardware CDC and JTAG*, set it to *Enabled* |
 | Flash Size | 8MB (64Mb) |
 | Partition Scheme | Huge APP (3MB No OTA/1MB SPIFFS) |
 | PSRAM | OPI PSRAM |
@@ -38,8 +39,8 @@ partition layout automatically (2MB for the firmware, ~5.9MB for recordings). Ke
 
 If the screen says **"No PSRAM!"**, change PSRAM to *QSPI PSRAM* and upload again.
 
-In TinyUSB mode the StickS3 still shows up as a COM port and uploads normally reset it
-automatically. If an upload fails, put the StickS3 into download mode
+In TinyUSB mode the StickS3 still shows up as a COM port (named after the switch, e.g. "ChatterSwitch 7B70") and
+uploads normally reset it automatically. If an upload fails, put the StickS3 into download mode
 (see M5Stack's StickS3 docs for the button sequence) and upload again.
 
 ## Setup page (USB)
@@ -73,14 +74,15 @@ nothing with the current choices are hidden), and what it uses below.
   every computer uses the same one. Changing it remakes the prompts, and **Remake in this voice** remakes the typed
   messages made in another voice (the switch keeps each typed message's words; recorded and uploaded ones don't
   change).
-- **Settings:** the switch's SETTINGS in the same order – Volume, Modes, Press must last, Ignore repeats,
-  Brightness, Switch wakes screen, Sleep after, Auto power off, Recording boost, Forget BT devices. Recording boost
-  also sets the loudness of messages made on the page. Then **Switch name**: a name (up to 10 characters) put in front of the
+- **Settings:** the switch's SETTINGS in the same order – Volume, Modes, Press must last, Ignore repeats, (with a ToF
+  sensor: its settings and a live **Sensor test** graph), Brightness, Switch wakes screen, Sleep after, Auto power
+  off, Recording boost, Forget BT devices. Recording boost also sets the loudness of messages made on the page. Then **Switch name**: a name (up to 10 characters) put in front of the
   switch's own for Bluetooth and the setup page's Connect list, e.g. "Sam" shows as "Sam ChatterSwitch 7B70" (it's always
   "ChatterSwitch" and the stick's ID). Unplug and plug the switch in
   again for computers to see a new name; Windows may keep the old one until the switch is removed in Device
   Manager. **About this switch** shows the firmware version, storage used (red when nearly full – delete sounds
-  you don't use), student presses since it was turned on, and whether it can be a USB keyboard. If the page and
+  you don't use), student presses since it was turned on, the input (switch or ToF sensor) and whether it can be a
+  USB keyboard. If the page and
   the switch's firmware don't match, the page says **Update the switch** (or to reload the page).
 - **Names become prompts:** naming a message, topic or IR code makes its short spoken prompt for scanning, in
   the switch's voice (plus "Back" when students choose topics, and "Stop" with Stop choice on).
@@ -159,11 +161,10 @@ The bottom line of the screen always shows what the buttons do right now.
 
 | Button | Does |
 |---|---|
-| **A click** | Next mode (QUICK → TOPICS → KEYBOARD → CONTROL → SETTINGS). In a mode's settings: close them |
-| **B click** | Next: Quick message / topic / key / IR code, then the mode's **Settings** item, then back to the first. In settings: the next setting |
-| **Hold A** in TOPICS | Opens the topic: **B** then steps through its messages (hold B hears one) and **A** closes it |
-| **Hold B** | Hear it: QUICK – plays the selected Quick message; an open topic – the message; CONTROL – plays the code's sound (without sending it). B itself is silent, to save battery |
-| **Hold A** | Do it: QUICK – record the selected Quick message (release to stop); CONTROL – learn the selected code (remote 30cm+ from the end of the stick, within 8s); on **Settings** – open them; in settings – change the value |
+| **A click** | Next mode (QUICK → TOPICS → KEYBOARD → CONTROL → SETTINGS, skipping modes turned off in *Modes*). In a mode's settings, an open topic, About or Sensor test: close it |
+| **B click** | Next: Quick message / topic / key / IR code, then the mode's **Settings** item, then back to the first. In an open topic: its next message. In settings: the next setting. B itself is silent, to save battery |
+| **Hold A** | Do it: QUICK – record the selected Quick message (release to stop); TOPICS – open the topic, to look through its messages; CONTROL – learn the selected code (remote 30cm+ from the end of the stick, within 8s); on **Settings** – open them; in settings – change the value, or open About / Sensor test |
+| **Hold B** | Hear it: QUICK – the selected Quick message; an open topic – the message; CONTROL – the code's sound (without sending it) |
 
 When the screen is dim or off, the first press of A or B only wakes it.
 
@@ -248,8 +249,8 @@ All of these are on the setup page too, on each mode's tab and the Settings tab.
 - **Top bar:** the mode, in its colour ("SETTINGS" on that colour while its settings are open); on the right, the
   volume (a speaker and 4 bars) and the battery (% and icon; green bolt = charging, red = low).
 - **Middle:** three lines, the same on every screen – the main thing (big), its state or what to do (green ready,
-  orange a problem, yellow what to do), and details (grey). What the switch will do – the Quick message, the topic TOPICS will offer (or the choice on offer while
-  scanning), the key and whether it's sending by USB or Bluetooth, or the IR code. With *Student scans*, QUICK and
+  orange a problem, yellow what to do), and details (grey). What the switch will do – the Quick message; in TOPICS the topic B is on and its messages (or the
+  choice on offer while scanning); the key and whether it's sending by USB or Bluetooth; or the IR code. With *Student scans*, QUICK and
   CONTROL still show the selected message or code (the one B and hold A work on), with "Student scans…" underneath.
 - **Bottom:** what the buttons do right now.
 - A white frame appears while the big switch is held down.
@@ -265,7 +266,7 @@ silence trimmed, hiss between words turned down, level evened out.
 
 ### Keyboard (USB or Bluetooth)
 
-Keys: **Space, Enter, Up, Down, Left, Right** (B-click to choose). In Grid 3 / Mind Express,
+Keys: **Space, Enter, Up, Down, Left, Right**, and a custom key or shortcut set on the setup page (B-click to choose). In Grid 3 / Mind Express,
 set switch input to the key shown on screen.
 
 - **USB:** plug into the computer with a data cable. Nothing to pair, and it charges at the same time.
@@ -287,7 +288,8 @@ The screen says which is in use.
 - **Sleep:** on battery, after the *Sleep after* time with no presses, the StickS3 sleeps – screen, speaker
   and radio off. The switch LED keeps glowing. **The big switch still works:** a press wakes it and does its
   job (a fraction of a second slower than normal). A or B wakes it for staff.
-  It doesn't sleep in KEYBOARD mode over Bluetooth, because the connection would drop.
+  It doesn't sleep in KEYBOARD mode over Bluetooth, because the connection would drop, or with the ToF sensor,
+  which can't wake it.
 - **Auto power off** (off by default): after the chosen time with no presses it beeps three times and shows
   a warning; 30s later it powers off. Press any button to cancel. Press the power button to turn it back on.
 - It never sleeps or powers off while plugged into USB.
@@ -297,7 +299,7 @@ The screen says which is in use.
 
 Every student activation is written to the USB serial port (115200 baud) as
 `press,<milliseconds since boot>,<mode>` – handy evidence for assessing
-intentional communication. The screen also shows a press counter.
+intentional communication. SETTINGS → About (and the setup page's About box) shows how many since it was turned on.
 
 ## Tuning in code
 
@@ -306,21 +308,27 @@ Most student settings are in the SETTINGS mode above. At the top of `TalkingSwit
 | Setting | Default | What it does |
 |---|---|---|
 | `DEBOUNCE_MS` | 25 | Contact bounce filter |
-| `MAX_SECONDS` | 10 | Longest recording per message |
+| `MAX_SECONDS` | 5 | Longest recording per message |
 | `MIC_PGA` | 8 | Microphone analogue gain (3dB steps, 0–10). Lower it if loud voices sound distorted |
 | `SCREEN_DIM_MS` / `SCREEN_OFF_MS` | 30000 / 120000 | Screen dims, then switches off, when idle |
 | `BLE_NAME` | "ChatterSwitch" | Default name (Bluetooth and USB); each stick's own ID is added to it |
-| `FW_VERSION` / `FW_API` | "27 Sep 2026" / 1 | Version shown in About. Raise `FW_API` (and `PAGE_API` in `docs/index.html`) when the page and firmware must change together |
+| `FW_VERSION` / `FW_API` | "27 Sep 2026" / 2 | Version shown in About. Raise `FW_API` (and `PAGE_API` in `docs/index.html`) when the page and firmware must change together |
 
 ## Troubleshooting
 
-- **Big switch does nothing:** swap `PIN_KEY` (10) and `PIN_LED` (9) – the Grove wire order varies between units.
+- **Big switch does nothing:** with a jack switch, try the other Grove wire (see below). With the Unit Key, swap
+  `PIN_KEY` (10) and `PIN_LED` (9) in the code – the Grove wire order can vary. With the ToF sensor, check About
+  says *Input: ToF sensor* – the switch only looks for it when it starts, so plug it in, then turn it on.
 - **Recordings hiss or distort:** hiss – speak closer and lower Recording boost; distortion on loud voices – lower `MIC_PGA`.
 - **IR only works close up:** the StickS3's IR LED is small (it's in the end of the stick). Point that end straight at
   the device – its IR window is usually on the front – ideally within 3–5m. In a dark sensory room, bouncing off a
   white wall or ceiling can help. For longer range, an IR repeater/extender near the device works with any remote.
 - **IR learns nothing:** make sure the remote is 38kHz (most TV remotes are) and point it at the StickS3's IR window from **30cm to 1m** – closer than 30cm can scramble the code. Very long air-con codes may be cut short.
-- **Quiet playback:** B-hold for volume; for a noisy classroom add a small external speaker.
+- **Quiet playback:** raise *Volume* in SETTINGS (or on the setup page's Settings tab); for a noisy classroom add
+  a small external speaker.
+- **The Connect list shows "ESP32S3_DEV":** set *USB CDC On Boot: Disabled* (see the board settings) and upload
+  again. If it still shows an old name, Windows is remembering it: in Device Manager, under *Ports*, uninstall the
+  switch's COM port, then unplug it and plug it in again.
 - **Using a standard 3.5mm switch instead:** cut a Grove cable and wire a 3.5mm mono socket to two of its wires:
   **yellow** (the switch signal, GPIO10) and **black** (ground) – either way round, as a switch just joins them. Cut the
   red (5V) and white wires short and cover them. If it doesn't respond, colours vary between cables: try white instead
@@ -356,6 +364,9 @@ after the stick has started.
 
 ## Notes
 
-- Compile-checked against esp32 core 3.3.11 with M5Unified 0.2.23 / M5GFX 0.2.30, in both USB modes.
-  Tested on hardware: switch, modes and press logging. Not yet tested: IR, USB keyboard, sleep, auto power-off.
+- Compile-checked against esp32 core 3.3.11 with M5Unified 0.2.23 / M5GFX 0.2.30 and VL53L1X 1.3.1, in both USB
+  modes.
+- Tested on hardware: the Unit Key and a 3.5mm jack switch, the modes and their settings, the setup page, and the
+  ToF sensor (Line and Move). Not yet tested on hardware: IR, the USB keyboard, sleep, auto power-off and the backup
+  mode.
 - This is a DIY device, not a certified AT product. Check it's robust and safe for each student before use.
