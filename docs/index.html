@@ -107,6 +107,11 @@ button.link { background: none; border: none; color: var(--accent); padding: 4px
 .setting .help { grid-column: 2; font-size: .85rem; color: var(--muted); }
 @media (max-width: 560px) { .setting { grid-template-columns: 1fr; } .setting .help { grid-column: 1; } }
 
+.card.warn { border-color: var(--bad); }
+.card.warn h2 { color: var(--bad); }
+.usage { height: 8px; background: var(--line); border-radius: 4px; overflow: hidden; margin-top: 4px; max-width: 260px; }
+.usage > div { height: 100%; background: var(--good); }
+.usage.full > div { background: var(--bad); }
 #toast { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); background: var(--text); color: var(--bg);
   padding: 10px 16px; border-radius: 10px; opacity: 0; transition: opacity .2s; pointer-events: none; max-width: 90vw; }
 #toast.show { opacity: 1; }
@@ -144,24 +149,25 @@ ol { padding-left: 1.2em; margin: 8px 0 0; }
   </section>
 
   <div id="app" class="hidden">
+    <section id="versionWarn" class="card warn hidden"></section>
     <nav class="tabs" role="tablist">
-      <button role="tab" data-tab="speak">SPEAK</button>
-      <button role="tab" data-tab="choose">CHOOSE</button>
+      <button role="tab" data-tab="quick">QUICK</button>
+      <button role="tab" data-tab="topics">TOPICS</button>
       <button role="tab" data-tab="keyboard">KEYBOARD</button>
-      <button role="tab" data-tab="ir">IR</button>
+      <button role="tab" data-tab="control">CONTROL</button>
       <button role="tab" data-tab="voice">Voice</button>
       <button role="tab" data-tab="settings">Settings</button>
     </nav>
 
-    <section id="tab-speak" class="card" role="tabpanel">
-      <div id="set-speak" class="settings"></div>
+    <section id="tab-quick" class="card" role="tabpanel">
+      <div id="set-quick" class="settings"></div>
       <p id="speakIntro" class="muted small"></p>
       <div id="quickScan" class="preview hidden" style="margin-bottom:10px"></div>
       <div id="quickList" class="slots"></div>
     </section>
 
-    <section id="tab-choose" class="card" role="tabpanel">
-      <div id="set-choose" class="settings"></div>
+    <section id="tab-topics" class="card" role="tabpanel">
+      <div id="set-topics" class="settings"></div>
       <p id="chooseIntro" class="muted small"></p>
       <div id="msgScan" class="preview hidden" style="margin-bottom:10px"></div>
       <div id="msgList" class="slots"></div>
@@ -193,8 +199,8 @@ ol { padding-left: 1.2em; margin: 8px 0 0; }
       </div>
     </section>
 
-    <section id="tab-ir" class="card" role="tabpanel">
-      <div id="set-ir" class="settings"></div>
+    <section id="tab-control" class="card" role="tabpanel">
+      <div id="set-control" class="settings"></div>
       <p class="muted small">Give a code a <b>sound</b> (e.g. "Bubbles!") and the switch says it as it sends – leave it
         out for silence. To learn a code: click <b>Learn</b>, point the remote at the <b>end</b> of the switch from
         30cm–1m away and press its button within 8 seconds.</p>
@@ -208,6 +214,8 @@ ol { padding-left: 1.2em; margin: 8px 0 0; }
 
     <section id="tab-settings" class="card" role="tabpanel">
       <div id="set-settings" class="settings"></div>
+      <div class="label">About this switch</div>
+      <div id="about" class="settings"></div>
     </section>
   </div>
 
@@ -242,12 +250,12 @@ let ttsBusy = false;
 let typed = '';           // words typed in the editor
 
 const MODE_HELP = {
-  'SPEAK': 'The 4 Quick messages: each press plays the selected one, or the student chooses one by scanning.',
-  'CHOOSE': 'The student chooses from the Topics by scanning.',
+  'QUICK': 'The 4 Quick messages: each press plays the selected one, or the student chooses one by scanning.',
+  'TOPICS': 'The student chooses from the Topics by scanning.',
   'KEYBOARD': 'Each press presses a keyboard key, over USB or Bluetooth.',
-  'IR': 'Each press sends the selected remote-control code, and says its sound if it has one.',
+  'CONTROL': 'Each press sends the selected remote-control code, and says its sound if it has one.',
 };
-const TABS = ['speak', 'choose', 'keyboard', 'ir', 'voice', 'settings'];
+const TABS = ['quick', 'topics', 'keyboard', 'control', 'voice', 'settings'];
 function tabOfMode(i) { return (info.modes[i] || '').toLowerCase(); }
 function tabOn(tab) {
   const m = info && info.modes.findIndex((x) => x.toLowerCase() === tab);
@@ -461,11 +469,11 @@ function segment(box, labels, current, onPick) {
 // Numbers shared with the switch.
 //   Sounds: 0-3 Quick, 4-19 topic messages (topic t, item k = 4 + t*4 + k), 20-23 IR codes' sounds,
 //           24-39 topic message prompts, 40-43 topic prompts, 44-47 IR prompts, 48 "Back",
-//           49-52 Quick message prompts, 53 "Stop", 54 "Control", 55 "My device".
+//           49-52 Quick message prompts, 53 "Stop", 54 "Control", 55 "My device", 56 "Quick".
 //   Names:  0-3 Quick, 4-19 topic messages, 20-23 IR codes, 24-27 topics (BACK and STOP only have a prompt).
-const PER = 4, TOPIC0 = 4, IRS = 20, TOPICN = 24, BACK = 48, STOP = 53, IRMENU = 54, TALKER = 55;
+const PER = 4, TOPIC0 = 4, IRS = 20, TOPICN = 24, BACK = 48, STOP = 53, IRMENU = 54, TALKER = 55, QMENU = 56;
 // Prompts with fixed words (no name of their own)
-const FIXED_PROMPTS = { [BACK]: 'Back', [STOP]: 'Stop', [IRMENU]: 'Control', [TALKER]: 'My device' };
+const FIXED_PROMPTS = { [BACK]: 'Back', [STOP]: 'Stop', [IRMENU]: 'Control', [TALKER]: 'My device', [QMENU]: 'Quick' };
 function topicMsg(t, k) { return TOPIC0 + t * PER + k; }
 function promptOf(n) {
   if (FIXED_PROMPTS[n]) return n;
@@ -478,7 +486,6 @@ function soundInfo(n) {
   return n < TOPICN ? info.irs[n - IRS] : info.topics[n - TOPICN];
 }
 function setCur(key) { const st = info.settings.find((x) => x.key === key); return st ? st.cur : 0; }
-function chooseMode() { return info.modes[info.mode] === 'CHOOSE'; }
 function irScanning() { return setCur('s_irmode') === 2; }
 function speakScanning() { return setCur('s_spkmode') === 1; }
 function secs(n) { return (n / info.rate).toFixed(1) + ' s'; }
@@ -496,13 +503,14 @@ function render() {
     b.classList.toggle('inuse', b.dataset.tab === tabOfMode(info.mode));
     b.classList.toggle('hidden', !tabOn(b.dataset.tab));  // modes turned off in Settings: Modes
   }
-  if (!tabOn(currentTab)) showTab('speak');
+  if (!tabOn(currentTab)) showTab('quick');
   renderQuick();
   renderTopics();
   renderIr();
   renderScanNotes();
   renderSettings();
   renderCustomKey();
+  renderAbout();
   placeModeLine();
 }
 
@@ -565,7 +573,7 @@ function renderTopics() {
   }));
 }
 
-// One message row. Quick messages can be selected for SPEAK; topic messages
+// One message row. Quick messages can be selected for QUICK; topic messages
 // show whether they have a spoken prompt.
 function messageRow(i, s, quick) {
   const name = el('input', {
@@ -653,6 +661,35 @@ function renderEditor(i) {
     ...body);
 }
 
+// ---------------------------------------------------------------- about
+// The firmware's FW_API this page is made for (see TalkingSwitch.ino).
+const PAGE_API = 1;
+function storageFull() { return info.fsTotal && info.fsUsed / info.fsTotal >= 0.9; }
+
+function renderAbout() {
+  const warn = $('versionWarn');
+  const match = info.api === PAGE_API;
+  warn.classList.toggle('hidden', match);
+  if (!match) warn.replaceChildren(el('h2', {}, 'Update the switch'),
+    el('p', { class: 'small', style: 'margin:0' }, info.api > PAGE_API
+      ? 'The switch has newer firmware than this page knows about. Reload the page (Ctrl+F5) to get the latest version.'
+      : 'This page is for newer firmware than the switch has, so some settings may be missing or not work. Upload the latest TalkingSwitch firmware from the Arduino IDE.'));
+
+  const mb = (b) => (b / 1048576).toFixed(1);
+  const row = (name, value, help) => el('div', { class: 'setting' }, el('div', { class: 'name' }, name), value,
+    help ? el('div', { class: 'help' }, help) : null);
+  const pct = info.fsTotal ? Math.round((100 * info.fsUsed) / info.fsTotal) : 0;
+  $('about').replaceChildren(
+    row('Firmware', el('div', {}, info.ver || 'older than 27 Sep 2026')),
+    info.fsTotal ? row('Storage', el('div', {}, `${mb(info.fsUsed)} of ${mb(info.fsTotal)} MB used (${pct}%)`,
+      el('div', { class: 'usage' + (storageFull() ? ' full' : '') }, el('div', { style: `width:${pct}%` }))),
+      storageFull() ? 'Nearly full – delete messages, sounds or topics you don’t use.' : 'Recordings, typed messages and spoken prompts.') : null,
+    row('Presses', el('div', {}, String(info.presses ?? '–')), 'Student presses since the switch was turned on.'),
+    row('USB keyboard', el('div', {}, info.usbhid ? 'Yes' : 'No – Bluetooth only'),
+      info.usbhid ? null : 'The firmware was built with USB Mode: Hardware CDC. Use USB-OTG (TinyUSB) for a USB keyboard and No USB.'),
+  );
+}
+
 async function savePending() {
   const p = pending;
   const nameIt = p.words && !soundInfo(p.slot).name;
@@ -664,6 +701,7 @@ async function savePending() {
     pending = null;
     editing = null;
   }, 'Saved');
+  if (storageFull()) toast('Saved – the switch’s storage is nearly full. Delete sounds you don’t use.', true);
   if (nameIt) makePrompt(p.slot);
 }
 
@@ -732,9 +770,9 @@ function promptItems() {
   ].filter(([, x]) => x.name).map(([n, x]) => [n, x.pr]);
   if (setCur('s_topics') === 1) list.push([BACK, info.back.pr]);
   if (setCur('s_stop') === 1 && info.stop) list.push([STOP, info.stop.pr]);
-  const extra = setCur('s_topics') === 1 ? setCur('s_extra') : 0;
-  if (extra & 1 && info.irmenu) list.push([IRMENU, info.irmenu.pr]);
-  if (extra & 2 && info.talker) list.push([TALKER, info.talker.pr]);
+  if (allTopics() && setCur('s_offq') && info.qmenu) list.push([QMENU, info.qmenu.pr]);
+  if (allTopics() && setCur('s_offctl') && info.irmenu) list.push([IRMENU, info.irmenu.pr]);
+  if (allTopics() && setCur('s_offdev') && info.talker) list.push([TALKER, info.talker.pr]);
   return list;
 }
 
@@ -765,7 +803,7 @@ function renderScanNotes() {
   note('irScan', irScanning(), 'Students choose IR codes by scanning: each code’s name is spoken quietly as it’s offered.', info.irs);
 }
 
-// ---------------------------------------------------------------- IR tab
+// ---------------------------------------------------------------- CONTROL tab
 async function learnIr(i) {
   toast('Point the remote at the end of the switch from 30cm+ and press its button…');
   await act(() => cmd(`IRLEARN ${i}`, 12000), `IR code ${i + 1} learned`);
@@ -816,13 +854,17 @@ const HELP = {
   s_access: 'Press twice: a press starts the offers, the next press chooses. Hold & release: hold to step through, let go to choose.',
   s_scanspd: 'How long each choice is offered. Go at the student’s pace.',
   s_scanrnd: 'Times round the choices before it stops by itself.',
-  s_extra: 'More choices next to the topics. Control: the IR codes (from the IR tab), chosen like a topic’s messages. My device: changes to KEYBOARD so the student can use their AAC device or computer – staff (or No USB) bring it back.',
+  s_offq: 'Offers “Quick” next to the topics: the Quick messages, chosen like a topic’s messages.',
+  s_offctl: 'Offers “Control” next to the topics: the IR codes (from the CONTROL tab), chosen like a topic’s messages.',
+  s_offdev: 'Offers “My device” next to the topics: changes to KEYBOARD so the student can use their AAC device or computer. Staff (or No USB) bring it back.',
   s_stop: 'Offers “Stop” last, so the student can choose none of them.',
   s_irmode: 'Staff pick: sends the selected code. Repeat held: keeps sending while held, like a remote’s volume button. Student scans: the student chooses the code.',
-  s_nousb: 'With no USB connection (e.g. the AAC device isn’t there): Bluetooth sends keys over Bluetooth. SPEAK or CHOOSE: after 10 s the switch talks instead, with Bluetooth off to save battery, and goes back to KEYBOARD when USB is connected again.',
+  s_nousb: 'With no USB connection (e.g. the AAC device isn’t there): Bluetooth sends keys over Bluetooth. QUICK or TOPICS: after 10 s the switch talks instead, with Bluetooth off to save battery, and goes back to KEYBOARD when USB is connected again.',
   s_keyact: 'Momentary: the key is held while the switch is. Latch: one press holds the key down, the next lets it go.',
-  s_psound: 'A click or beep on each press (IR: only for codes with no sound of their own).',
-  s_modes: 'Turn KEYBOARD and/or IR off for a switch that only talks: the stick’s A button and this page skip them. Their key and IR codes are kept.',
+  s_psound: 'A click or beep on each press (CONTROL: only for codes with no sound of their own).',
+  s_bsound: 'Staff pressing B on the stick to step through messages, topics or codes: say each one (empty ones are silent), or Off for no sound.',
+  s_modes: 'Turn KEYBOARD and/or CONTROL off for a switch that only talks: the stick’s A button and this page skip them. Their key and IR codes are kept.',
+  s_bright: 'Screen brightness while in use. Low saves battery. The screen still dims, then turns off, when it isn’t being used.',
   s_accept: 'A press must last this long to count – filters accidental brushes.',
   s_lockout: 'Presses this soon after the last one are ignored – filters tremor and bounces.',
   s_sleep: 'On battery, sleeps after this long without presses. The big switch still works and wakes it.',
@@ -832,13 +874,15 @@ const HELP = {
 };
 
 const pressTwice = () => setCur('s_access') === 0;
+const allTopics = () => setCur('s_topics') === 1;
 const TAB_SETTINGS = {  // [setting, shown only when]
-  speak: [['s_spkmode'], ['s_play', () => !speakScanning()], ['s_hold', () => !speakScanning() && setCur('s_play') === 0],
+  quick: [['s_spkmode'], ['s_play', () => !speakScanning()], ['s_hold', () => !speakScanning() && setCur('s_play') === 0],
     ['s_access', speakScanning], ['s_scanspd', speakScanning], ['s_scanrnd', () => speakScanning() && pressTwice()],
     ['s_stop', speakScanning]],
-  choose: [['s_topics'], ['s_extra', () => setCur('s_topics') === 1], ['s_access'], ['s_scanspd'], ['s_scanrnd', pressTwice], ['s_stop']],
+  topics: [['s_topics'], ['s_offq', allTopics], ['s_offctl', () => allTopics() && tabOn('control')],
+    ['s_offdev', () => allTopics() && tabOn('keyboard')], ['s_access'], ['s_scanspd'], ['s_scanrnd', pressTwice], ['s_stop']],
   keyboard: [['s_keyact'], ['s_psound'], ['s_nousb', () => info.usbhid]],
-  ir: [['s_irmode'], ['s_access', irScanning], ['s_scanspd', irScanning],
+  control: [['s_irmode'], ['s_access', irScanning], ['s_scanspd', irScanning],
     ['s_scanrnd', () => irScanning() && pressTwice()], ['s_stop', irScanning], ['s_psound']],
 };
 
@@ -881,11 +925,22 @@ function renderSettings() {
   $('set-settings').replaceChildren(...[
     settingRow('Volume', Array.from({ length: info.vols }, (_, i) => String(i + 1)), info.vol,
       (i) => act(() => cmd(`VOL ${i}`)), 'How loud messages play. 4 is the loudest the switch can go.'),
-    ...['s_modes', 's_accept', 's_lockout', 's_wake', 's_sleep', 's_autooff', 's_loud'].map(switchSetting),
+    ...['s_bsound', 's_modes', 's_accept', 's_lockout', 's_bright', 's_wake', 's_sleep', 's_autooff', 's_loud'].map(switchSetting),
     tabOn('keyboard') && el('div', { class: 'setting' }, el('div', { class: 'name' }, 'Forget BT devices'), el('div', {}, forget),
       el('div', { class: 'help' }, 'To pair the switch with a different computer or tablet. Also remove it in that device’s Bluetooth settings.')),
+    nameRow(),
   ].filter(Boolean));
   $('set-voice').replaceChildren(...renderVoiceSetting());
+}
+
+// The switch's name, for Bluetooth and USB (only on this page).
+function nameRow() {
+  const input = el('input', { type: 'text', maxLength: 20, value: info.name === info.defname ? '' : info.name,
+    placeholder: info.defname, 'aria-label': 'Switch name' });
+  const save = el('button', { onclick: () => act(() => cmd(`DEVNAME ${input.value.trim()}`),
+    'Name saved – unplug the switch and plug it in again for computers to see it') }, 'Save');
+  return el('div', { class: 'setting' }, el('div', { class: 'name' }, 'Switch name'), el('div', { class: 'row' }, input, save),
+    el('div', { class: 'help' }, `Shown for Bluetooth and in this page’s Connect list, e.g. “Sam’s switch”. Leave empty for “${info.defname}”. Windows may keep showing the old name until the switch is removed in Device Manager.`));
 }
 
 // ---------------------------------------------------------------- audio
@@ -1243,16 +1298,16 @@ $('ckSet').addEventListener('click', () =>
 $('ckDel').addEventListener('click', () => act(() => cmd('CKEY 0 0'), 'Custom key removed'));
 
 // ---------------------------------------------------------------- tabs
-let currentTab = 'speak';
+let currentTab = 'quick';
 function showTab(name) {
-  if (!TABS.includes(name)) name = 'speak';
+  if (!TABS.includes(name)) name = 'quick';
   currentTab = name;
   for (const b of document.querySelectorAll('.tabs button')) b.setAttribute('aria-selected', String(b.dataset.tab === name));
   for (const t of TABS) $('tab-' + t).classList.toggle('hidden', t !== name);
   placeModeLine();
 }
 for (const b of document.querySelectorAll('.tabs button')) b.addEventListener('click', () => showTab(b.dataset.tab));
-showTab('speak');
+showTab('quick');
 
 // ---------------------------------------------------------------- wiring
 $('connectBtn').addEventListener('click', () => (port ? disconnect() : connect()));
