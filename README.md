@@ -193,7 +193,8 @@ All of these are on the setup page too, on each mode's tab and the Settings tab.
 | General | Recording boost | Off, Low, **Medium**, High | Makes recordings made on the switch louder, at the cost of some harshness |
 | General | Forget BT devices | hold A, then again to confirm | Clears every paired computer/tablet. Also remove the switch in that device's Bluetooth settings |
 | General | About | – | The firmware version, how much recording storage is used, and student presses since it was turned on |
-| QUICK | Messages | **Staff pick**, Student scans | *Staff pick*: plays the selected Quick message. *Student scans*: the student chooses one by scanning (then Choosing, Scan speed and Scan rounds apply instead of Play style and Hold for next msg) |
+| QUICK | Messages | **Staff pick**, Student scans, Count presses | *Staff pick*: plays the selected Quick message. *Student scans*: the student chooses one by scanning (then Choosing, Scan speed and Scan rounds apply instead of Play style and Hold for next msg). *Count presses*: press 1–4 times quickly for message 1–4 – each press ticks and the LED shows that message's colour; the message plays after the Press gap. Not for students with tremor or accidental double presses |
+| QUICK | Press gap | 0.5s, **0.8s**, 1.2s | Count presses: how long without a press ends the count. Ignore repeats only filters bounces under 0.15s in this mode |
 | QUICK | Play style | **Tap**, Hold to play, Latch | *Tap*: a press plays the whole message. *Hold to play*: plays (looping) only while the switch is held – classic cause and effect. *Latch*: one press starts it looping, the next press stops it |
 | QUICK | Hold for next msg | Off, 1s, **1.5s**, 2s, 3s | With Tap: how long the student holds the switch to move to the next Quick message. Turn off for students who can't let go quickly |
 | TOPICS | Choose from | **One topic**, All topics | See above |

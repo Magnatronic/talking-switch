@@ -849,7 +849,8 @@ function renderIr() {
 const HELP = {
   s_play: 'Tap: a press plays the whole message. Hold to play: plays only while held. Latch: one press starts it, the next stops it.',
   s_hold: 'Keep holding the switch this long to move to the next Quick message. Off for students who can’t let go quickly.',
-  s_spkmode: 'Staff pick: each press plays the selected message. Student scans: the student chooses one of the messages.',
+  s_spkmode: 'Staff pick: each press plays the selected message. Student scans: the student chooses one of the messages. Count presses: press 1 to 4 times quickly for message 1 to 4 (a tick and the LED colour for each press).',
+  s_gap: 'Count presses: this long without a press ends the count and plays the message. With Count presses, Ignore repeats only filters bounces under 0.15 s.',
   s_topics: 'One topic: the messages in the topic marked “In use”. All topics: the student picks a topic first, then a message.',
   s_access: 'Press twice: a press starts the offers, the next press chooses. Hold & release: hold to step through, let go to choose.',
   s_scanspd: 'How long each choice is offered. Go at the student’s pace.',
@@ -875,7 +876,8 @@ const HELP = {
 const pressTwice = () => setCur('s_access') === 0;
 const allTopics = () => setCur('s_topics') === 1;
 const TAB_SETTINGS = {  // [setting, shown only when]
-  quick: [['s_spkmode'], ['s_play', () => !speakScanning()], ['s_hold', () => !speakScanning() && setCur('s_play') === 0],
+  quick: [['s_spkmode'], ['s_gap', () => setCur('s_spkmode') === 2],
+    ['s_play', () => setCur('s_spkmode') === 0], ['s_hold', () => setCur('s_spkmode') === 0 && setCur('s_play') === 0],
     ['s_access', speakScanning], ['s_scanspd', speakScanning], ['s_scanrnd', () => speakScanning() && pressTwice()],
     ['s_stop', speakScanning]],
   topics: [['s_topics'], ['s_offq', allTopics], ['s_offctl', () => allTopics() && tabOn('control')],
@@ -911,6 +913,9 @@ function renderSettings() {
 
   $('speakIntro').replaceChildren(...(speakScanning()
     ? ['The switch offers these messages one at a time and the student chooses one. Click ', el('b', {}, 'Add'), ' or ', el('b', {}, 'Change'),
+      ' to type, record or upload a message.']
+    : setCur('s_spkmode') === 2
+    ? ['Press the switch 1 to 4 times quickly to play message 1 to 4. Click ', el('b', {}, 'Add'), ' or ', el('b', {}, 'Change'),
       ' to type, record or upload a message.']
     : ['The switch plays the ', el('b', {}, 'selected'), ' message. Click ', el('b', {}, 'Add'), ' or ', el('b', {}, 'Change'),
       ' to type, record or upload a message.']));

@@ -7,6 +7,8 @@
 //                  style: Tap / Hold to play / Latch. With Tap, keep holding
 //                  the switch to move on to the next Quick message.
 //                Student scans - the student chooses one by scanning (below).
+//                Count presses - press 1 to 4 times quickly for message 1 to 4;
+//                  after the "Press gap" with no press, that message plays.
 //    TOPICS    The 4 Topics of 4 messages, by scanning. Choose from:
 //                One topic - the messages in the topic staff selected;
 //                All topics - the topics first, then that topic's messages
@@ -194,7 +196,7 @@ static const int NUM_KEYS = sizeof(KEYS) / sizeof(KEYS[0]);
 //  and remembered after power-off. Each has a fixed list of choices.
 // ---------------------------------------------------------------------
 enum SettingId : uint8_t {
-  S_VOLUME, S_MODES, S_SPEAK_CHOOSE, S_PLAY, S_HOLD, S_CHOOSE_FROM, S_OFFER_QUICK, S_OFFER_CONTROL, S_OFFER_DEVICE, S_IR_CHOOSE, S_ACCESS, S_SCAN_SPEED, S_SCAN_ROUNDS, S_STOP,
+  S_VOLUME, S_MODES, S_SPEAK_CHOOSE, S_GAP, S_PLAY, S_HOLD, S_CHOOSE_FROM, S_OFFER_QUICK, S_OFFER_CONTROL, S_OFFER_DEVICE, S_IR_CHOOSE, S_ACCESS, S_SCAN_SPEED, S_SCAN_ROUNDS, S_STOP,
   S_KEY_ACTION, S_PRESS_SOUND, S_NO_USB,
   S_ACCEPT, S_LOCKOUT, S_BRIGHT, S_WAKE, S_SLEEP, S_AUTOOFF, S_LOUD, S_FORGET, S_ABOUT,
   S_COUNT
@@ -214,7 +216,9 @@ static const Setting SETTINGS[S_COUNT] = {
   // which modes this switch uses (QUICK and TOPICS always)
   {"Modes",               "s_modes",   4, 0, {0, 1, 2, 3}, {"All", "No KEYBOARD", "No CONTROL", "Talking only"}, G_GENERAL},
   // QUICK: play the Quick message staff selected, or the student chooses one by scanning
-  {"Messages",            "s_spkmode", 2, 0, {0, 1}, {"Staff pick", "Student scans"}, G_SPEAK},
+  {"Messages",            "s_spkmode", 3, 0, {0, 1, 2}, {"Staff pick", "Student scans", "Count presses"}, G_SPEAK},
+  // QUICK, Count presses: this long without a press ends the count
+  {"Press gap",           "s_gap",     3, 1, {500, 800, 1200}, {"0.5 s", "0.8 s", "1.2 s"}, G_SPEAK},
   // QUICK: Tap = a press plays the whole message; Hold to play = plays (looping)
   // only while the switch is held; Latch = one press starts it looping, the next stops it
   {"Play style",          "s_play",    3, 0, {0, 1, 2}, {"Tap", "Hold to play", "Latch"}, G_SPEAK},
@@ -291,6 +295,8 @@ uint32_t pressCount = 0; // student activations since boot
 KbOut    keyDownOut = OUT_NONE; // where the current key-down went (the key-up goes there too)
 bool     keyLatched = false;    // Latch key action: key is being held down
 bool     playLatched = false;   // Latch play style: message is looping
+uint8_t  pressTally = 0;        // QUICK, Count presses: presses so far (0 = not counting)
+uint32_t tallyEnds = 0;         // ...and when the count ends
 // Scanning (TOPICS, and IR with "Student scans")
 ScanItem scanItems[NUM_TOPICS + 4];  // top: Quick, 4 topics, Control, My device, Stop  // the choices on offer: topics, messages (+ Back) or IR codes, + Stop
 int      scanCount = 0;
@@ -1168,13 +1174,20 @@ void drawMain(lgfx::LovyanGFX& c) {
   if (scanning) { drawOffer(c); return; }
   switch (mode) {
     case M_SPEAK:
+      if (pressTally) {  // Count presses: the message the count has reached
+        line1(c, titleOf(pressTally - 1));
+        line2(c, plural(pressTally, "press", "presses"), C_DO);
+        detailLine(c, "Quick " + String(pressTally) + " of " + String(NUM_QUICK));
+        break;
+      }
       // the Quick message B and hold A (record) work on - also when the student scans
       line1(c, titleOf(slot));
       if (playLatched) line2(c, "Playing - press to stop", C_DO);
       else if (slotLen[slot]) line2(c, String(slotLen[slot] / (float)SAMPLE_RATE, 1) + " s recorded", C_READY);
       else line2(c, "Empty - hold A to record", C_PROBLEM);
       detailLine(c, speakScanning() ? "Student scans " + plural(countQuick(), "message", "messages")
-                                    : "Quick " + String(slot + 1) + " of " + String(NUM_QUICK)
+                    : countPresses() ? "Press 1-4 times - Quick " + String(slot + 1)
+                                     : "Quick " + String(slot + 1) + " of " + String(NUM_QUICK)
                                       + (slotLen[slot] ? " - hold B to hear" : ""));
       break;
     case M_CHOOSE: {
@@ -1288,8 +1301,9 @@ bool settingShown(int i) {
   if (!(SETTINGS[i].groups & settingsMask())) return false;
   bool scan = mode == M_SPEAK ? speakScanning() : mode == M_IR ? irScanning() : true;
   switch (i) {
-    case S_PLAY: return !speakScanning();
-    case S_HOLD: return !speakScanning() && setting(S_PLAY) == PLAY_TAP;
+    case S_PLAY: return speakPick();
+    case S_HOLD: return speakPick() && setting(S_PLAY) == PLAY_TAP;
+    case S_GAP: return countPresses();
     case S_ACCESS: case S_SCAN_SPEED: return scan;
     case S_SCAN_ROUNDS: return scan && !holdToChoose();
     case S_STOP: return scan;
@@ -1513,7 +1527,9 @@ void managePower(uint32_t now) {
 // ---------------------------------------------------------------------
 static const uint8_t PROMPT_VOLUME = 150;  // channel volume for prompts (255 = as loud as messages)
 
+bool speakPick() { return setting(S_SPEAK_CHOOSE) == 0; }
 bool speakScanning() { return setting(S_SPEAK_CHOOSE) == 1; }
+bool countPresses() { return setting(S_SPEAK_CHOOSE) == 2; }
 bool topicsByStudent() { return setting(S_CHOOSE_FROM) == 1; }
 bool holdToChoose() { return setting(S_ACCESS) == 1; }
 bool irScanning() { return setting(S_IR_CHOOSE) == 2; }
@@ -1725,6 +1741,17 @@ void onActivate() {
 
   const uint8_t style = setting(S_PLAY);
   if (scanModeActive()) { scanActivate(); needRedraw = true; return; }
+  if (studentMode() == M_SPEAK && countPresses()) {  // one more: tick, and the LED shows which message
+    if (pressTally < NUM_QUICK) pressTally++;
+    tallyEnds = millis() + setting(S_GAP);
+    M5.Speaker.stop(0);
+    M5.Speaker.tone(2500, 12);
+    const uint8_t* c = SLOT_RGB[pressTally - 1];
+    ledShow(c[0] * 3, c[1] * 3, c[2] * 3);
+    ledFlashUntil = tallyEnds;
+    needRedraw = true;
+    return;
+  }
   switch (studentMode()) {
     case M_SPEAK:
       if (style == PLAY_LATCH) {
@@ -1779,7 +1806,7 @@ void onDeactivate() {
   if (scanModeActive()) { scanDeactivate(); return; }
   if (studentMode() == M_KEYBOARD && !keyLatched) sendKey(false);
   // Hold to play: letting go stops the message
-  if (setting(S_PLAY) == PLAY_HOLD && studentMode() != M_KEYBOARD && studentMode() != M_IR) M5.Speaker.stop(0);
+  if (setting(S_PLAY) == PLAY_HOLD && studentMode() == M_SPEAK && speakPick()) M5.Speaker.stop(0);
 }
 
 void pollStudentSwitch() {
@@ -1799,7 +1826,9 @@ void pollStudentSwitch() {
   }
   if (swPending && swStable && now - swPressStart >= setting(S_ACCEPT)) {
     swPending = false;
-    if (now - swLastActivation >= setting(S_LOCKOUT)) {
+    // Count presses needs quick presses: only true bounces are ignored
+    uint32_t lockout = studentMode() == M_SPEAK && countPresses() ? min(setting(S_LOCKOUT), (uint32_t)150) : setting(S_LOCKOUT);
+    if (now - swLastActivation >= lockout) {
       swLastActivation = swLastAdvance = now;
       swActive = true;
       onActivate();
@@ -1808,7 +1837,7 @@ void pollStudentSwitch() {
   // Still holding in QUICK: step through the other messages
   uint32_t longPress = setting(S_HOLD);
   uint8_t m = studentMode();
-  if (swActive && longPress && setting(S_PLAY) == PLAY_TAP && m == M_SPEAK && !speakScanning()) {
+  if (swActive && longPress && setting(S_PLAY) == PLAY_TAP && m == M_SPEAK && speakPick()) {
     uint32_t wait = swLastAdvance == swLastActivation ? longPress : LONG_REPEAT_MS;
     if (now - swLastAdvance >= wait) { swLastAdvance = now; advanceMessage(); }
   }
@@ -2400,6 +2429,15 @@ void loop() {
     needRedraw = true;
   }
   updateScan(now);
+  if (pressTally && (int32_t)(now - tallyEnds) >= 0) {  // Count presses: the gap ended the count
+    int m = pressTally - 1;
+    pressTally = 0;
+    if (studentMode() != M_SPEAK || !countPresses()) {}  // mode changed meanwhile: nothing
+    else if (slotLen[m]) { slot = m; saveSettings(); playSlot(m); }
+    else beep(300, 150);
+    ledIdle();
+    needRedraw = true;
+  }
   manageBackup(now);
   manageBle(now);
   managePower(now);
