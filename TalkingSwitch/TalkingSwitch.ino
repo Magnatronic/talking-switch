@@ -113,7 +113,8 @@ USBHIDKeyboard UsbKeyboard;
 
 // ToF sensor settings that are the same for everyone
 static const int SENSE_MIN_MM = 40;        // closer than this isn't reliable: counts as pressed
-static const int SENSE_STILL_MM = 4;       // Settle: "still" = within this much
+static const int SENSE_STILL_MM = 6;       // Settle: "still" = readings within this much (or half the Movement)
+static const int SENSE_LOST_LET_GO = 10;   // while pressed, this many unreliable readings in a row (~150 ms) let go
 static const int SENSE_GRAPH_W = 224;      // Sensor test graph: one reading per pixel (~3.5 s)
 
 // Firmware version. FW_API goes up whenever the setup page needs to change
@@ -553,8 +554,11 @@ float    senseRest = -1;        // Move: the resting distance (-1 = not learnt)
 int      senseDist = -1;        // latest reading used (-1 = nothing there)
 bool     senseClose = false;    // ...closer than the sensor can measure
 int      senseStreak = 0;
-int      senseStillMm = -1;
-uint32_t senseStillSince = 0;
+int      senseStillLo = -1, senseStillHi = -1;  // Settle: the readings' range while still...
+long     senseStillSum = 0;
+int      senseStillN = 0;
+uint32_t senseStillSince = 0;                   // ...since this time
+int      senseLostRun = 0;                      // unreliable readings in a row
 uint32_t senseReadings = 0, senseLost = 0;
 int16_t  senseHist[SENSE_GRAPH_W], senseHistLine[SENSE_GRAPH_W];
 bool     senseHistPressed[SENSE_GRAPH_W];
@@ -563,7 +567,8 @@ int      senseHistPos = 0;
 void senseReset() {
   senseRest = -1;
   senseStreak = 0;
-  senseStillMm = -1;
+  senseStillN = 0;
+  senseLostRun = 0;
   senseReadings = senseLost = 0;
   testPresses = 0;
   for (int i = 0; i < SENSE_GRAPH_W; i++) { senseHist[i] = senseHistLine[i] = -1; senseHistPressed[i] = false; }
@@ -610,6 +615,7 @@ void pollSensor() {
   if (senseClose) mm = SENSE_MIN_MM / 2;               // too close: as if very close (pressed)
   else if (!valid) { mm = -1; senseLost++; }
   else if (senseBeyond() && mm > senseBeyond()) mm = -1;  // too far: nothing there
+  senseLostRun = !senseClose && !valid ? senseLostRun + 1 : 0;
   const bool here = mm >= 0;
   senseDist = mm;
 
@@ -619,23 +625,38 @@ void pollSensor() {
     else if (senseRest < 0) senseRest = mm;
     else senseRest += (mm - senseRest) * setting(S_FOLLOW) / 1000.0f;
   }
-  // press: past the line; let go: back past it plus the margin
+  // press: past the line; let go: back past it plus the margin, or nothing there.
+  // While pressed, a few unreliable readings (they happen now and then) don't let
+  // go - only ~150 ms of them do; moving back lets go straight away.
   const int line = senseLine();
-  bool other = line < 0 ? false : sensorPressed ? (!here || mm > line + senseMargin()) : (here && mm < line);
+  bool other;
+  if (line < 0) other = false;
+  else if (!sensorPressed) other = here && mm < line;
+  else if (here) other = mm > line + senseMargin();
+  else other = mm == -1 && senseLostRun ? senseLostRun >= SENSE_LOST_LET_GO : true;  // lost / nothing there
   senseStreak = other ? senseStreak + 1 : 0;
   if (senseStreak >= (sensorPressed ? 2 : 1)) {
     senseStreak = 0;
     sensorPressed = !sensorPressed;
-    senseStillMm = -1;
+    senseStillN = 0;
   }
-  // Move: pressed and still for the Settle time -> the new resting place, let go
+  // Move: pressed and still for the Settle time -> the new resting place (the
+  // average while still), let go. "Still" = all the readings since then within
+  // SENSE_STILL_MM (or half the Movement) of each other - sensor noise allowed for.
   if (senseMove() && sensorPressed && here && setting(S_SETTLE)) {
-    if (senseStillMm < 0 || abs(mm - senseStillMm) > SENSE_STILL_MM) { senseStillMm = mm; senseStillSince = millis(); }
-    else if (millis() - senseStillSince >= setting(S_SETTLE)) {
+    const int tol = max(SENSE_STILL_MM, (int)setting(S_SENSE_MOVE) / 2);
+    if (senseStillN && max(senseStillHi, mm) - min(senseStillLo, mm) > tol) senseStillN = 0;  // moved: start again
+    if (!senseStillN) { senseStillLo = senseStillHi = mm; senseStillSum = 0; senseStillSince = millis(); }
+    senseStillLo = min(senseStillLo, mm);
+    senseStillHi = max(senseStillHi, mm);
+    senseStillSum += mm;
+    senseStillN++;
+    if (millis() - senseStillSince >= setting(S_SETTLE)) {
       sensorPressed = false;
       senseStreak = 0;
-      senseRest = mm;
-      senseStillMm = -1;
+      senseRest = (float)senseStillSum / senseStillN;
+      senseStillN = 0;
+      if (sensorTest) M5.Speaker.tone(600, 30);  // Sensor test: a quiet low tick, settled
     }
   }
 
