@@ -218,7 +218,7 @@ static const Setting SETTINGS[S_COUNT] = {
   // QUICK: play the Quick message staff selected, or the student chooses one by scanning
   {"Messages",            "s_spkmode", 3, 0, {0, 1, 2}, {"Staff pick", "Student scans", "Count presses"}, G_SPEAK},
   // QUICK, Count presses: this long without a press ends the count
-  {"Press gap",           "s_gap",     3, 1, {500, 800, 1200}, {"0.5 s", "0.8 s", "1.2 s"}, G_SPEAK},
+  {"Press gap",           "s_gap",     5, 1, {500, 800, 1200, 1600, 2000}, {"0.5 s", "0.8 s", "1.2 s", "1.6 s", "2 s"}, G_SPEAK},
   // QUICK: Tap = a press plays the whole message; Hold to play = plays (looping)
   // only while the switch is held; Latch = one press starts it looping, the next stops it
   {"Play style",          "s_play",    3, 0, {0, 1, 2}, {"Tap", "Hold to play", "Latch"}, G_SPEAK},
