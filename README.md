@@ -301,12 +301,26 @@ Most student settings are in the SETTINGS mode above. At the top of `TalkingSwit
 a touch-free switch (a hand, head or foot moving closer than a set distance) and to watch a student's movement. It
 needs the **VL53L1X** library by Pololu (Library Manager). Unplug the Unit Key and any switch on the mono jack first –
 they share the Grove pins. Two ways to press: **LINE** – closer than a set distance (5–50 cm); **MOVE** – a movement of 5–30 mm towards the
-sensor from where the hand or finger rests (the resting distance is learnt as it goes; best for small movements like
-a finger; if it stays pressed and still for the *settle* time – Off, 1, 2, 3 or 5 s, B to change – that becomes the
-new resting place and it lets go, so a relaxed finger doesn't leave it stuck). The screen shows a scrolling graph that zooms to fit, with the trigger line. A = trigger size, hold A =
-LINE / MOVE, B = reset, hold B = Short (~65 readings a second) / Long range. The sensor isn't reliable closer than
-about 4 cm, and a finger works best 5–10 cm away (further off it's only part of what the sensor sees). Readings also
-go to the serial port for the Serial Plotter – open it after the stick has started.
+sensor from where the hand or finger rests (best for small movements like a finger). The screen shows a scrolling
+graph that zooms to fit, with the trigger line. A = size, hold A = LINE / MOVE, B = reset, **hold B = settings**
+(B next, hold A change, A close):
+
+| Setting | Choices | What it does |
+|---|---|---|
+| Mode | LINE, **MOVE** | How a press is detected |
+| Distance | 5, 6, 8, **10**, 15, 20, 30, 50 cm | LINE: press closer than this |
+| Movement | 5, **8**, 10, 15, 20, 30 mm | MOVE: press on a movement this big towards the sensor |
+| Settle | Off, 1, **2**, 3, 5 s | MOVE: pressed and still this long becomes the new resting place (so it can't stay stuck pressed) |
+| Follow | Slow, **Medium**, Fast | MOVE: how quickly the resting place follows drift. Slow catches slow presses; Fast copes with a restless student |
+| Ignore beyond | **Off**, 20, 30, 50 cm | Anything further away counts as nothing there – stops people passing by from pressing |
+| Field of view | **Wide**, Medium, Narrow | Narrower ignores movement at the sides, but the finger must be right in front |
+| Smoothing | **Off**, 3 readings | The middle of the last 3 readings: removes single spikes, ~30 ms later |
+| Too close | **Pressed**, Nothing | Closer than the sensor can measure (~4 cm) |
+| Range | **Short**, Long | Short: up to ~1.3 m, ~65 readings a second, better in sunlight. Long: ~4 m, slower |
+
+The sensor isn't reliable closer than about 4 cm, and a finger works best 5–10 cm away. Mount it rigidly, keep its
+window clean, and point it at a plain background. Readings also go to the serial port for the Serial Plotter – open it
+after the stick has started.
 
 ## Notes
 

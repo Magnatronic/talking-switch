@@ -11,28 +11,28 @@
 //             the distance, at least 4 mm) let go.
 //    MOVE ... a movement of a set size (5-30 mm) towards the sensor from
 //             where the hand or finger is resting. The resting distance
-//             is learnt slowly while not pressed, so it copes with the
-//             student shifting position - for small movements like a
-//             finger. If it stays pressed and still for the "settle" time
-//             (Off, 1, 2, 3 or 5 s), that becomes the new resting place and
-//             it lets go (without another press), so a finger that relaxes
+//             is learnt while not pressed ("Follow" speed), so it copes
+//             with the student shifting position - for small movements
+//             like a finger. If it stays pressed and still for the
+//             "Settle" time, that becomes the new resting place and it
+//             lets go (without another press), so a finger that relaxes
 //             closer doesn't leave it stuck pressed.
 //  The screen shows the distance, a scrolling graph of the last few
 //  seconds (it zooms to fit, so small movements show) with the trigger
 //  line in yellow, and how many presses it has counted. The header turns
 //  green while "pressed", with a beep for each press.
 //
-//    A click .... next trigger size (distance in LINE, movement in MOVE)
+//    A click .... next size (distance in LINE, movement in MOVE)
 //    Hold A ..... LINE / MOVE
-//    B click .... MOVE: next settle time. LINE: reset the count, the graph
-//                 and the "lost" figure (changing mode or size resets too)
-//    Hold B ..... Short range (up to ~1.3 m, faster, better in sunlight) /
-//                 Long (up to ~4 m, slower)
+//    B click .... reset the count, the graph and the "lost" figure
+//    Hold B ..... settings: B next, hold A change, A close
+//
+//  Settings: Mode, Distance / Movement, Settle, Follow, Ignore beyond,
+//  Field of view, Smoothing, Too close, Range (see SETTINGS below).
 //
 //  Tips: the sensor isn't reliable closer than about 4 cm, and it sees a
-//  cone about 27 degrees wide - so a finger works best 5-10 cm away, where
-//  it fills more of the view (further away a finger is only part of what
-//  it sees).
+//  cone about 27 degrees wide ("Field of view" narrows it) - so a finger
+//  works best 5-10 cm away, where it fills more of the view.
 //
 //  Readings also go to the USB serial port (115200) for the Arduino IDE's
 //  Serial Plotter, as  distance_cm:<cm>,trigger_cm:<cm>,pressed:<0 or 10>
@@ -50,46 +50,82 @@
 VL53L1X tof;
 M5Canvas canvas(&M5.Display);
 
-static const int LINES_CM[] = {5, 6, 8, 10, 15, 20, 30, 50};  // LINE: press closer than this
-static const int MOVES_MM[] = {5, 8, 10, 15, 20, 30};         // MOVE: press on a movement this big
-static const int NUM_LINES = sizeof(LINES_CM) / sizeof(LINES_CM[0]);
-static const int NUM_MOVES = sizeof(MOVES_MM) / sizeof(MOVES_MM[0]);
+// ---------------------------------------------------------------------
+//  Settings (changed on the stick: hold B)
+// ---------------------------------------------------------------------
+enum SettingId { T_MODE, T_LINE, T_MOVE, T_SETTLE, T_FOLLOW, T_BEYOND, T_FOV, T_SMOOTH, T_CLOSE, T_RANGE, T_COUNT };
+struct Setting { const char* name; uint8_t count, cur; int values[8]; const char* labels[8]; };
+Setting SETTINGS[T_COUNT] = {
+  {"Mode",          2, 1, {0, 1}, {"LINE", "MOVE"}},
+  // LINE: press closer than this (mm)
+  {"Distance",      8, 3, {50, 60, 80, 100, 150, 200, 300, 500}, {"5 cm", "6 cm", "8 cm", "10 cm", "15 cm", "20 cm", "30 cm", "50 cm"}},
+  // MOVE: press on a movement this big towards the sensor (mm)
+  {"Movement",      6, 1, {5, 8, 10, 15, 20, 30}, {"5 mm", "8 mm", "10 mm", "15 mm", "20 mm", "30 mm"}},
+  // MOVE: pressed and still this long -> the new resting place (ms)
+  {"Settle",        5, 2, {0, 1000, 2000, 3000, 5000}, {"Off", "1 s", "2 s", "3 s", "5 s"}},
+  // MOVE: how quickly the resting distance follows drift (per 1000 readings)
+  {"Follow",        3, 1, {8, 20, 50}, {"Slow", "Medium", "Fast"}},
+  // anything further than this counts as nothing there (mm, 0 = off)
+  {"Ignore beyond", 4, 0, {0, 200, 300, 500}, {"Off", "20 cm", "30 cm", "50 cm"}},
+  // the sensor's view: how many of its 16x16 zones it uses
+  {"Field of view", 3, 0, {16, 10, 6}, {"Wide", "Medium", "Narrow"}},
+  // take the middle of the last 3 readings (removes single spikes, ~30 ms later)
+  {"Smoothing",     2, 0, {1, 3}, {"Off", "3 readings"}},
+  // closer than the sensor can measure (about 4 cm): pressed, or nothing there
+  {"Too close",     2, 0, {1, 0}, {"Pressed", "Nothing"}},
+  // Short: up to ~1.3 m, faster (~65 a second), better in sunlight. Long: ~4 m, slower
+  {"Range",         2, 0, {0, 1}, {"Short", "Long"}},
+};
+int val(SettingId i) { return SETTINGS[i].values[SETTINGS[i].cur]; }
+const char* label(SettingId i) { return SETTINGS[i].labels[SETTINGS[i].cur]; }
+bool moveMode() { return val(T_MODE) == 1; }
+bool shown(int i) {  // settings that do something with the current choices
+  if (i == T_LINE) return !moveMode();
+  if (i == T_MOVE || i == T_SETTLE || i == T_FOLLOW) return moveMode();
+  return true;
+}
+
 static const int PRESS_READINGS = 1;    // readings in a row past the line to press (1 catches a quick wave)
 static const int RELEASE_READINGS = 2;  // ...and back to let go (so one stray reading can't)
-static const float REST_FOLLOW = 0.02f; // MOVE: how quickly the resting distance follows (per reading)
-static const int SETTLES_MS[] = {0, 1000, 2000, 3000, 5000};  // MOVE: pressed and still this long -> new resting place
-static const int NUM_SETTLES = sizeof(SETTLES_MS) / sizeof(SETTLES_MS[0]);
-static const int STILL_MM = 4;          // ...still = within this much
+static const int STILL_MM = 4;          // Settle: "still" = within this much
+static const int MIN_MM = 40;           // closer than this isn't reliable ("Too close")
 static const int GRAPH_W = 224;         // readings shown, one per pixel (~3.5-4.5 s)
 static const int GRAPH_MIN_SPAN = 30;   // the graph shows at least this many mm top to bottom
 
-bool moveMode = false;
-int lineIdx = 3;             // 10 cm
-int moveIdx = 1;             // 8 mm
-int settleIdx = 2;           // 2 s
-int stillMm = -1;            // MOVE, pressed: where the finger has been still since...
-uint32_t stillSince = 0;     // ...this time
-bool longRange = false;
+// ---------------------------------------------------------------------
+//  State
+// ---------------------------------------------------------------------
+bool settingsOpen = false;
+int settingIdx = 0;
 bool sensorOk = false;
-int distMm = -1;             // latest reading (-1 = nothing in range / unreliable)
+int distMm = -1;             // latest reading used (-1 = nothing there / unreliable)
+bool tooClose = false;       // ...closer than the sensor can measure
 float restMm = -1;           // MOVE: the resting distance (-1 = not learnt yet)
 bool pressed = false;
 int streak = 0;              // readings in a row on the other side of the line
+int stillMm = -1;            // MOVE, pressed: where it has been still since...
+uint32_t stillSince = 0;     // ...this time
+int recent[3], recentN = 0;  // Smoothing: the last 3 readings
 uint32_t presses = 0;
 uint32_t readings = 0, lost = 0, rateCount = 0, rateStart = 0;
 float rateHz = 0;
-int16_t history[GRAPH_W];    // mm, -1 = none
+int16_t history[GRAPH_W];      // mm, -1 = none
 int16_t historyLine[GRAPH_W];  // the trigger line at that reading
 bool historyPressed[GRAPH_W];
 int historyPos = 0;
 
-void setRange() {
+// ---------------------------------------------------------------------
+//  Sensor
+// ---------------------------------------------------------------------
+void applySensorSettings() {
+  bool longRange = val(T_RANGE) == 1;
   tof.stopContinuous();
   tof.setDistanceMode(longRange ? VL53L1X::Long : VL53L1X::Short);
   // Short: 15 ms readings (~65 a second, if the sensor accepts it, else 20 ms)
   // so quick movements aren't missed. Long needs longer readings to reach further.
   uint32_t budget = longRange ? 33000 : 15000;
   if (!tof.setMeasurementTimingBudget(budget)) { budget = 20000; tof.setMeasurementTimingBudget(budget); }
+  tof.setROISize(val(T_FOV), val(T_FOV));
   tof.startContinuous(budget / 1000);
 }
 
@@ -100,7 +136,7 @@ bool startSensor() {
   tof.setBus(&Wire);
   tof.setTimeout(500);
   if (!tof.init()) return false;
-  setRange();
+  applySensorSettings();
   return true;
 }
 
@@ -109,37 +145,87 @@ void resetStats() {
   restMm = -1;
   pressed = false;
   streak = 0;
+  stillMm = -1;
+  recentN = 0;
   for (int i = 0; i < GRAPH_W; i++) { history[i] = historyLine[i] = -1; historyPressed[i] = false; }
 }
 
 // The trigger line now: a distance (LINE), or the resting distance minus the movement (MOVE).
 int lineMm() {
-  if (!moveMode) return LINES_CM[lineIdx] * 10;
-  return restMm < 0 ? -1 : (int)restMm - MOVES_MM[moveIdx];
+  if (!moveMode()) return val(T_LINE);
+  return restMm < 0 ? -1 : (int)restMm - val(T_MOVE);
 }
 // How far back past the line to let go: 10% of the distance (at least 4 mm) in
 // LINE; half the movement in MOVE.
-int marginMm() { return moveMode ? MOVES_MM[moveIdx] / 2 : max(4, LINES_CM[lineIdx]); }
+int marginMm() { return moveMode() ? val(T_MOVE) / 2 : max(4, val(T_LINE) / 10); }
 
-String settleText() { return SETTLES_MS[settleIdx] ? "settle " + String(SETTLES_MS[settleIdx] / 1000) + " s" : "settle off"; }
+// One reading from the sensor -> the distance used (-1 = nothing there), after
+// Too close, Ignore beyond and Smoothing.
+int useReading(int mm, uint8_t st, bool timeout, bool& unreliable) {
+  unreliable = false;
+  tooClose = false;
+  // close up, good readings come back as "min range clipped"; keep those
+  bool valid = !timeout && (st == VL53L1X::RangeValid || st == VL53L1X::RangeValidMinRangeClipped
+                            || st == VL53L1X::RangeValidNoWrapCheckFail);
+  if (!timeout && (st == VL53L1X::MinRangeFail || (valid && mm < MIN_MM))) {
+    tooClose = true;
+    recentN = 0;
+    return val(T_CLOSE) ? MIN_MM / 2 : -1;  // "Pressed": as if very close
+  }
+  if (!valid) { unreliable = true; return -1; }
+  if (val(T_BEYOND) && mm > val(T_BEYOND)) { recentN = 0; return -1; }  // too far: nothing there
+  if (val(T_SMOOTH) == 3) {
+    if (recentN < 3) recent[recentN++] = mm;
+    else { recent[0] = recent[1]; recent[1] = recent[2]; recent[2] = mm; }
+    if (recentN == 3) {
+      int a = recent[0], b = recent[1], c = recent[2];
+      mm = max(min(a, b), min(max(a, b), c));  // the middle one
+    }
+  }
+  return mm;
+}
+
+// ---------------------------------------------------------------------
+//  Screen
+// ---------------------------------------------------------------------
 String sizeText() {
-  return moveMode ? String(MOVES_MM[moveIdx]) + " mm move, " + settleText() : String(LINES_CM[lineIdx]) + " cm";
+  if (!moveMode()) return String("Line ") + label(T_LINE);
+  return String("Move ") + label(T_MOVE) + ", settle " + label(T_SETTLE);
+}
+
+void drawSettings() {
+  const int W = canvas.width();
+  int n = 0, pos = 0;
+  for (int i = 0; i < T_COUNT; i++) if (shown(i)) { n++; if (i <= settingIdx) pos++; }
+  canvas.setTextDatum(middle_center);
+  canvas.setFont(&fonts::FreeSansBold12pt7b);
+  canvas.setTextColor(TFT_WHITE);
+  canvas.drawString(SETTINGS[settingIdx].name, W / 2, 50);
+  canvas.setFont(&fonts::FreeSansBold18pt7b);
+  canvas.setTextColor(TFT_YELLOW);
+  canvas.drawString(label((SettingId)settingIdx), W / 2, 80);
+  canvas.setFont(&fonts::Font2);
+  canvas.setTextColor(TFT_LIGHTGREY);
+  canvas.drawString("Sensor settings - " + String(pos) + " of " + String(n), W / 2, 104);
+  canvas.setTextColor(TFT_DARKGREY);
+  canvas.drawString("B next  hold A change  A close", W / 2, 125);
 }
 
 void draw() {
   const int W = canvas.width();
   canvas.fillScreen(TFT_BLACK);
-  // header: green while pressed; the way it presses, the range and readings a second
+  // header: green while pressed; the range, readings a second and lost on the right
   canvas.fillRect(0, 0, W, 24, pressed ? TFT_GREEN : canvas.color565(90, 90, 90));
   canvas.setTextColor(pressed ? TFT_BLACK : TFT_WHITE);
   canvas.setFont(&fonts::FreeSansBold9pt7b);
   canvas.setTextDatum(middle_left);
-  canvas.drawString(pressed ? "PRESSED" : moveMode ? "MOVE" : "LINE", 6, 12);
+  canvas.drawString(settingsOpen ? "SETTINGS" : pressed ? "PRESSED" : label(T_MODE), 6, 12);
   canvas.setFont(&fonts::Font2);
   canvas.setTextDatum(middle_right);
   int bad = readings ? (int)(lost * 100 / readings) : 0;
-  canvas.drawString(String(longRange ? "Long " : "Short ") + String(rateHz, 0) + "/s  " + String(bad) + "% lost", W - 6, 12);
+  canvas.drawString(String(label(T_RANGE)) + " " + String(rateHz, 0) + "/s  " + String(bad) + "% lost", W - 6, 12);
 
+  if (settingsOpen) { drawSettings(); return; }
   canvas.setTextDatum(middle_center);
   if (!sensorOk) {
     canvas.setTextColor(TFT_ORANGE);
@@ -153,8 +239,8 @@ void draw() {
 
   // the distance, big
   canvas.setFont(&fonts::FreeSansBold18pt7b);
-  canvas.setTextColor(distMm < 0 ? TFT_DARKGREY : TFT_WHITE);
-  canvas.drawString(distMm < 0 ? "--" : String(distMm / 10.0f, 1) + " cm", W / 2, 41);
+  canvas.setTextColor(distMm < 0 && !tooClose ? TFT_DARKGREY : TFT_WHITE);
+  canvas.drawString(tooClose ? "< 4 cm" : distMm < 0 ? "--" : String(distMm / 10.0f, 1) + " cm", W / 2, 41);
 
   // the graph: oldest on the left, closer = lower, zoomed to what's shown
   const int gx = (W - GRAPH_W) / 2, gy = 58, gh = 40;
@@ -198,10 +284,40 @@ void draw() {
   canvas.setTextColor(TFT_YELLOW);
   canvas.drawString(sizeText() + " - " + String(presses) + " presses", W / 2, 108);
   canvas.setTextColor(TFT_DARKGREY);
-  canvas.drawString(moveMode ? "A size  hold A mode  B settle" : "A size  hold A mode  B reset",
-                    W / 2, 125);
+  canvas.drawString("A size  hold A mode  hold B settings", W / 2, 125);
 }
 
+// ---------------------------------------------------------------------
+//  Buttons
+// ---------------------------------------------------------------------
+int nextShown(int from) {
+  for (int k = 1; k <= T_COUNT; k++) { int i = (from + k) % T_COUNT; if (shown(i)) return i; }
+  return from;
+}
+
+void buttons() {
+  if (settingsOpen) {
+    if (M5.BtnB.wasClicked()) settingIdx = nextShown(settingIdx);
+    if (M5.BtnA.wasHold()) {
+      Setting& st = SETTINGS[settingIdx];
+      st.cur = (st.cur + 1) % st.count;
+      if (settingIdx == T_FOV || settingIdx == T_RANGE) applySensorSettings();
+      resetStats();
+    }
+    if (M5.BtnA.wasClicked()) settingsOpen = false;
+    return;
+  }
+  if (M5.BtnA.wasClicked()) {
+    Setting& st = SETTINGS[moveMode() ? T_MOVE : T_LINE];
+    st.cur = (st.cur + 1) % st.count;
+    resetStats();
+  }
+  if (M5.BtnA.wasHold()) { SETTINGS[T_MODE].cur ^= 1; resetStats(); }
+  if (M5.BtnB.wasClicked()) resetStats();
+  if (M5.BtnB.wasHold()) { settingsOpen = true; settingIdx = 0; }
+}
+
+// ---------------------------------------------------------------------
 void setup() {
   auto cfg = M5.config();
   cfg.internal_spk = true;
@@ -221,38 +337,31 @@ void setup() {
 
 void loop() {
   M5.update();
-  if (M5.BtnA.wasClicked()) {
-    if (moveMode) moveIdx = (moveIdx + 1) % NUM_MOVES;
-    else lineIdx = (lineIdx + 1) % NUM_LINES;
-    resetStats();
-  }
-  if (M5.BtnA.wasHold()) { moveMode = !moveMode; resetStats(); }
-  if (M5.BtnB.wasClicked()) {
-    if (moveMode) settleIdx = (settleIdx + 1) % NUM_SETTLES;
-    resetStats();
-  }
-  if (M5.BtnB.wasHold() && sensorOk) { longRange = !longRange; setRange(); resetStats(); }
+  buttons();
 
   if (sensorOk && tof.dataReady()) {
-    int mm = tof.read(false);
-    // close up, good readings come back as "min range clipped"; keep those too
-    uint8_t st = tof.ranging_data.range_status;
-    bool valid = !tof.timeoutOccurred() && (st == VL53L1X::RangeValid || st == VL53L1X::RangeValidMinRangeClipped
-                                            || st == VL53L1X::RangeValidNoWrapCheckFail);
+    int raw = tof.read(false);
+    bool unreliable;
+    int mm = useReading(raw, tof.ranging_data.range_status, tof.timeoutOccurred(), unreliable);
+    bool here = mm >= 0;
     readings++;
     rateCount++;
-    if (!valid) lost++;
-    distMm = valid ? mm : -1;
+    if (unreliable) lost++;
+    distMm = mm;
 
-    // MOVE: learn the resting distance while not pressed (straight away the first time)
-    if (moveMode && valid && !pressed) restMm = restMm < 0 ? mm : restMm + (mm - restMm) * REST_FOLLOW;
-    if (moveMode && !valid && !pressed) restMm = -1;  // hand gone: learn again when it's back
+    // MOVE: learn the resting distance while not pressed (straight away the first
+    // time); when nothing's there, learn it again when something comes back
+    if (moveMode() && !pressed) {
+      if (!here) restMm = -1;
+      else if (restMm < 0) restMm = mm;
+      else restMm += (mm - restMm) * val(T_FOLLOW) / 1000.0f;
+    }
 
     // press: past the line; let go: back past it plus the margin
     const int line = lineMm();
     bool other = line < 0 ? false
-               : pressed ? (!valid || mm > line + marginMm())
-                         : (valid && mm < line);
+               : pressed ? (!here || mm > line + marginMm())
+                         : (here && mm < line);
     streak = other ? streak + 1 : 0;
     if (streak >= (pressed ? RELEASE_READINGS : PRESS_READINGS)) {
       streak = 0;
@@ -261,9 +370,9 @@ void loop() {
     }
     // MOVE: pressed and still for the settle time -> that's the new resting
     // place: let go, without counting a press
-    if (moveMode && pressed && valid && SETTLES_MS[settleIdx]) {
+    if (moveMode() && pressed && here && val(T_SETTLE)) {
       if (stillMm < 0 || abs(mm - stillMm) > STILL_MM) { stillMm = mm; stillSince = millis(); }
-      else if (millis() - stillSince >= (uint32_t)SETTLES_MS[settleIdx]) {
+      else if (millis() - stillSince >= (uint32_t)val(T_SETTLE)) {
         pressed = false;
         streak = 0;
         restMm = mm;
