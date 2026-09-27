@@ -72,9 +72,20 @@ button.link { background: none; border: none; color: var(--accent); padding: 4px
 .slot-main { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .slot-main .num { font-weight: 700; width: 1.6em; text-align: center; }
 .slot-main .name { flex: 1 1 160px; min-width: 120px; }
-.slot-main .status { min-width: 90px; font-size: .9rem; color: var(--muted); }
+.slot-main .status { width: 6.5em; font-size: .9rem; color: var(--muted); }
 .slot-main .status.has { color: var(--good); font-weight: 600; }
-.sel { display: flex; align-items: center; gap: 4px; font-size: .85rem; color: var(--muted); cursor: pointer; }
+.sel { display: flex; align-items: center; gap: 4px; font-size: .85rem; color: var(--muted); cursor: pointer; min-width: 7.5em; }
+/* phones: a little less padding so rows and tabs fit */
+@media (max-width: 560px) {
+  main { padding: 12px; }
+  .card { padding: 12px; }
+  .tabs { gap: 0; justify-content: space-between; }
+  .tabs button { padding: 10px 4px; font-size: .8rem; }
+  .settings { padding: 2px 10px; }
+  .slot { padding: 10px; }
+  .slot-main .status { width: auto; }
+  .slot-main button { padding: 6px 10px; }
+}
 
 /* message editor */
 .editor { margin-top: 10px; border-top: 1px dashed var(--line); padding-top: 12px; display: flex; flex-direction: column; gap: 12px; }
@@ -89,10 +100,8 @@ button.link { background: none; border: none; color: var(--accent); padding: 4px
 /* settings */
 .settings { border: 1px solid var(--line); border-radius: 10px; padding: 2px 12px; margin-bottom: 14px; }
 .settings:empty { display: none; }
-.group { margin-bottom: 18px; }
-.group h2 { margin-bottom: 4px; }
 .setting { display: grid; grid-template-columns: 170px 1fr; gap: 4px 12px; align-items: center; padding: 10px 0; border-top: 1px solid var(--line); }
-.settings .setting:first-child, .group h2 + .setting { border-top: none; }
+.settings .setting:first-child { border-top: none; }
 .setting > .name { font-weight: 600; font-size: .95rem; }
 .setting .seg button { min-height: 36px; padding: 6px 12px; }
 .setting .help { grid-column: 2; font-size: .85rem; color: var(--muted); }
@@ -140,43 +149,47 @@ ol { padding-left: 1.2em; margin: 8px 0 0; }
       <button role="tab" data-tab="choose">CHOOSE</button>
       <button role="tab" data-tab="keyboard">KEYBOARD</button>
       <button role="tab" data-tab="ir">IR</button>
+      <button role="tab" data-tab="voice">Voice</button>
       <button role="tab" data-tab="settings">Settings</button>
     </nav>
 
     <section id="tab-speak" class="card" role="tabpanel">
       <div id="set-speak" class="settings"></div>
-      <p class="muted small">4 Quick messages: the switch plays the <b>selected</b> one. Click <b>Change</b> to record,
-        type or upload a message.</p>
-      <div id="speakQuick"></div>
+      <p id="speakIntro" class="muted small"></p>
+      <div id="quickScan" class="preview hidden" style="margin-bottom:10px"></div>
+      <div id="quickList" class="slots"></div>
     </section>
 
     <section id="tab-choose" class="card" role="tabpanel">
       <div id="set-choose" class="settings"></div>
       <p id="chooseIntro" class="muted small"></p>
-      <div id="chooseQuick"></div>
-      <div id="topicsWrap">
-        <div id="msgScan" class="preview hidden" style="margin-bottom:10px"></div>
-        <div id="msgList" class="slots"></div>
-      </div>
+      <div id="msgScan" class="preview hidden" style="margin-bottom:10px"></div>
+      <div id="msgList" class="slots"></div>
     </section>
 
     <section id="tab-keyboard" class="card" role="tabpanel">
       <div id="set-keyboard" class="settings"></div>
-      <div class="label">Custom key or shortcut</div>
-      <div class="row">
-        <label><input type="checkbox" id="mCtrl"> Ctrl</label>
-        <label><input type="checkbox" id="mShift"> Shift</label>
-        <label><input type="checkbox" id="mAlt"> Alt</label>
-        <label><input type="checkbox" id="mWin"> Win</label>
-        <select id="ckKey" aria-label="Key"></select>
-        <button id="ckSet">Use <span id="ckPreview"></span></button>
-        <button id="ckDel" class="danger">Remove</button>
+      <div class="settings">
+        <div class="setting">
+          <div class="name">Custom key</div>
+          <div class="row">
+            <label><input type="checkbox" id="mCtrl"> Ctrl</label>
+            <label><input type="checkbox" id="mShift"> Shift</label>
+            <label><input type="checkbox" id="mAlt"> Alt</label>
+            <label><input type="checkbox" id="mWin"> Win</label>
+            <select id="ckKey" aria-label="Key"></select>
+            <button id="ckSet">Use <span id="ckPreview"></span></button>
+            <button id="ckDel" class="danger">Remove</button>
+          </div>
+          <div class="help">A key or shortcut of your own, added to the Key choices – e.g. Win + H starts Windows dictation.</div>
+        </div>
+        <div class="setting">
+          <div class="name">Bluetooth</div>
+          <div class="small">The switch appears as <b id="btName"></b> (<span id="btState"></span>).</div>
+          <div class="help">Keys go over USB when plugged into a computer, otherwise over Bluetooth. To pair with a
+            different computer or tablet, use <i>Forget BT devices</i> on the Settings tab.</div>
+        </div>
       </div>
-      <p class="muted small">For example Win + H starts Windows dictation. The custom key is added to the Key choices above.</p>
-      <div class="label" style="margin-top:20px">Bluetooth</div>
-      <p class="small" style="margin:0">Keys go over USB when plugged into a computer, otherwise over Bluetooth.
-        The switch appears as <b id="btName"></b> when pairing (<span id="btState"></span>). To pair it with a
-        different computer or tablet, use <i>Forget BT devices</i> on the Settings tab.</p>
     </section>
 
     <section id="tab-ir" class="card" role="tabpanel">
@@ -188,20 +201,17 @@ ol { padding-left: 1.2em; margin: 8px 0 0; }
       <div id="irList" class="slots"></div>
     </section>
 
+    <section id="tab-voice" class="card" role="tabpanel">
+      <div id="set-voice" class="settings"></div>
+    </section>
+
     <section id="tab-settings" class="card" role="tabpanel">
       <div id="set-settings" class="settings"></div>
-      <div id="voiceGroup"></div>
     </section>
   </div>
 
   <!-- Which mode the switch is in: shown at the top of each mode's tab -->
   <div id="modeLine" class="modeline hidden"></div>
-
-  <!-- The Quick messages: shown on SPEAK, or on CHOOSE when it chooses from them -->
-  <div id="quickWrap" class="hidden">
-    <div id="quickScan" class="preview hidden" style="margin-bottom:10px"></div>
-    <div id="quickList" class="slots"></div>
-  </div>
 </main>
 <footer class="wrap muted small">
   Typed speech runs on this computer using <a href="https://huggingface.co/hexgrad/Kokoro-82M">Kokoro</a> (Apache-2.0,
@@ -224,19 +234,19 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 let info = null;          // last @INFO from the switch
 let editing = null;       // slot whose message editor is open
-let editHow = 'record';   // 'record' | 'type' | 'upload'
+let editHow = location.protocol === 'file:' ? 'record' : 'type';  // 'record' | 'type' | 'upload'
 let pending = null;       // new message waiting to be saved: {slot, pcm, seconds, truncated}
 let recState = null;      // microphone recording in progress
 let ttsBusy = false;
 let typed = '';           // words typed in the editor
 
 const MODE_HELP = {
-  'SPEAK': 'Each press plays the selected Quick message.',
-  'CHOOSE': 'The student chooses a message by scanning.',
+  'SPEAK': 'The 4 Quick messages: each press plays the selected one, or the student chooses one by scanning.',
+  'CHOOSE': 'The student chooses from the Topics by scanning.',
   'KEYBOARD': 'Each press presses a keyboard key, over USB or Bluetooth.',
   'IR': 'Each press sends the selected remote-control code, and says its sound if it has one.',
 };
-const TABS = ['speak', 'choose', 'keyboard', 'ir', 'settings'];
+const TABS = ['speak', 'choose', 'keyboard', 'ir', 'voice', 'settings'];
 function tabOfMode(i) { return (info.modes[i] || '').toLowerCase(); }
 
 // ---------------------------------------------------------------- toast
@@ -463,6 +473,7 @@ function soundInfo(n) {
 function setCur(key) { const st = info.settings.find((x) => x.key === key); return st ? st.cur : 0; }
 function chooseMode() { return info.modes[info.mode] === 'CHOOSE'; }
 function irScanning() { return setCur('s_irmode') === 2; }
+function speakScanning() { return setCur('s_spkmode') === 1; }
 function secs(n) { return (n / info.rate).toFixed(1) + ' s'; }
 
 // ---------------------------------------------------------------- render
@@ -481,7 +492,6 @@ function render() {
   renderScanNotes();
   renderSettings();
   renderCustomKey();
-  placeQuick();
   placeModeLine();
 }
 
@@ -523,8 +533,7 @@ const openTopics = new Set();  // topic sections shown open
 function renderTopics() {
   if (!renderTopics.started) { openTopics.add(info.topic); renderTopics.started = true; }
   if (editing !== null && editing >= TOPIC0 && editing < IRS) openTopics.add(Math.floor((editing - TOPIC0) / PER));
-  const staffTopics = setCur('s_choose') === 1;
-  $('topicsWrap').classList.toggle('hidden', setCur('s_choose') === 0);
+  const staffTopics = setCur('s_topics') === 0;
   $('msgList').replaceChildren(...info.topics.map((tp, t) => {
     const open = openTopics.has(t);
     const count = tp.msgs.filter((m) => m.len).length;
@@ -559,9 +568,9 @@ function messageRow(i, s, quick) {
       el('span', { class: 'num' }, String((quick ? i : (i - TOPIC0) % PER) + 1)),
       name,
       el('span', { class: 'status' + (s.len ? ' has' : '') }, s.len ? secs(s.len) : 'No message'),
-      quick && setCur('s_choose') !== 0 ? null : promptBadge(s),
+      quick && !speakScanning() ? null : promptBadge(s),
       el('button', { disabled: !s.len, onclick: () => act(() => cmd(`PLAY ${i}`)), title: 'Play it on the switch' }, '▶ Play'),
-      el('button', { class: open ? 'on' : '', onclick: () => toggleEditor(i) }, open ? 'Close' : 'Change'),
+      el('button', { class: open ? 'on' : '', onclick: () => toggleEditor(i) }, open ? 'Close' : s.len ? 'Change' : 'Add'),
       el('button', { class: 'danger', disabled: !s.len, onclick: () => {
         if (confirm(`Delete "${s.name || 'this message'}"?`)) act(() => cmd(`DEL ${i}`), 'Message deleted');
       } }, 'Delete'),
@@ -573,6 +582,7 @@ function toggleEditor(i) {
   if (recState) stopRecording();
   editing = editing === i ? null : i;
   pending = null;
+  if (editing !== null) typed = soundInfo(i).tx || soundInfo(i).name || '';
   render();
 }
 
@@ -591,15 +601,17 @@ function renderEditor(i) {
         recording ? 'Recording…' : 'Speak clearly, about 30cm from the microphone or headset.')));
   } else if (editHow === 'type') {
     const text = el('textarea', { placeholder: 'Type the words to say…', value: typed, maxLength: 200,
-      'aria-label': 'Words to say', oninput: () => (typed = text.value) });
+      'aria-label': 'Words to say', oninput: () => (typed = text.value),
+      onkeydown: (e) => {
+        if (e.key === 'Enter' && !e.shiftKey && !ttsBusy) { e.preventDefault(); makeSpeech(i, text.value, savedVoice(), +savedSpeed()); }
+      } });
     if (!ttsAvailable()) {
       body.push(el('p', { class: 'small muted' }, 'Typed speech works when this page is opened from its web address, not as a file.'));
     } else {
       body.push(text, el('div', { class: 'row' },
         el('button', { class: 'primary', disabled: ttsBusy, onclick: () => makeSpeech(i, text.value, savedVoice(), +savedSpeed()) },
           ttsBusy ? 'Making…' : 'Make speech'),
-        el('label', { class: 'small muted' }, 'Voice ', voiceSelect()),
-        el('label', { class: 'small muted' }, 'Speed ', speedSelect())),
+        el('span', { class: 'small muted' }, `In ${voiceName()}'s voice – change it on the Voice tab.`)),
       el('div', { id: 'ttsProgress', class: 'hidden' },
         el('span', { id: 'ttsProgressText', class: 'small muted' }),
         el('div', { class: 'progress' }, el('div', { id: 'ttsProgressBar' }))),
@@ -621,11 +633,7 @@ function renderEditor(i) {
       el('button', { onclick: () => { pending = null; render(); } }, 'Discard')));
   }
 
-  const lst = info.settings.find((x) => x.key === 's_loud');
-  const loud = lst && el('select', { 'aria-label': 'Loudness', onchange: () => setSetting('s_loud', +loud.value) },
-    ...lst.choices.map((c, k) => el('option', { value: k, selected: k === lst.cur }, c)));
-  body.push(el('div', { class: 'row small muted' },
-    loud ? el('label', { title: 'Louder, at some cost in clarity. The same as Recording boost on the Settings tab.' }, 'Loudness ', loud) : null,
+  if (soundInfo(i).len) body.push(el('div', { class: 'row small muted' },
     soundInfo(i).len ? el('button', { class: 'link', onclick: () => listenSaved(i) }, 'Listen to the current sound here') : null,
     soundInfo(i).len ? el('button', { class: 'link', onclick: () => saveWav(i) }, 'Download it (.wav)') : null));
 
@@ -636,12 +644,16 @@ function renderEditor(i) {
 
 async function savePending() {
   const p = pending;
+  const nameIt = p.words && !soundInfo(p.slot).name;
   await act(async () => {
     toast('Sending to the switch…');
     await upload(p.slot, p.pcm);
+    if (p.words) await cmd(`WORDS ${p.slot} ${p.voice} ${p.words}`);
+    if (nameIt) await cmd(`NAME ${p.slot} ${p.words.slice(0, 24)}`);
     pending = null;
     editing = null;
   }, 'Saved');
+  if (nameIt) makePrompt(p.slot);
 }
 
 async function listenSaved(i) {
@@ -707,7 +719,7 @@ function promptItems() {
     ...info.topics.map((x, t) => [TOPICN + t, x]),
     ...info.irs.map((x, i) => [IRS + i, x]),
   ].filter(([, x]) => x.name).map(([n, x]) => [n, x.pr]);
-  if (setCur('s_choose') === 2) list.push([BACK, info.back.pr]);
+  if (setCur('s_topics') === 1) list.push([BACK, info.back.pr]);
   return list;
 }
 
@@ -732,7 +744,7 @@ function renderScanNotes() {
       missing ? el('button', { onclick: () => makeMissingPrompts() }, `Make ${missing} missing prompt${missing > 1 ? 's' : ''}`) : null,
     ].filter(Boolean));
   };
-  note('quickScan', setCur('s_choose') === 0, 'CHOOSE offers these: each message’s name is spoken quietly as it’s offered.', info.quick);
+  note('quickScan', speakScanning(), 'The student scans these: each message’s name is spoken quietly as it’s offered.', info.quick);
   note('msgScan', true, 'When scanning, each topic’s and message’s name is spoken quietly as it’s offered.',
     [...info.topics, ...info.topics.flatMap((tp) => tp.msgs)]);
   note('irScan', irScanning(), 'Students choose IR codes by scanning: each code’s name is spoken quietly as it’s offered.', info.irs);
@@ -784,7 +796,8 @@ function renderIr() {
 const HELP = {
   s_play: 'Tap: a press plays the whole message. Hold to play: plays only while held. Latch: one press starts it, the next stops it.',
   s_hold: 'Keep holding the switch this long to move to the next Quick message. Off for students who can’t let go quickly.',
-  s_choose: 'What the switch offers the student.',
+  s_spkmode: 'Staff pick: each press plays the selected message. Student scans: the student chooses one of the messages.',
+  s_topics: 'One topic: the messages in the topic marked “In use”. All topics: the student picks a topic first, then a message.',
   s_access: 'Press twice: a press starts the offers, the next press chooses. Hold & release: hold to step through, let go to choose.',
   s_scanspd: 'How long each choice is offered. Go at the student’s pace.',
   s_scanrnd: 'Times round the choices before it stops by itself.',
@@ -798,13 +811,12 @@ const HELP = {
   s_wake: 'Whether presses of the big switch light up the screen.',
   s_loud: 'Louder messages, at some cost in clarity – for recordings, typed and uploaded messages.',
 };
-// Clearer names and choices than fit on the switch's small screen
-const CHOICES = { s_choose: ['Quick messages', 'One topic', 'Student picks a topic'] };
 
 const pressTwice = () => setCur('s_access') === 0;
 const TAB_SETTINGS = {  // [setting, shown only when]
-  speak: [['s_play'], ['s_hold', () => setCur('s_play') === 0]],
-  choose: [['s_choose'], ['s_access'], ['s_scanspd'], ['s_scanrnd', pressTwice]],
+  speak: [['s_spkmode'], ['s_play', () => !speakScanning()], ['s_hold', () => !speakScanning() && setCur('s_play') === 0],
+    ['s_access', speakScanning], ['s_scanspd', speakScanning], ['s_scanrnd', () => speakScanning() && pressTwice()]],
+  choose: [['s_topics'], ['s_access'], ['s_scanspd'], ['s_scanrnd', pressTwice]],
   keyboard: [['s_keyact'], ['s_psound']],
   ir: [['s_irmode'], ['s_access', irScanning], ['s_scanspd', irScanning],
     ['s_scanrnd', () => irScanning() && pressTwice()], ['s_psound']],
@@ -825,7 +837,7 @@ function settingRow(name, choices, cur, onPick, help) {
 function switchSetting(k) {
   const st = info.settings.find((x) => x.key === k);
   if (!st) return null;
-  return settingRow(st.name, CHOICES[k] || st.choices, st.cur, (i) => setSetting(k, i), HELP[k]);
+  return settingRow(st.name, st.choices, st.cur, (i) => setSetting(k, i), HELP[k]);
 }
 
 function renderSettings() {
@@ -834,12 +846,12 @@ function renderSettings() {
   $('set-keyboard').prepend(settingRow('Key', info.keys, info.key, (i) => act(() => cmd(`KEY ${i}`)),
     'The key the switch presses, e.g. Space or Enter for Grid 3 or Mind Express.'));
 
-  const CHOOSE_INTRO = [
-    'The switch offers the Quick messages – the same ones SPEAK plays.',
-    'The switch offers the messages in the topic marked “In use”. Name each topic and message – the names are spoken as the prompts.',
-    'The switch offers the topics first, then that topic’s messages and “Back”. Name each topic and message – the names are spoken as the prompts.',
-  ];
-  $('chooseIntro').textContent = CHOOSE_INTRO[setCur('s_choose')] || '';
+  $('speakIntro').replaceChildren(...(speakScanning()
+    ? ['The switch offers these messages one at a time and the student chooses one. Click ', el('b', {}, 'Add'), ' or ', el('b', {}, 'Change'),
+      ' to type, record or upload a message.']
+    : ['The switch plays the ', el('b', {}, 'selected'), ' message. Click ', el('b', {}, 'Add'), ' or ', el('b', {}, 'Change'),
+      ' to type, record or upload a message.']));
+  $('chooseIntro').textContent = '4 topics of up to 4 messages. Name each topic and message – the names are spoken as the prompts.';
 
   // the switch's SETTINGS, in the same order as on the switch
   const forget = el('button', { class: 'danger', onclick: () => {
@@ -852,15 +864,7 @@ function renderSettings() {
     ...['s_accept', 's_lockout', 's_wake', 's_sleep', 's_autooff', 's_loud'].map(switchSetting).filter(Boolean),
     el('div', { class: 'setting' }, el('div', { class: 'name' }, 'Forget BT devices'), el('div', {}, forget),
       el('div', { class: 'help' }, 'To pair the switch with a different computer or tablet. Also remove it in that device’s Bluetooth settings.')));
-  $('voiceGroup').replaceChildren(renderVoiceSetting());
-}
-
-// The Quick messages live on SPEAK, and move to CHOOSE while it's open and choosing from them.
-function placeQuick() {
-  if (!info) return;
-  const onChoose = currentTab === 'choose' && setCur('s_choose') === 0;
-  $(onChoose ? 'chooseQuick' : 'speakQuick').append($('quickWrap'));
-  $('quickWrap').classList.remove('hidden');
+  $('set-voice').replaceChildren(...renderVoiceSetting());
 }
 
 // ---------------------------------------------------------------- audio
@@ -1054,7 +1058,7 @@ async function remakeAllPrompts() {
   toast('Prompts updated');
 }
 
-// Voice and speed pickers (the Settings tab and the message editor use the same ones)
+// The Voice tab: the voice and speed for typed messages and scanning prompts
 function voiceSelect() {
   const group = (engine, label) => el('optgroup', { label },
     ...VOICES.filter((v) => v.engine === engine).map((v) => el('option', { value: v.id, selected: v.id === savedVoice() }, v.name)));
@@ -1062,22 +1066,65 @@ function voiceSelect() {
     group('kokoro', 'Natural – takes a few seconds'), group('piper', 'Quick – less natural'));
   return s;
 }
-function speedSelect() {
-  const s = el('select', { 'aria-label': 'Speed', onchange: () => setVoice(savedVoice(), s.value) },
-    ...SPEEDS.map(([v, n]) => el('option', { value: v, selected: v === savedSpeed() }, n)));
-  return s;
-}
-
 function renderVoiceSetting() {
   const listen = el('button', { disabled: !ttsAvailable(), onclick: () => previewVoice() }, '▶ Hear it');
-  return el('div', { class: 'group' }, el('h2', {}, 'Voice for typed messages and prompts'),
+  return [
     el('div', { class: 'setting' }, el('div', { class: 'name' }, 'Voice'), el('div', { class: 'row' }, voiceSelect(), listen),
       el('div', { class: 'help' }, ttsAvailable()
-        ? 'Used for typed messages and scanning prompts on this switch. Changing it remakes the prompts; typed messages keep their voice until you type them again.'
+        ? 'Speaks typed messages and the scanning prompts. Stored on the switch, so every computer uses the same one. Changing it remakes the prompts; typed messages keep their voice until you type them again.'
         : 'Typed speech works when this page is opened from its web address.')),
     settingRow('Speed', SPEEDS.map(([, n]) => n), SPEEDS.findIndex(([v]) => v === savedSpeed()),
-      (i) => setVoice(savedVoice(), SPEEDS[i][0])));
+      (i) => setVoice(savedVoice(), SPEEDS[i][0])),
+    remakeRow(),
+  ];
 }
+
+// Typed messages whose words were made in another voice or speed
+function oldVoiceMessages() {
+  const now = `${savedVoice()} ${savedSpeed()}`;
+  const all = [...info.quick.map((x, i) => [i, x]),
+    ...info.topics.flatMap((tp, t) => tp.msgs.map((x, k) => [topicMsg(t, k), x])),
+    ...info.irs.map((x, i) => [IRS + i, x])];
+  return all.filter(([, x]) => x.tx && x.len && x.tv !== now).map(([n, x]) => [n, x.tx]);
+}
+
+function remakeRow() {
+  const old = oldVoiceMessages();
+  const btn = el('button', { class: old.length ? 'primary' : '', disabled: !old.length || remaking || !ttsAvailable(),
+    onclick: () => remakeTyped() }, remaking ? 'Remaking…' : `Remake ${old.length || ''} in this voice`.replace('  ', ' '));
+  return el('div', { class: 'setting' }, el('div', { class: 'name' }, 'Typed messages'), el('div', {}, btn),
+    el('div', { class: 'help' }, old.length
+      ? `${old.length} typed message${old.length > 1 ? 's were' : ' was'} made in a different voice or speed. Recorded and uploaded messages don’t change.`
+      : 'All typed messages are in this voice. Recorded and uploaded messages don’t change.'));
+}
+
+// Speaks each typed message again in the switch's voice and saves it.
+let remaking = false;
+async function remakeTyped() {
+  const todo = oldVoiceMessages();
+  const v = VOICES.find((x) => x.id === savedVoice()), speed = savedSpeed();
+  remaking = true;
+  render();
+  try {
+    engineMods[v.engine] ||= await import(ENGINES[v.engine]);
+    for (let k = 0; k < todo.length; k++) {
+      const [n, words] = todo[k];
+      toast(`Remaking typed message ${k + 1} of ${todo.length}…`);
+      const { samples, sampleRate } = await engineMods[v.engine].synthesize(words, v.id, +speed, showTtsProgress);
+      const audio = new AudioBuffer({ length: samples.length, sampleRate, numberOfChannels: 1 });
+      audio.copyToChannel(samples, 0);
+      await upload(n, (await toSwitchFormat(audio)).pcm);
+      await cmd(`WORDS ${n} ${v.id} ${speed} ${words}`);
+    }
+    toast('Typed messages remade');
+  } catch (e) {
+    toast(e.message || "Couldn't remake the messages", true);
+  }
+  remaking = false;
+  try { await refresh(); } catch {}
+}
+
+function voiceName() { return VOICES.find((x) => x.id === savedVoice()).name.split(' – ')[0]; }
 
 async function previewVoice() {
   try {
@@ -1120,6 +1167,10 @@ async function makeSpeech(slot, text, voice, speed) {
     audio.copyToChannel(samples, 0);
     ttsBusy = false;
     await useAudio(slot, audio);
+    if (pending && pending.slot === slot) {
+      pending.words = text.replace(/\s+/g, ' ');
+      pending.voice = `${voice} ${speed}`;
+    }
   } catch (e) {
     ttsBusy = false;
     toast(e.message || "Couldn't make the speech", true);
@@ -1177,7 +1228,6 @@ function showTab(name) {
   currentTab = name;
   for (const b of document.querySelectorAll('.tabs button')) b.setAttribute('aria-selected', String(b.dataset.tab === name));
   for (const t of TABS) $('tab-' + t).classList.toggle('hidden', t !== name);
-  placeQuick();
   placeModeLine();
 }
 for (const b of document.querySelectorAll('.tabs button')) b.addEventListener('click', () => showTab(b.dataset.tab));

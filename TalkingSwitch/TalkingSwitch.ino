@@ -2,18 +2,19 @@
 //  TalkingSwitch - M5StickS3 + M5Stack Unit Key accessibility switch
 // ---------------------------------------------------------------------
 //  One big switch, four jobs:
-//    SPEAK     Plays the selected Quick message (BIGmack style). Play style:
-//              Tap / Hold to play / Latch. With Tap, keep holding the
-//              switch to move on to the next Quick message.
-//    CHOOSE    Choice-making by scanning: the switch offers messages one at
-//              a time (LED colour, name on screen, a quiet spoken prompt)
-//              and the student picks one, which then plays.
-//                Choose from: Quick messages - the 4 Quick messages;
-//                  A topic - the messages in the topic staff selected;
-//                  Topics - the topics first, then that topic's messages
+//    SPEAK     The 4 Quick messages. "Messages" setting:
+//                Staff pick - plays the selected one (BIGmack style). Play
+//                  style: Tap / Hold to play / Latch. With Tap, keep holding
+//                  the switch to move on to the next Quick message.
+//                Student scans - the student chooses one by scanning (below).
+//    CHOOSE    The Topics, by scanning. Choose from:
+//                One topic - the messages in the topic staff selected;
+//                All topics - the topics first, then that topic's messages
 //                  plus "Back".
-//                Choosing: Press twice - a press starts, the next chooses;
-//                  Hold & release - hold to step through, let go to choose.
+//  Scanning: the switch offers the choices one at a time (LED colour, name
+//  on screen, a quiet spoken prompt) and the student picks one, which then
+//  plays. Choosing: Press twice - a press starts, the next chooses;
+//  Hold & release - hold to step through, let go to choose.
 //    KEYBOARD  Acts as a USB or Bluetooth keyboard key, e.g. Space/Enter
 //              for Grid 3 or Mind Express switch access. Key goes down on
 //              press and up on release, so dwell and hold-to-scan settings
@@ -23,7 +24,7 @@
 //    IR        Sends the selected learned infrared code (TV, fibre optics,
 //              bubble tube), and plays that code's own sound if it has one
 //              (e.g. "Bubbles!"). "IR codes" setting: Staff pick / Repeat
-//              while held / Student scans (the student chooses, as CHOOSE).
+//              while held / Student scans (the student chooses by scanning).
 //
 //  4 Quick messages (SPEAK), 4 Topics of 4 messages (CHOOSE) and 4 IR codes,
 //  each up to 5 s and each with an optional name. The setup page turns the
@@ -171,7 +172,7 @@ static const int NUM_KEYS = sizeof(KEYS) / sizeof(KEYS[0]);
 //  and remembered after power-off. Each has a fixed list of choices.
 // ---------------------------------------------------------------------
 enum SettingId : uint8_t {
-  S_VOLUME, S_PLAY, S_HOLD, S_CHOOSE_FROM, S_IR_CHOOSE, S_ACCESS, S_SCAN_SPEED, S_SCAN_ROUNDS,
+  S_VOLUME, S_SPEAK_CHOOSE, S_PLAY, S_HOLD, S_CHOOSE_FROM, S_IR_CHOOSE, S_ACCESS, S_SCAN_SPEED, S_SCAN_ROUNDS,
   S_KEY_ACTION, S_PRESS_SOUND,
   S_ACCEPT, S_LOCKOUT, S_WAKE, S_SLEEP, S_AUTOOFF, S_LOUD, S_FORGET,
   S_COUNT
@@ -188,21 +189,23 @@ struct Setting {
 };
 static const Setting SETTINGS[S_COUNT] = {
   {"Volume",              "vol",       4, 2, {0, 1, 2, 3}, {"1", "2", "3", "4"}, G_GENERAL},
+  // SPEAK: play the Quick message staff selected, or the student chooses one by scanning
+  {"Messages",            "s_spkmode", 2, 0, {0, 1}, {"Staff pick", "Student scans"}, G_SPEAK},
   // SPEAK: Tap = a press plays the whole message; Hold to play = plays (looping)
   // only while the switch is held; Latch = one press starts it looping, the next stops it
   {"Play style",          "s_play",    3, 0, {0, 1, 2}, {"Tap", "Hold to play", "Latch"}, G_SPEAK},
   // SPEAK, Tap: keep holding the switch this long to move to the next Quick message
   {"Hold for next msg",   "s_hold",    5, 2, {0, 1000, 1500, 2000, 3000}, {"Off", "1 s", "1.5 s", "2 s", "3 s"}, G_SPEAK},
-  // CHOOSE: what the student chooses from - the Quick messages; the topic staff
-  // selected (B button); or the topics first, then a topic's messages
-  {"Choose from",         "s_choose",  3, 0, {0, 1, 2}, {"Quick msgs", "A topic", "Topics"}, G_CHOOSE},
+  // CHOOSE: the messages in the topic staff selected (B button); or the topics
+  // first, then a topic's messages
+  {"Choose from",         "s_topics",  2, 0, {0, 1}, {"One topic", "All topics"}, G_CHOOSE},
   // IR: send the selected code; the same, repeating while held; or the student chooses by scanning
   {"IR codes",            "s_irmode",  3, 0, {0, 1, 2}, {"Staff pick", "Repeat held", "Student scans"}, G_IR},
   // scanning: press to start, press to choose; or hold to step, let go to choose
-  {"Choosing",            "s_access",  2, 0, {0, 1}, {"Press twice", "Hold & release"}, G_CHOOSE | G_IR},
+  {"Choosing",            "s_access",  2, 0, {0, 1}, {"Press twice", "Hold & release"}, G_SPEAK | G_CHOOSE | G_IR},
   // scanning: how long each choice is offered, and how many times round before stopping
-  {"Scan speed",          "s_scanspd", 5, 2, {1500, 2000, 3000, 4000, 5000}, {"1.5 s", "2 s", "3 s", "4 s", "5 s"}, G_CHOOSE | G_IR},
-  {"Scan rounds",         "s_scanrnd", 3, 1, {1, 2, 3}, {"1", "2", "3"}, G_CHOOSE | G_IR},
+  {"Scan speed",          "s_scanspd", 5, 2, {1500, 2000, 3000, 4000, 5000}, {"1.5 s", "2 s", "3 s", "4 s", "5 s"}, G_SPEAK | G_CHOOSE | G_IR},
+  {"Scan rounds",         "s_scanrnd", 3, 1, {1, 2, 3}, {"1", "2", "3"}, G_SPEAK | G_CHOOSE | G_IR},
   // KEYBOARD: Momentary = key held while the switch is held; Latch = one press
   // holds the key down, the next press lets it go
   {"Key action",          "s_keyact",  2, 0, {0, 1}, {"Momentary", "Latch"}, G_KEYBOARD},
@@ -289,6 +292,9 @@ bool     needRedraw = true;
 uint32_t ledFlashUntil = 0;
 String   slotName[NUM_NAMES];  // optional names (see name numbers above), set on the setup page
 String   voiceId, voiceSpeed;  // typed-speech voice for this switch, chosen on the setup page
+// A typed message's words and the voice they were spoken in ("<voice> <speed>"),
+// so the setup page can remake it in a new voice. Empty for recorded ones.
+String   slotWords[SND_PMSG], slotWordsVoice[SND_PMSG];
 String   statusMsg = "";
 uint16_t statusColor = TFT_YELLOW;
 uint32_t statusUntil = 0;
@@ -391,6 +397,21 @@ void loadSettings() {
     settingChoice[i] = prefs.getUChar(SETTINGS[i].key, SETTINGS[i].def);
     if (settingChoice[i] >= SETTINGS[i].count) settingChoice[i] = SETTINGS[i].def;
   }
+  // older firmware's "Choose from": Quick msgs / A topic / Topics. Scanning the
+  // Quick messages is now SPEAK's "Messages: Student scans".
+  if (prefs.isKey("s_choose")) {
+    uint8_t old = prefs.getUChar("s_choose", 0);
+    if (old == 0 && mode == M_CHOOSE) {
+      mode = M_SPEAK;
+      prefs.putUChar("mode3", mode);
+      settingChoice[S_SPEAK_CHOOSE] = 1;
+      prefs.putUChar(SETTINGS[S_SPEAK_CHOOSE].key, 1);
+    } else if (old > 0) {
+      settingChoice[S_CHOOSE_FROM] = old - 1;
+      prefs.putUChar(SETTINGS[S_CHOOSE_FROM].key, old - 1);
+    }
+    prefs.remove("s_choose");
+  }
 }
 
 void loadSlots() {
@@ -404,7 +425,32 @@ void loadSlots() {
   }
 }
 
+String wordsPath(int i) { return String("/w") + i + ".txt"; }
+
+// Typed words for message i (first line the voice, then the words); "" clears them.
+void setWords(int i, const String& voice, const String& words) {
+  if (i < 0 || i >= SND_PMSG) return;
+  slotWords[i] = words;
+  slotWordsVoice[i] = words.length() ? voice : "";
+  if (!words.length()) { LittleFS.remove(wordsPath(i)); return; }
+  File f = LittleFS.open(wordsPath(i), "w");
+  if (f) { f.print(voice + "\n" + words); f.close(); }
+}
+
+void loadWords() {
+  for (int i = 0; i < SND_PMSG; i++) {
+    slotWords[i] = slotWordsVoice[i] = "";
+    File f = LittleFS.open(wordsPath(i), "r");
+    if (!f) continue;
+    slotWordsVoice[i] = f.readStringUntil('\n');
+    slotWords[i] = f.readString();
+    f.close();
+  }
+}
+
+// A new sound replaces any typed words (the page sets them again for typed ones).
 bool saveSlot(int i) {
+  setWords(i, "", "");
   File f = LittleFS.open(slotPath(i), "w");
   if (!f) return false;
   size_t w = f.write((uint8_t*)slotBuf[i], slotLen[i] * 2);
@@ -574,6 +620,7 @@ void recordSlot(int i) {
   tidyRecording(i);
   if (slotLen[i] == 0) {
     LittleFS.remove(slotPath(i));
+    setWords(i, "", "");
     setStatus("Nothing heard\n" + titleOf(i) + " cleared");
   } else {
     bool ok = saveSlot(i);
@@ -872,16 +919,19 @@ void drawArrow(lgfx::LovyanGFX& c, Arrow a, int cx, int cy, int s, uint16_t col)
 }
 
 // Battery pill in the top-right corner: "78%" and an icon.
-static const int PILL_W = 112;  // top-right pill: volume bars and battery
+static const int PILL_W = 122;  // top-right pill: volume and battery
 
 void drawBattery(lgfx::LovyanGFX& c) {
   const int W = c.width();
   c.fillRoundRect(W - PILL_W - 4, 5, PILL_W, HEADER_H - 10, 6, TFT_BLACK);
-  // volume: 4 bars
+  // volume: a speaker, then 4 equal bars (hollow above the current level)
+  const int sx = W - PILL_W + 1, sy = HEADER_H / 2;
+  c.fillRect(sx, sy - 2, 3, 5, TFT_WHITE);
+  c.fillTriangle(sx + 2, sy, sx + 7, sy - 5, sx + 7, sy + 5, TFT_WHITE);
   for (int i = 0; i < (int)sizeof(VOLUMES); i++) {
-    int h = 4 + i * 3, x = W - PILL_W + 2 + i * 5, y = HEADER_H / 2 + 6 - h;
-    if (i <= settingChoice[S_VOLUME]) c.fillRect(x, y, 3, h, TFT_WHITE);
-    else c.drawRect(x, y, 3, h, TFT_DARKGREY);
+    int x = sx + 12 + i * 5, y = sy - 6;
+    if (i <= settingChoice[S_VOLUME]) c.fillRect(x, y, 3, 12, TFT_WHITE);
+    else c.drawRect(x, y, 3, 12, TFT_DARKGREY);
   }
   const int bw = 26, bh = 13, bx = W - 38, by = HEADER_H / 2 - bh / 2;
   c.drawRoundRect(bx, by, bw, bh, 3, TFT_WHITE);
@@ -905,16 +955,27 @@ void drawBattery(lgfx::LovyanGFX& c) {
   c.drawString(String(batLevel) + "%", bx - 5, HEADER_H / 2);
 }
 
-// Large centred text, stepping down the font size until it fits the width.
-void drawFit(lgfx::LovyanGFX& c, const String& s, int y, uint16_t col) {
-  const lgfx::IFont* fonts[] = {&fonts::FreeSansBold18pt7b, &fonts::FreeSansBold12pt7b, &fonts::FreeSansBold9pt7b};
+// Centred text in the largest of `fonts` that fits `maxW`; if even the
+// smallest is too wide, it's shortened with "..".
+void drawFitIn(lgfx::LovyanGFX& c, const String& s, int y, uint16_t col,
+               std::initializer_list<const lgfx::IFont*> fonts, int maxW) {
+  String t = s;
   for (auto f : fonts) {
     c.setFont(f);
-    if (c.textWidth(s) <= c.width() - 12 || f == fonts[2]) break;
+    if (c.textWidth(t) <= maxW) break;
+  }
+  if (c.textWidth(t) > maxW) {
+    while (t.length() && c.textWidth(t + "..") > maxW) t.remove(t.length() - 1);
+    t += "..";
   }
   c.setTextColor(col);
   c.setTextDatum(middle_center);
-  c.drawString(s, c.width() / 2, y);
+  c.drawString(t, c.width() / 2, y);
+}
+
+// Large centred text, stepping down the font size until it fits the width.
+void drawFit(lgfx::LovyanGFX& c, const String& s, int y, uint16_t col) {
+  drawFitIn(c, s, y, col, {&fonts::FreeSansBold18pt7b, &fonts::FreeSansBold12pt7b, &fonts::FreeSansBold9pt7b}, c.width() - 12);
 }
 
 void drawCentered(lgfx::LovyanGFX& c, const String& s, int y, const lgfx::IFont* font, uint16_t col) {
@@ -943,17 +1004,29 @@ void drawMain(lgfx::LovyanGFX& c) {
   uint16_t accent = rgb(SCREEN_RGB[mode]);
   if (gateShown) {  // staff stepped to this mode's "Settings" item
     drawFit(c, "Settings", 56, TFT_WHITE);
-    drawCentered(c, String("for ") + MODE_NAMES[mode] + " - hold A to open", 90, &fonts::FreeSans9pt7b, TFT_YELLOW);
+    drawCentered(c, "Hold A to open", 90, &fonts::FreeSans9pt7b, TFT_YELLOW);
     return;
   }
   switch (mode) {
     case M_SPEAK: {
+      if (scanning) {
+        drawFit(c, scanTitle(scanItems[scanPos]), 58, TFT_WHITE);
+        drawCentered(c, holdToChoose() ? "Let go to choose" : "Press to choose", 94, &fonts::FreeSansBold9pt7b, TFT_YELLOW);
+        break;
+      }
+      // the Quick message B and hold A (record) work on - also when the student scans
       drawFit(c, titleOf(slot), 54, TFT_WHITE);
       if (playLatched) drawCentered(c, "Playing - press to stop", 88, &fonts::FreeSansBold9pt7b, TFT_YELLOW);
       else drawCentered(c, slotLen[slot] ? String(slotLen[slot] / (float)SAMPLE_RATE, 1) + " s recorded"
                                          : String("Empty - hold A to record"), 88, &fonts::FreeSans9pt7b,
                         slotLen[slot] ? TFT_GREEN : TFT_ORANGE);
-      drawCentered(c, "Quick " + String(slot + 1) + " of " + String(NUM_QUICK), 106, &fonts::Font2, hint);
+      if (speakScanning()) {
+        int n = 0;
+        for (int i = 0; i < NUM_QUICK; i++) n += slotLen[i] ? 1 : 0;
+        drawCentered(c, "Student scans " + String(n) + (n == 1 ? " message" : " messages"), 106, &fonts::Font2, TFT_CYAN);
+      } else {
+        drawCentered(c, "Quick " + String(slot + 1) + " of " + String(NUM_QUICK), 106, &fonts::Font2, hint);
+      }
       break;
     }
     case M_CHOOSE: {
@@ -965,11 +1038,7 @@ void drawMain(lgfx::LovyanGFX& c) {
       // what the student will choose from, and how many choices there are
       int n = 0;
       String from, what = " messages", empty = "Add them on the setup page";
-      if (chooseQuick()) {
-        for (int i = 0; i < NUM_QUICK; i++) n += slotLen[i] ? 1 : 0;
-        from = "Quick messages";
-        empty = "Record them in SPEAK (hold A)";
-      } else if (topicsByStudent() && !scanInGroup) {
+      if (topicsByStudent() && !scanInGroup) {
         for (int t = 0; t < NUM_TOPICS; t++) n += topicUsed(t);
         from = "Topics";
         what = " topics";
@@ -1008,17 +1077,18 @@ void drawMain(lgfx::LovyanGFX& c) {
         drawCentered(c, holdToChoose() ? "Let go to choose" : "Press to choose", 94, &fonts::FreeSansBold9pt7b, TFT_YELLOW);
         break;
       }
-      if (irScanning()) {
-        int n = 0;
-        for (int i = 0; i < NUM_SLOTS; i++) n += irLen[i] ? 1 : 0;
-        drawChoices(c, n, " IR codes", "IR codes", "Learn codes (hold A)");
-        break;
-      }
+      // the IR code B and hold A (learn) work on - also when the student scans
       int snd = irSound(irSlot);
       drawFit(c, titleOf(snd), 54, TFT_WHITE);
       drawCentered(c, !irLen[irSlot] ? "No IR code" : slotLen[snd] ? "Code ready + sound" : "Code ready", 84,
                    &fonts::FreeSans9pt7b, irLen[irSlot] ? TFT_GREEN : TFT_ORANGE);
-      drawCentered(c, "IR code " + String(irSlot + 1) + " of " + String(NUM_SLOTS), 104, &fonts::Font2, hint);
+      if (irScanning()) {
+        int n = 0;
+        for (int i = 0; i < NUM_SLOTS; i++) n += irLen[i] ? 1 : 0;
+        drawCentered(c, "Student scans " + String(n) + (n == 1 ? " IR code" : " IR codes"), 104, &fonts::Font2, TFT_CYAN);
+      } else {
+        drawCentered(c, "IR code " + String(irSlot + 1) + " of " + String(NUM_SLOTS), 104, &fonts::Font2, hint);
+      }
       break;
     }
   }
@@ -1035,12 +1105,8 @@ void drawStatus(lgfx::LovyanGFX& c) {
   bool bar = recProgress >= 0;
   int y1 = l2.length() ? mid - 12 : mid;
   if (bar) y1 -= 8;
-  c.setFont(&fonts::FreeSansBold12pt7b);
-  if (c.textWidth(l1) > W - 24) c.setFont(&fonts::FreeSansBold9pt7b);
-  c.setTextColor(fg);
-  c.setTextDatum(middle_center);
-  c.drawString(l1, W / 2, y1);
-  if (l2.length()) drawCentered(c, l2, y1 + 24, &fonts::FreeSans9pt7b, fg);
+  drawFitIn(c, l1, y1, fg, {&fonts::FreeSansBold12pt7b, &fonts::FreeSansBold9pt7b}, W - 24);
+  if (l2.length()) drawFitIn(c, l2, y1 + 24, fg, {&fonts::FreeSans9pt7b, &fonts::Font2}, W - 24);
   if (bar) {  // recording time used
     int by = y1 + (l2.length() ? 42 : 22), bw = W - 40;
     c.drawRect(20, by, bw, 8, fg);
@@ -1054,15 +1120,29 @@ uint8_t settingsMask() {
   return MASK[mode];
 }
 
+// Settings on the current screen, leaving out ones that do nothing with the
+// current choices (e.g. scan speed when staff pick the IR code).
+bool settingShown(int i) {
+  if (!(SETTINGS[i].groups & settingsMask())) return false;
+  bool scan = mode == M_SPEAK ? speakScanning() : mode == M_IR ? irScanning() : true;
+  switch (i) {
+    case S_PLAY: return !speakScanning();
+    case S_HOLD: return !speakScanning() && setting(S_PLAY) == PLAY_TAP;
+    case S_ACCESS: case S_SCAN_SPEED: return scan;
+    case S_SCAN_ROUNDS: return scan && !holdToChoose();
+  }
+  return true;
+}
+
 void drawSettings(lgfx::LovyanGFX& c) {
   const Setting& st = SETTINGS[settingIdx];
   int n = 0, pos = 0;
   for (int i = 0; i < S_COUNT; i++)
-    if (SETTINGS[i].groups & settingsMask()) { n++; if (i <= settingIdx) pos++; }
-  drawCentered(c, st.name, 54, &fonts::FreeSansBold12pt7b, TFT_WHITE);
+    if (settingShown(i)) { n++; if (i <= settingIdx) pos++; }
+  drawFitIn(c, st.name, 54, TFT_WHITE, {&fonts::FreeSansBold12pt7b, &fonts::FreeSansBold9pt7b}, c.width() - 12);
   bool confirm = settingIdx == S_FORGET && forgetConfirmUntil;
-  drawCentered(c, confirm ? "Hold A again" : settingIdx == S_FORGET ? "Hold A to forget" : st.labels[settingChoice[settingIdx]], 86,
-               &fonts::FreeSansBold18pt7b, confirm ? TFT_ORANGE : TFT_YELLOW);
+  drawFit(c, confirm ? "Hold A again" : settingIdx == S_FORGET ? "Hold A to forget" : st.labels[settingChoice[settingIdx]], 86,
+          confirm ? TFT_ORANGE : TFT_YELLOW);
   drawCentered(c, String(pos) + "/" + String(n) + (inSettings() ? "   Switch does: " + String(MODE_NAMES[prevMode]) : ""),
                106, &fonts::Font2, TFT_DARKGREY);
 }
@@ -1076,7 +1156,7 @@ String buttonGuide() {
   if (gateShown) return "B first  hold A open  A mode";
   switch (mode) {
     case M_SPEAK: return "B next  hold A record  A mode";
-    case M_CHOOSE: return chooseQuick() ? "B settings  A mode" : "B next topic  A mode";
+    case M_CHOOSE: return "B next topic  A mode";
     case M_KEYBOARD: return "B next key  A mode";
     case M_IR: return "B next code  hold A learn  A mode";
   }
@@ -1099,7 +1179,8 @@ void drawScreen() {
 
   // Header: mode name on the mode colour, battery on the right
   c.fillRect(0, 0, W, HEADER_H, rgb(SCREEN_RGB[mode]));
-  String title = modeSettingsOpen ? String(MODE_NAMES[mode]) + " settings" : String(MODE_NAMES[mode]);
+  // a mode's own settings: "Settings" on that mode's colour
+  String title = modeSettingsOpen ? String("Settings") : String(MODE_NAMES[mode]);
   c.setFont(&fonts::FreeSansBold12pt7b);
   if (c.textWidth(title) > W - PILL_W - 14) c.setFont(&fonts::FreeSansBold9pt7b);  // leave room for the pill
   c.setTextColor(HEADER_DARK_TEXT[mode] ? TFT_BLACK : TFT_WHITE);
@@ -1246,24 +1327,25 @@ void managePower(uint32_t now) {
 //  Student switch actions
 // ---------------------------------------------------------------------
 // ---------------------------------------------------------------------
-//  Choosing by scanning (CHOOSE mode, and IR mode with "Student scans").
+//  Choosing by scanning (CHOOSE mode, and SPEAK and IR with "Student scans").
 //  The switch offers each choice in turn - LED colour, name on screen and a
 //  quiet spoken prompt - and the student picks one:
 //    Press twice ..... a press starts the offers, the next press chooses
 //    Hold & release .. hold to step through the offers, let go to choose
-//  CHOOSE with "Topics chosen by: Student" first offers the topics, then the
-//  chosen topic's messages plus "Back"; with "Staff" it offers the messages
-//  in the topic staff selected.
+//  CHOOSE with "Choose from: All topics" first offers the topics, then the
+//  chosen topic's messages plus "Back"; with "One topic" it offers the
+//  messages in the topic staff selected.
 // ---------------------------------------------------------------------
 static const uint8_t PROMPT_VOLUME = 150;  // channel volume for prompts (255 = as loud as messages)
 
-bool chooseQuick() { return setting(S_CHOOSE_FROM) == 0; }
-bool topicsByStudent() { return setting(S_CHOOSE_FROM) == 2; }
+bool speakScanning() { return setting(S_SPEAK_CHOOSE) == 1; }
+bool topicsByStudent() { return setting(S_CHOOSE_FROM) == 1; }
 bool holdToChoose() { return setting(S_ACCESS) == 1; }
 bool irScanning() { return setting(S_IR_CHOOSE) == 2; }
 bool irRepeat() { return setting(S_IR_CHOOSE) == 1; }
 bool scanModeActive() {
-  return studentMode() == M_CHOOSE || (studentMode() == M_IR && irScanning());
+  return studentMode() == M_CHOOSE || (studentMode() == M_IR && irScanning())
+      || (studentMode() == M_SPEAK && speakScanning());
 }
 
 String scanTitle(const ScanItem& it) {
@@ -1298,7 +1380,7 @@ void buildScanList() {
     for (int i = 0; i < NUM_SLOTS; i++) if (irLen[i]) scanItems[scanCount++] = {SK_IR, (uint8_t)i};
     return;
   }
-  if (chooseQuick()) {
+  if (studentMode() == M_SPEAK) {
     for (int i = 0; i < NUM_QUICK; i++) if (slotLen[i]) scanItems[scanCount++] = {SK_MSG, (uint8_t)i};
     return;
   }
@@ -1497,7 +1579,7 @@ void pollStudentSwitch() {
   // Still holding in SPEAK: step through the other messages
   uint32_t longPress = setting(S_HOLD);
   uint8_t m = studentMode();
-  if (swActive && longPress && setting(S_PLAY) == PLAY_TAP && m == M_SPEAK) {
+  if (swActive && longPress && setting(S_PLAY) == PLAY_TAP && m == M_SPEAK && !speakScanning()) {
     uint32_t wait = swLastAdvance == swLastActivation ? longPress : LONG_REPEAT_MS;
     if (now - swLastAdvance >= wait) { swLastAdvance = now; advanceMessage(); }
   }
@@ -1517,7 +1599,7 @@ void pollStudentSwitch() {
 void settingChanged(int i) {
   if (i == S_KEY_ACTION) releaseKey();
   if (i == S_PLAY) stopPlay();
-  if (i == S_CHOOSE_FROM || i == S_ACCESS || i == S_IR_CHOOSE) { stopScan(); scanInGroup = false; }
+  if (i == S_CHOOSE_FROM || i == S_ACCESS || i == S_IR_CHOOSE || i == S_SPEAK_CHOOSE) { stopScan(); scanInGroup = false; }
   if (i == S_VOLUME) { M5.Speaker.setVolume(volume()); M5.Speaker.tone(1000, 100); }
 }
 
@@ -1525,7 +1607,7 @@ void settingChanged(int i) {
 int nextSettingInView(int from) {
   for (int k = 1; k <= S_COUNT; k++) {
     int i = (from + k) % S_COUNT;
-    if (SETTINGS[i].groups & settingsMask()) return i;
+    if (settingShown(i)) return i;
   }
   return from;
 }
@@ -1556,7 +1638,7 @@ void nextItem() {
     gateShown = false;
     switch (mode) {
       case M_SPEAK: stopPlay(); slot = 0; slotCue(slot); break;
-      case M_CHOOSE: scanInGroup = false; if (!chooseQuick()) { group = 0; topicCue(group); } break;
+      case M_CHOOSE: scanInGroup = false; group = 0; topicCue(group); break;
       case M_KEYBOARD: releaseKey(); keyIdx = 0; break;
       case M_IR: irSlot = 0; slotCue(irSound(irSlot)); break;
     }
@@ -1568,7 +1650,7 @@ void nextItem() {
         break;
       case M_CHOOSE:
         scanInGroup = false;
-        if (group == NUM_TOPICS - 1 || chooseQuick()) gateShown = true;  // Quick: no topics to step through
+        if (group == NUM_TOPICS - 1) gateShown = true;
         else topicCue(++group);
         break;
       case M_KEYBOARD:
@@ -1655,8 +1737,11 @@ String jsonStr(const String& v) {
 
 void sendInfo() {
   auto yes = [](bool b) { return String(b ? "true" : "false"); };
+  auto words = [](int i) {  // a typed message's words and voice
+    return slotWords[i].length() ? ",\"tx\":" + jsonStr(slotWords[i]) + ",\"tv\":" + jsonStr(slotWordsVoice[i]) : String();
+  };
   auto msg = [&](int i) {  // a Quick message: length, name, and whether it has a prompt
-    return "{\"len\":" + String(slotLen[i]) + ",\"pr\":" + yes(slotLen[SND_PQUICK + i]) + ",\"name\":" + jsonStr(slotName[i]) + "}";
+    return "{\"len\":" + String(slotLen[i]) + ",\"pr\":" + yes(slotLen[SND_PQUICK + i]) + ",\"name\":" + jsonStr(slotName[i]) + words(i) + "}";
   };
   String j = "@INFO {\"name\":" + jsonStr(bleName);
   j += ",\"rate\":" + String(SAMPLE_RATE) + ",\"maxSec\":" + String(MAX_SECONDS) + ",\"promptSec\":" + String(PROMPT_SECONDS);
@@ -1679,14 +1764,14 @@ void sendInfo() {
     for (int k = 0; k < PER_TOPIC; k++) {
       int m = topicMsg(t, k);
       j += String(k ? "," : "") + "{\"len\":" + String(slotLen[m]) + ",\"pr\":" + yes(slotLen[SND_PMSG + (m - SND_TOPIC)])
-           + ",\"name\":" + jsonStr(slotName[m]) + "}";
+           + ",\"name\":" + jsonStr(slotName[m]) + words(m) + "}";
     }
     j += "]}";
   }
   j += "],\"irs\":[";
   for (int i = 0; i < NUM_SLOTS; i++)
     j += String(i ? "," : "") + "{\"ir\":" + yes(irLen[i]) + ",\"len\":" + String(slotLen[irSound(i)])
-         + ",\"pr\":" + yes(slotLen[SND_PIR + i]) + ",\"name\":" + jsonStr(slotName[irSound(i)]) + "}";
+         + ",\"pr\":" + yes(slotLen[SND_PIR + i]) + ",\"name\":" + jsonStr(slotName[irSound(i)]) + words(irSound(i)) + "}";
   j += "],\"back\":{\"pr\":" + yes(slotLen[SND_PBACK]) + "}";
   j += ",\"settings\":[";
   bool first = true;
@@ -1837,6 +1922,14 @@ void handleCommand(String line) {
     stopPlay();
     slotLen[n] = 0;
     LittleFS.remove(slotPath(n));
+    setWords(n, "", "");
+    reply();
+  } else if (cmd == "WORDS") {
+    // WORDS <sound> <voice> <speed> <words>: the words a typed message says
+    if (n < 0 || n >= SND_PMSG) return reply("bad sound");
+    int a = arg.indexOf(' '), b = arg.indexOf(' ', a + 1), c = arg.indexOf(' ', b + 1);
+    if (a < 0 || b < 0 || c < 0) return reply("bad words");
+    setWords(n, arg.substring(a + 1, c).substring(0, 60), arg.substring(c + 1).substring(0, 200));
     reply();
   } else if (cmd == "NAME") {
     if (n < 0 || n >= NUM_NAMES) return reply("bad name number");
@@ -1981,6 +2074,7 @@ void setup() {
   if (!LittleFS.begin(true)) setStatus("Storage error", TFT_RED, 10000);
   migrateFiles();
   loadSlots();
+  loadWords();
   loadIr();
 
 #if HAS_USB_HID

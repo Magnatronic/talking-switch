@@ -47,28 +47,33 @@ Edge** (Firefox and Safari can't talk to USB devices). Plug the StickS3 in, clos
 click **Connect** and pick the switch. The switch is set up over the USB cable – no Wi-Fi – and recordings and
 typed words stay on the computer.
 
-The page has a tab for each mode – SPEAK, CHOOSE, KEYBOARD, IR – and **Settings**, like the modes on the
-switch. The tab of the mode the switch is in has a green dot; any other mode's tab has a **Use** button to switch
+The page has a tab for each mode – SPEAK, CHOOSE, KEYBOARD, IR – then **Voice** and **Settings**, like the
+modes on the switch. The tab of the mode the switch is in has a green dot; any other mode's tab has a **Use** button to switch
 to it. Each mode's tab has that mode's settings at the top, in the same order as on the switch (settings that do
 nothing with the current choices are hidden), and what it uses below.
 
-- **SPEAK:** Play style, Hold for next; the 4 Quick messages. For each: a name, ▶ Play, **Change** (record with the
-  computer's microphone or a headset, **type the words** – spoken in the switch's voice – or upload an audio file;
-  then listen and save), Delete, and *Select* (the one SPEAK plays).
-- **CHOOSE:** Choose from, Choosing, Scan speed, Scan rounds; then what it chooses from – the Quick messages, or
-  the 4 **topics** of up to 4 messages each (up to 5 seconds per message). Name each topic and message – the names
-  become the spoken prompts. With *Choose from: One topic*, *Use this topic* picks it.
+- **SPEAK:** Messages (Staff pick / Student scans), then Play style and Hold for next, or the scanning settings
+  when the student scans; the 4 Quick messages. For each: a name, ▶ Play, **Add / Change** (**type the words** –
+  spoken in the switch's voice; Enter makes the speech – record with the computer's microphone or a headset, or
+  upload an audio file; it plays straight away, then *Save to the switch*), Delete, and *Select* (the one SPEAK
+  plays). Typing starts from the message's words, or its name; a typed message with no name is named after its
+  words.
+- **CHOOSE:** Choose from, Choosing, Scan speed, Scan rounds; the 4 **topics** of up to 4 messages each (up to 5
+  seconds per message). Name each topic and message – the names become the spoken prompts. With *Choose from: One
+  topic*, *Use this topic* picks it.
 - **KEYBOARD:** the key, Key action, Press sound; a **custom key or shortcut** such as Win+H (dictation); the
   Bluetooth name.
 - **IR:** IR codes (and the scanning settings when students scan), Press sound; 4 remote-control codes, separate
   from the messages. For each: a name, **Learn / Test / Delete**, and an optional **sound** (made the same three
   ways) that the switch says as it sends the code.
+- **Voice:** the switch's **voice** and speed for typed messages and scanning prompts (natural: Emma, Isabella,
+  George, Fable; quick: Cori, Alba, Southern English female, Northern English male). It's stored on the switch, so
+  every computer uses the same one. Changing it remakes the prompts, and **Remake in this voice** remakes the typed
+  messages made in another voice (the switch keeps each typed message's words; recorded and uploaded ones don't
+  change).
 - **Settings:** the switch's SETTINGS in the same order – Volume, Press must last, Ignore repeats, Switch wakes
-  screen, Sleep after, Auto power off, Recording boost, Forget BT devices – then the switch's **voice** and speed
-  for typed messages and scanning prompts (natural: Emma, Isabella, George, Fable; quick: Cori, Alba, Southern
-  English female, Northern English male – stored on the switch, so every computer uses the same one; changing the
-  voice remakes the prompts). Recording boost also sets the loudness of messages made on the page. Voice, speed
-  and loudness can also be changed in the message editor.
+  screen, Sleep after, Auto power off, Recording boost, Forget BT devices. Recording boost also sets the loudness
+  of messages made on the page.
 - **Names become prompts:** naming a message, topic or IR code makes its short spoken prompt for scanning, in
   the switch's voice (plus a "Back" prompt when students choose topics).
 
@@ -98,10 +103,10 @@ up to 5 seconds. Each IR code can have its own sound, e.g. IR code 1 "Bubbles" t
 
 | Mode | Big switch does | LED glow |
 |---|---|---|
-| SPEAK | Plays the selected Quick message. See *Play style* for hold-to-play and latch; with Tap, keep holding to move to the next Quick message | message colour: 1 green, 2 blue, 3 purple, 4 orange |
-| CHOOSE | The student **chooses** a message by scanning – from the Quick messages or the Topics, see below | colour of the choice on offer |
+| SPEAK | *Messages* setting: **Staff pick** – plays the selected Quick message (see *Play style* for hold-to-play and latch; with Tap, keep holding to move to the next Quick message). **Student scans** – the student chooses one of the Quick messages by scanning (see below) | message colour: 1 green, 2 blue, 3 purple, 4 orange |
+| CHOOSE | The student **chooses** from the Topics by scanning, see below | colour of the choice on offer |
 | KEYBOARD | Holds down the chosen key while pressed | purple |
-| IR | Sends the selected IR code, and says its sound if it has one. *IR codes* setting: Staff pick / Repeat held (keeps sending while held, like a remote's volume button) / Student scans (the student chooses, as in CHOOSE) | code colour |
+| IR | Sends the selected IR code, and says its sound if it has one. *IR codes* setting: Staff pick / Repeat held (keeps sending while held, like a remote's volume button) / Student scans (the student chooses by scanning) | code colour |
 | SETTINGS | Keeps doing whatever the previous mode did | as previous mode |
 
 ### Staff buttons – one rule everywhere
@@ -111,21 +116,21 @@ The bottom line of the screen always shows what the buttons do right now.
 | Button | Does |
 |---|---|
 | **A click** | Next mode (SPEAK → CHOOSE → KEYBOARD → IR → SETTINGS). In a mode's settings: close them |
-| **B click** | Next: Quick message / topic / key / IR code, then the mode's **Settings** item, then back to the first (CHOOSE from Quick messages: straight to Settings). In settings: the next setting |
+| **B click** | Next: Quick message / topic / key / IR code, then the mode's **Settings** item, then back to the first. In settings: the next setting |
 | **Hold A** | Do it: SPEAK – record the selected Quick message (release to stop); IR – learn the selected code (remote 30cm+ from the end of the stick, within 8s); on **Settings** – open them; in settings – change the value |
 
 When the screen is dim or off, the first press of A or B only wakes it.
 
-### CHOOSE: choice-making with one switch
+### Scanning: choice-making with one switch
 
-The switch offers the choices one at a time – each with its LED colour, its name on screen and a short **spoken
-prompt** played quietly ("Toast"… "Crisps"… "Yoghurt") – and the student picks one, which then plays in full.
+With SPEAK or IR set to **Student scans**, and in CHOOSE, the switch offers the choices one at a time – each with
+its LED colour, its name on screen and a short **spoken prompt** played quietly ("Toast"… "Crisps"… "Yoghurt") –
+and the student picks one, which then plays in full (or, in IR, is sent).
 
-- **Choose from: Quick messages** (default) – it offers the 4 Quick messages, the same ones SPEAK plays. The
-  simplest start.
-- **Choose from: A topic** – it offers the messages in the topic staff selected (B on the switch, or *Use this
+- **SPEAK, Messages: Student scans** – it offers the 4 Quick messages. The simplest start.
+- **CHOOSE, Choose from: One topic** (default) – it offers the messages in the topic staff selected (B on the switch, or *Use this
   topic* on the setup page), e.g. "Snack time".
-- **Choose from: Topics** – it offers the **topics** first ("Snack time"… "Music"…), then the chosen topic's
+- **CHOOSE, Choose from: All topics** – it offers the **topics** first ("Snack time"… "Music"…), then the chosen topic's
   messages and **"Back"** (to return to the topics).
 - **Choosing: Press twice** – a press starts the offers, the next press chooses. With no choice it stops after the
   set number of *Scan rounds*.
@@ -135,13 +140,14 @@ prompt** played quietly ("Toast"… "Crisps"… "Yoghurt") – and the student p
 Only topics and messages that are set up are offered, so two messages make a simple two-way choice. Prompts are
 made by the setup page from the **names**. A message without a prompt – e.g. one just recorded on the stick – plays
 itself quietly as its prompt (cut short by the next offer), so scanning works straight away with no setup page:
-record the Quick messages (SPEAK, hold A) and set *Choose from: Quick messages*.
+record the Quick messages (SPEAK, hold A) and set SPEAK's *Messages: Student scans*.
 
 ### Settings
 
 Each mode has its own settings – press B until the screen shows **Settings**, then hold A to open them – and the
 **SETTINGS** mode holds the general ones. In any settings: **B** = next setting, **hold A** = change the value,
 **A** = close (or next mode). Changes are saved straight away; settings close by themselves after 30s untouched.
+Settings that do nothing with the current choices are left out (e.g. Scan speed when staff pick).
 All of these are on the setup page too, on each mode's tab and the Settings tab.
 
 | Where | Setting | Choices (default **bold**) | What it does |
@@ -154,22 +160,24 @@ All of these are on the setup page too, on each mode's tab and the Settings tab.
 | General | Auto power off | **Never**, 30 min, 60 min, 2 hours | On battery, with no presses: turn off completely, e.g. at the end of the day |
 | General | Recording boost | Off, Low, **Medium**, High | Makes recordings made on the switch louder, at the cost of some harshness |
 | General | Forget BT devices | hold A, then again to confirm | Clears every paired computer/tablet. Also remove the switch in that device's Bluetooth settings |
+| SPEAK | Messages | **Staff pick**, Student scans | *Staff pick*: plays the selected Quick message. *Student scans*: the student chooses one by scanning (then Choosing, Scan speed and Scan rounds apply instead of Play style and Hold for next msg) |
 | SPEAK | Play style | **Tap**, Hold to play, Latch | *Tap*: a press plays the whole message. *Hold to play*: plays (looping) only while the switch is held – classic cause and effect. *Latch*: one press starts it looping, the next press stops it |
 | SPEAK | Hold for next msg | Off, 1s, **1.5s**, 2s, 3s | With Tap: how long the student holds the switch to move to the next Quick message. Turn off for students who can't let go quickly |
-| CHOOSE | Choose from | **Quick msgs**, A topic, Topics | See above |
-| CHOOSE, IR | Choosing | **Press twice**, Hold & release | See above |
-| CHOOSE, IR | Scan speed | 1.5s, 2s, **3s**, 4s, 5s | How long each choice is offered |
-| CHOOSE, IR | Scan rounds | 1, **2**, 3 | Press twice: how many times round before it stops by itself |
+| CHOOSE | Choose from | **One topic**, All topics | See above |
+| SPEAK, CHOOSE, IR | Choosing | **Press twice**, Hold & release | See above |
+| SPEAK, CHOOSE, IR | Scan speed | 1.5s, 2s, **3s**, 4s, 5s | How long each choice is offered |
+| SPEAK, CHOOSE, IR | Scan rounds | 1, **2**, 3 | Press twice: how many times round before it stops by itself |
 | KEYBOARD | Key action | **Momentary**, Latch | *Momentary* holds the key while the switch is held; *Latch* – one press holds the key down, the next lets it go. The screen says "Key held" and the LED glows brighter while latched |
 | KEYBOARD, IR | Press sound | **Off**, Click, Beep | A sound on each press, as feedback (IR: only for codes with no sound of their own) |
 | IR | IR codes | **Staff pick**, Repeat held, Student scans | See the IR mode above |
 
 ### The screen
 
-- **Top bar:** the mode, in its colour; on the right, the volume (4 bars) and the battery (% and icon; green bolt =
-  charging, red = low).
+- **Top bar:** the mode, in its colour ("Settings" on that colour while its settings are open); on the right, the
+  volume (a speaker and 4 bars) and the battery (% and icon; green bolt = charging, red = low).
 - **Middle:** what the switch will do – the Quick message, the topic CHOOSE will offer (or the choice on offer while
-  scanning), the key and whether it's sending by USB or Bluetooth, or the IR code.
+  scanning), the key and whether it's sending by USB or Bluetooth, or the IR code. With *Student scans*, SPEAK and
+  IR still show the selected message or code (the one B and hold A work on), with "Student scans…" underneath.
 - **Bottom:** what the buttons do right now.
 - A white frame appears while the big switch is held down.
 
