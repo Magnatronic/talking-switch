@@ -68,7 +68,7 @@ nothing with the current choices are hidden), and what it uses below.
   every computer uses the same one. Changing it remakes the prompts, and **Remake in this voice** remakes the typed
   messages made in another voice (the switch keeps each typed message's words; recorded and uploaded ones don't
   change).
-- **Settings:** the switch's SETTINGS in the same order – Volume, B button sound, Modes, Press must last, Ignore repeats,
+- **Settings:** the switch's SETTINGS in the same order – Volume, Modes, Press must last, Ignore repeats,
   Brightness, Switch wakes screen, Sleep after, Auto power off, Recording boost, Forget BT devices. Recording boost
   also sets the loudness of messages made on the page. Then **Switch name**: a name (up to 10 characters) put in front of the
   switch's own for Bluetooth and the setup page's Connect list, e.g. "Sam" shows as "Sam ChatterSwitch 7B70" (it's always
@@ -136,6 +136,8 @@ The bottom line of the screen always shows what the buttons do right now.
 |---|---|
 | **A click** | Next mode (QUICK → TOPICS → KEYBOARD → CONTROL → SETTINGS). In a mode's settings: close them |
 | **B click** | Next: Quick message / topic / key / IR code, then the mode's **Settings** item, then back to the first. In settings: the next setting |
+| **Hold A** in TOPICS | Opens the topic: **B** then steps through its messages (hold B hears one) and **A** closes it |
+| **Hold B** | Hear it: QUICK – plays the selected Quick message; an open topic – the message; CONTROL – plays the code's sound (without sending it). B itself is silent, to save battery |
 | **Hold A** | Do it: QUICK – record the selected Quick message (release to stop); CONTROL – learn the selected code (remote 30cm+ from the end of the stick, within 8s); on **Settings** – open them; in settings – change the value |
 
 When the screen is dim or off, the first press of A or B only wakes it.
@@ -181,7 +183,6 @@ All of these are on the setup page too, on each mode's tab and the Settings tab.
 | Where | Setting | Choices (default **bold**) | What it does |
 |---|---|---|---|
 | General | Volume | 1, 2, **3**, 4 | How loud messages play |
-| General | B button sound | **Say it**, Off | Staff pressing B to step through messages, topics or codes: *Say it* plays each one (empty ones are silent); *Off* is silent |
 | General | Modes | **All**, No KEYBOARD, No CONTROL, Talking only | Turn KEYBOARD and/or CONTROL off for a switch that only talks: A skips them, the setup page hides their tabs, and their settings (and the matching Offer settings) go too. Their key and IR codes are kept |
 | General | Press must last | **Instant**, 0.1s, 0.25s, 0.5s, 1s | Filters accidental brushes |
 | General | Ignore repeats for | Off, 0.2s, **0.4s**, 0.8s, 1.5s | Filters tremor and bounces after a press |

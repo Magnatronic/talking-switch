@@ -49,7 +49,11 @@
 //    B click .... next: Quick message / topic / key / IR code, then the
 //                 mode's "Settings" item; in settings, the next setting
 //    Hold A ..... do it: QUICK record the message, CONTROL learn the code,
-//                 on "Settings" open them, in settings change the value
+//                 TOPICS open the topic (B then steps through its messages,
+//                 A closes it), on "Settings" open them, in settings change
+//                 the value
+//    Hold B ..... hear it: QUICK the message, CONTROL the code's sound
+//                 (B itself is silent, to save battery)
 //
 //  Power saving: the screen dims, then switches off, when idle. Bluetooth
 //  only runs in KEYBOARD mode. On battery, after the "Sleep after" time
@@ -190,7 +194,7 @@ static const int NUM_KEYS = sizeof(KEYS) / sizeof(KEYS[0]);
 //  and remembered after power-off. Each has a fixed list of choices.
 // ---------------------------------------------------------------------
 enum SettingId : uint8_t {
-  S_VOLUME, S_BSOUND, S_MODES, S_SPEAK_CHOOSE, S_PLAY, S_HOLD, S_CHOOSE_FROM, S_OFFER_QUICK, S_OFFER_CONTROL, S_OFFER_DEVICE, S_IR_CHOOSE, S_ACCESS, S_SCAN_SPEED, S_SCAN_ROUNDS, S_STOP,
+  S_VOLUME, S_MODES, S_SPEAK_CHOOSE, S_PLAY, S_HOLD, S_CHOOSE_FROM, S_OFFER_QUICK, S_OFFER_CONTROL, S_OFFER_DEVICE, S_IR_CHOOSE, S_ACCESS, S_SCAN_SPEED, S_SCAN_ROUNDS, S_STOP,
   S_KEY_ACTION, S_PRESS_SOUND, S_NO_USB,
   S_ACCEPT, S_LOCKOUT, S_BRIGHT, S_WAKE, S_SLEEP, S_AUTOOFF, S_LOUD, S_FORGET, S_ABOUT,
   S_COUNT
@@ -207,8 +211,6 @@ struct Setting {
 };
 static const Setting SETTINGS[S_COUNT] = {
   {"Volume",              "vol",       4, 2, {0, 1, 2, 3}, {"1", "2", "3", "4"}, G_GENERAL},
-  // staff pressing B through messages / topics / codes: say each one (silent if empty), or nothing
-  {"B button sound",      "s_bsound",  2, 0, {0, 1}, {"Say it", "Off"}, G_GENERAL},
   // which modes this switch uses (QUICK and TOPICS always)
   {"Modes",               "s_modes",   4, 0, {0, 1, 2, 3}, {"All", "No KEYBOARD", "No CONTROL", "Talking only"}, G_GENERAL},
   // QUICK: play the Quick message staff selected, or the student chooses one by scanning
@@ -272,6 +274,8 @@ Preferences prefs;
 uint8_t mode = M_SPEAK;
 uint8_t slot = 0;        // QUICK: selected Quick message (0-3)
 uint8_t group = 0;       // TOPICS: topic staff selected / the student is choosing in
+bool    topicOpen = false; // TOPICS: staff opened the topic (hold A) to look through its messages
+uint8_t topicItem = 0;     // ...the message they're on
 uint8_t irSlot = 0;      // selected IR code
 int irSound(int i) { return SND_IR + i; }  // sound (and name) number of IR code i
 int topicMsg(int t, int k) { return SND_TOPIC + t * PER_TOPIC + k; }  // sound of topic t's message k
@@ -740,10 +744,6 @@ void slotCue(int i) {
   else M5.Speaker.tone(1200, 60);
 }
 
-// Staff pressing B to step through: say the message / topic / code sound, if
-// it has one - or nothing, with "B button sound: Off". (No beep when empty:
-// the screen says so.)
-void staffCue(int snd) { if (setting(S_BSOUND) == 0 && slotLen[snd]) playSlot(snd); }
 
 // ---------------------------------------------------------------------
 //  Keyboard output: USB when a computer is using us, else Bluetooth
@@ -1174,21 +1174,39 @@ void drawMain(lgfx::LovyanGFX& c) {
       else if (slotLen[slot]) line2(c, String(slotLen[slot] / (float)SAMPLE_RATE, 1) + " s recorded", C_READY);
       else line2(c, "Empty - hold A to record", C_PROBLEM);
       detailLine(c, speakScanning() ? "Student scans " + plural(countQuick(), "message", "messages")
-                                    : "Quick " + String(slot + 1) + " of " + String(NUM_QUICK));
+                                    : "Quick " + String(slot + 1) + " of " + String(NUM_QUICK)
+                                      + (slotLen[slot] ? " - hold B to hear" : ""));
       break;
     case M_CHOOSE: {
-      // what the student will choose from, and how many choices there are
+      if (topicOpen) {  // a message in the topic staff opened
+        int m = topicMsg(group, topicItem), n = 0, pos = 0;
+        for (int k = 0; k < PER_TOPIC; k++) if (slotLen[topicMsg(group, k)]) { n++; if (k <= topicItem) pos++; }
+        line1(c, titleOf(m));
+        line2(c, String(slotLen[m] / (float)SAMPLE_RATE, 1) + " s recorded", C_READY);
+        detailLine(c, topicTitle(group) + " - " + String(pos) + " of " + String(n));
+        break;
+      }
+      if (!topicsByStudent() || !scanInGroup) {
+        // the topic B is on, and its messages
+        line1(c, topicTitle(group));
+        String names;
+        for (int k = 0; k < PER_TOPIC; k++)
+          if (slotLen[topicMsg(group, k)]) names += (names.length() ? ", " : "") + titleOf(topicMsg(group, k));
+        if (names.length()) line2(c, names, C_READY);
+        else line2(c, "Empty - add messages on the setup page", C_PROBLEM);
+        String where = "topic " + String(group + 1) + " of " + String(NUM_TOPICS);
+        detailLine(c, topicsByStudent() ? "Student picks - " + where
+                                        : "T" + where.substring(1) + (names.length() ? holdToChoose() ? " - hold to start" : " - press to start" : ""));
+        break;
+      }
+      // All topics, after the student picked one (Hold & release): what's next
       int n = 0;
       String from, what = " messages";
-      if (topicsByStudent() && !scanInGroup) {
-        n = topCount();
-        from = "Topics";
-        what = topCount() > countTopics() ? " choices" : " topics";
-      } else if (scanSub == SUB_CONTROL && topicsByStudent()) {
+      if (scanSub == SUB_CONTROL) {
         n = countIr();
         from = "Control";
         what = " IR codes";
-      } else if (scanSub == SUB_QUICK && topicsByStudent()) {
+      } else if (scanSub == SUB_QUICK) {
         n = countQuick();
         from = "Quick";
       } else {
@@ -1231,7 +1249,8 @@ void drawMain(lgfx::LovyanGFX& c) {
       if (!irLen[irSlot]) line2(c, "No code - hold A to learn", C_PROBLEM);
       else line2(c, slotLen[snd] ? "Code learned, with sound" : "Code learned", C_READY);
       line3(c, irScanning() ? "Student scans " + plural(countIr(), "IR code", "IR codes")
-                            : "IR code " + String(irSlot + 1) + " of " + String(NUM_SLOTS));
+                            : "IR code " + String(irSlot + 1) + " of " + String(NUM_SLOTS)
+                              + (slotLen[snd] ? " - hold B to hear" : ""));
       break;
     }
   }
@@ -1313,7 +1332,7 @@ String buttonGuide() {
   if (gateShown) return "B first  hold A open  A mode";
   switch (mode) {
     case M_SPEAK: return "B next  hold A record  A mode";
-    case M_CHOOSE: return "B next topic  A mode";
+    case M_CHOOSE: return topicOpen ? "B next  hold B hear  A close" : "B next topic  hold A open  A mode";
     case M_KEYBOARD: return "B next key  A mode";
     case M_IR: return "B next code  hold A learn  A mode";
   }
@@ -1861,28 +1880,33 @@ void nextItem() {
   if (gateShown) {
     gateShown = false;
     switch (mode) {
-      case M_SPEAK: stopPlay(); slot = 0; staffCue(slot); break;
-      case M_CHOOSE: scanInGroup = false; group = 0; staffCue(SND_PTOPIC + group); break;
+      case M_SPEAK: stopPlay(); slot = 0; break;
+      case M_CHOOSE: scanInGroup = false; group = 0; break;
       case M_KEYBOARD: releaseKey(); keyIdx = 0; break;
-      case M_IR: irSlot = 0; staffCue(irSound(irSlot)); break;
+      case M_IR: irSlot = 0; break;
     }
   } else {
     switch (mode) {
       case M_SPEAK:
         stopPlay();
-        if (slot == NUM_QUICK - 1) gateShown = true; else staffCue(++slot);
+        if (slot == NUM_QUICK - 1) gateShown = true; else slot++;
         break;
       case M_CHOOSE:
         scanInGroup = false;
-        if (group == NUM_TOPICS - 1) gateShown = true;
-        else { ++group; staffCue(SND_PTOPIC + group); }
+        if (topicOpen) {
+          for (int k = 1; k <= PER_TOPIC; k++) {
+            int i = (topicItem + k) % PER_TOPIC;
+            if (slotLen[topicMsg(group, i)]) { topicItem = i; break; }
+          }
+        } else if (group == NUM_TOPICS - 1) gateShown = true;
+        else group++;
         break;
       case M_KEYBOARD:
         releaseKey();
         if (keyIdx == keyCount() - 1) gateShown = true; else keyIdx++;
         break;
       case M_IR:
-        if (irSlot == NUM_SLOTS - 1) gateShown = true; else { irSlot++; staffCue(irSound(irSlot)); }
+        if (irSlot == NUM_SLOTS - 1) gateShown = true; else irSlot++;
         break;
     }
   }
@@ -1900,10 +1924,19 @@ void pollStaffButtons() {
   if (wakeScreen()) return;  // screen was dim/off: this press only wakes it
   if (settingsView() && (M5.BtnA.wasHold() || M5.BtnB.wasClicked())) { settingsButtons(); return; }
 
+  if (M5.BtnB.wasHold()) {  // hear the selected Quick message / IR code's sound
+    int snd = mode == M_SPEAK ? slot : mode == M_IR ? irSound(irSlot)
+            : mode == M_CHOOSE && topicOpen ? topicMsg(group, topicItem) : -1;
+    if (!gateShown && !settingsView() && snd >= 0 && slotLen[snd]) { stopPlay(); playSlot(snd); }
+    return;
+  }
   if (M5.BtnA.wasHold()) {
     if (gateShown) {  // open this mode's settings
       modeSettingsOpen = true;
       settingIdx = nextSettingInView(S_COUNT - 1);
+    } else if (mode == M_CHOOSE && !topicOpen) {  // open the topic to look through its messages
+      for (int k = 0; k < PER_TOPIC; k++)
+        if (slotLen[topicMsg(group, k)]) { topicOpen = true; topicItem = k; break; }
     } else if (mode == M_IR) {
       learnIr(irSlot);
     } else if (mode == M_SPEAK) {
@@ -1914,6 +1947,11 @@ void pollStaffButtons() {
     return;
   }
   if (M5.BtnA.wasClicked()) {  // not wasSingleClicked: that waits to rule out a double-click
+    if (topicOpen) {           // close the topic, back to the topics
+      topicOpen = false;
+      needRedraw = true;
+      return;
+    }
     if (modeSettingsOpen) {    // close the mode's settings, back to its "Settings" item
       modeSettingsOpen = false;
       needRedraw = true;
@@ -1924,6 +1962,7 @@ void pollStaffButtons() {
     stopPlay();
     if (!inSettings()) prevMode = mode;
     do mode = (mode + 1) % M_COUNT; while (!modeOn(mode));
+    topicOpen = false;
     if (!inSettings()) backupOn = false;  // staff chose a mode
     gateShown = false;
     if (inSettings()) settingIdx = nextSettingInView(S_COUNT - 1);
@@ -2108,6 +2147,7 @@ void handleCommand(String line) {
   } else if (cmd == "TOPIC") {
     if (n < 0 || n >= NUM_TOPICS) return reply("bad topic");
     group = n;
+    topicOpen = false;
     scanInGroup = false;
     saveSettings();
     ledIdle();
@@ -2355,8 +2395,8 @@ void loop() {
   if (now - lastRefresh > 5000) { lastRefresh = now; readBattery(); }
   if (forgetConfirmUntil && now >= forgetConfirmUntil) { forgetConfirmUntil = 0; needRedraw = true; }
   if (inSettings() && now - lastInteraction > SETTINGS_EXIT_MS) { mode = prevMode; ledIdle(); needRedraw = true; }
-  if ((modeSettingsOpen || gateShown) && now - lastInteraction > SETTINGS_EXIT_MS) {
-    modeSettingsOpen = gateShown = false;
+  if ((modeSettingsOpen || gateShown || topicOpen) && now - lastInteraction > SETTINGS_EXIT_MS) {
+    modeSettingsOpen = gateShown = topicOpen = false;
     needRedraw = true;
   }
   updateScan(now);

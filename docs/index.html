@@ -862,7 +862,6 @@ const HELP = {
   s_nousb: 'With no USB connection (e.g. the AAC device isn’t there): Bluetooth sends keys over Bluetooth. QUICK or TOPICS: after 10 s the switch talks instead, with Bluetooth off to save battery, and goes back to KEYBOARD when USB is connected again.',
   s_keyact: 'Momentary: the key is held while the switch is. Latch: one press holds the key down, the next lets it go.',
   s_psound: 'A click or beep on each press (CONTROL: only for codes with no sound of their own).',
-  s_bsound: 'Staff pressing B on the stick to step through messages, topics or codes: say each one (empty ones are silent), or Off for no sound.',
   s_modes: 'Turn KEYBOARD and/or CONTROL off for a switch that only talks: the stick’s A button and this page skip them. Their key and IR codes are kept.',
   s_bright: 'Screen brightness while in use. Low saves battery. The screen still dims, then turns off, when it isn’t being used.',
   s_accept: 'A press must last this long to count – filters accidental brushes.',
@@ -925,7 +924,7 @@ function renderSettings() {
   $('set-settings').replaceChildren(...[
     settingRow('Volume', Array.from({ length: info.vols }, (_, i) => String(i + 1)), info.vol,
       (i) => act(() => cmd(`VOL ${i}`)), 'How loud messages play. 4 is the loudest the switch can go.'),
-    ...['s_bsound', 's_modes', 's_accept', 's_lockout', 's_bright', 's_wake', 's_sleep', 's_autooff', 's_loud'].map(switchSetting),
+    ...['s_modes', 's_accept', 's_lockout', 's_bright', 's_wake', 's_sleep', 's_autooff', 's_loud'].map(switchSetting),
     tabOn('keyboard') && el('div', { class: 'setting' }, el('div', { class: 'name' }, 'Forget BT devices'), el('div', {}, forget),
       el('div', { class: 'help' }, 'To pair the switch with a different computer or tablet. Also remove it in that device’s Bluetooth settings.')),
     nameRow(),
