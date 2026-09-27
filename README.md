@@ -24,6 +24,10 @@ a Bluetooth/USB keyboard key for an AAC device, and an IR remote (Control), all 
 | PSRAM | OPI PSRAM |
 | USB Mode | **USB-OTG (TinyUSB)** (wired USB keyboard + Bluetooth). *Hardware CDC and JTAG* also works, but then the keyboard is Bluetooth only |
 
+These settings are saved in `sketch.yaml` next to each sketch (`TalkingSwitch/` and `ToFTest/`): the Arduino IDE
+picks them up when it opens the sketch, and `arduino-cli compile` uses them. If the Tools menu still shows something
+else, set it to the table above.
+
 Open `TalkingSwitch/TalkingSwitch.ino` (the sketch keeps its original name; Arduino needs the sketch folder and
 `.ino` to share a name). The `partitions.csv` in that folder replaces the
 partition layout automatically (2MB for the firmware, ~5.9MB for recordings). Keep it next to the `.ino`.
