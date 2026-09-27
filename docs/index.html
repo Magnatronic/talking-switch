@@ -935,12 +935,12 @@ function renderSettings() {
 
 // The switch's name, for Bluetooth and USB (only on this page).
 function nameRow() {
-  const input = el('input', { type: 'text', maxLength: 20, value: info.name === info.defname ? '' : info.name,
-    placeholder: info.defname, 'aria-label': 'Switch name' });
+  const input = el('input', { type: 'text', maxLength: 16, value: info.devname || '',
+    placeholder: info.defname.replace(/ \S+$/, ''), 'aria-label': 'Switch name' });
   const save = el('button', { onclick: () => act(() => cmd(`DEVNAME ${input.value.trim()}`),
     'Name saved – unplug the switch and plug it in again for computers to see it') }, 'Save');
   return el('div', { class: 'setting' }, el('div', { class: 'name' }, 'Switch name'), el('div', { class: 'row' }, input, save),
-    el('div', { class: 'help' }, `Shown for Bluetooth and in this page’s Connect list, e.g. “Sam’s switch”. Leave empty for “${info.defname}”. Windows may keep showing the old name until the switch is removed in Device Manager.`));
+    el('div', { class: 'help' }, `Shown for Bluetooth and in this page’s Connect list, with the switch’s ID on the end – e.g. “Sam’s switch ${info.defname.split(' ').pop()}”. Leave empty for “${info.defname}”. Windows may keep showing the old name until the switch is removed in Device Manager.`));
 }
 
 // ---------------------------------------------------------------- audio

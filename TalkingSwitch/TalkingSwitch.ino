@@ -330,10 +330,12 @@ bool     needRedraw = true;
 uint32_t ledFlashUntil = 0;
 String   slotName[NUM_NAMES];  // optional names (see name numbers above), set on the setup page
 String   voiceId, voiceSpeed;  // typed-speech voice for this switch, chosen on the setup page
-String bleName;  // the switch's name: the one staff gave it on the setup page, or BLE_NAME plus this stick's ID
+String bleName;  // the switch's name: the one staff gave it on the setup page (or BLE_NAME), plus this stick's ID
 String devName;  // the name staff gave it ("" = the default)
 String stickId;  // last 4 characters of this stick's Bluetooth address, e.g. "7B70"
 String defaultName() { return String(BLE_NAME) + " " + stickId; }
+// The name with this stick's ID on the end, so two switches never look the same
+String fullName() { return (devName.length() ? devName : String(BLE_NAME)) + " " + stickId; }
 // A typed message's words and the voice they were spoken in ("<voice> <speed>"),
 // so the setup page can remake it in a new voice. Empty for recorded ones.
 String   slotWords[SND_PMSG], slotWordsVoice[SND_PMSG];
@@ -1965,7 +1967,7 @@ void sendInfo() {
   auto msg = [&](int i) {  // a Quick message: length, name, and whether it has a prompt
     return "{\"len\":" + String(slotLen[i]) + ",\"pr\":" + yes(slotLen[SND_PQUICK + i]) + ",\"name\":" + jsonStr(slotName[i]) + words(i) + "}";
   };
-  String j = "@INFO {\"name\":" + jsonStr(bleName) + ",\"defname\":" + jsonStr(defaultName());
+  String j = "@INFO {\"name\":" + jsonStr(bleName) + ",\"defname\":" + jsonStr(defaultName()) + ",\"devname\":" + jsonStr(devName);
   j += ",\"rate\":" + String(SAMPLE_RATE) + ",\"maxSec\":" + String(MAX_SECONDS) + ",\"promptSec\":" + String(PROMPT_SECONDS);
   j += ",\"mode\":" + String(studentMode()) + ",\"slot\":" + String(slot) + ",\"topic\":" + String(group)
        + ",\"irSlot\":" + String(irSlot);
@@ -2221,9 +2223,9 @@ void handleCommand(String line) {
     // DEVNAME <name>: the switch's name for Bluetooth and USB ("" = the default)
     String t = arg;
     t.trim();
-    devName = t.substring(0, 20);
+    devName = t.substring(0, 16);  // + " 7B70" stays within Bluetooth's name length
     prefs.putString("devname", devName);
-    bleName = devName.length() ? devName : defaultName();
+    bleName = fullName();
     if (bleRunning) bleEnd();  // KEYBOARD restarts Bluetooth with the new name
     reply();
   } else if (cmd == "FORGET") {
@@ -2306,7 +2308,7 @@ void setup() {
   char id[6];
   snprintf(id, sizeof(id), "%02X%02X", mac[4], mac[5]);
   stickId = id;
-  bleName = devName.length() ? devName : defaultName();
+  bleName = fullName();
 
   canvas.setColorDepth(16);
   canvas.setPsram(true);
