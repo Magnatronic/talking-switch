@@ -109,6 +109,7 @@ button.link { background: none; border: none; color: var(--accent); padding: 4px
 
 .card.warn { border-color: var(--bad); }
 .card.warn h2 { color: var(--bad); }
+.sensegraph { width: 100%; height: 150px; border-radius: 8px; display: block; }
 .usage { height: 8px; background: var(--line); border-radius: 4px; overflow: hidden; margin-top: 4px; max-width: 260px; }
 .usage > div { height: 100%; background: var(--good); }
 .usage.full > div { background: var(--bad); }
@@ -303,6 +304,9 @@ function handleLine(line) {
   } else if (line.startsWith('@')) {
     const w = waiters.shift();
     if (w) { clearTimeout(w.timer); w.resolve(line); }
+  } else if (line.startsWith('tof,')) {
+    const [, mm, ln, pr] = line.split(',').map(Number);
+    senseReading(mm, ln, pr === 1);
   } else if (line.startsWith('press,')) {
     const d = $('pressDot');
     d.classList.add('lit');
@@ -664,7 +668,7 @@ function renderEditor(i) {
 
 // ---------------------------------------------------------------- about
 // The firmware's FW_API this page is made for (see TalkingSwitch.ino).
-const PAGE_API = 1;
+const PAGE_API = 2;
 function storageFull() { return info.fsTotal && info.fsUsed / info.fsTotal >= 0.9; }
 
 function renderAbout() {
@@ -865,6 +869,12 @@ const HELP = {
   s_nousb: 'With no USB connection (e.g. the AAC device isn’t there): Bluetooth sends keys over Bluetooth. QUICK or TOPICS: after 10 s the switch talks instead, with Bluetooth off to save battery, and goes back to KEYBOARD when USB is connected again.',
   s_keyact: 'Momentary: the key is held while the switch is. Latch: one press holds the key down, the next lets it go.',
   s_psound: 'A click or beep on each press (CONTROL: only for codes with no sound of their own).',
+  s_smode: 'The ToF distance sensor is the switch. Line: press by coming closer than a distance. Move: press by moving towards it from where the hand or finger rests – best for small movements.',
+  s_sline: 'Line: closer than this counts as a press.',
+  s_smove: 'Move: a movement this big towards the sensor counts as a press.',
+  s_settle: 'Move: pressed and still this long becomes the new resting place and lets go, so a relaxed finger can’t leave it pressed.',
+  s_follow: 'Move: how quickly the resting place follows drift. Slow catches slow presses; Fast copes with a restless student.',
+  s_beyond: 'Anything further away counts as nothing there – stops people walking past from pressing.',
   s_modes: 'Turn KEYBOARD and/or CONTROL off for a switch that only talks: the stick’s A button and this page skip them. Their key and IR codes are kept.',
   s_bright: 'Screen brightness while in use. Low saves battery. The screen still dims, then turns off, when it isn’t being used.',
   s_accept: 'A press must last this long to count – filters accidental brushes.',
@@ -931,7 +941,10 @@ function renderSettings() {
   $('set-settings').replaceChildren(...[
     settingRow('Volume', Array.from({ length: info.vols }, (_, i) => String(i + 1)), info.vol,
       (i) => act(() => cmd(`VOL ${i}`)), 'How loud messages play. 4 is the loudest the switch can go.'),
-    ...['s_modes', 's_accept', 's_lockout', 's_bright', 's_wake', 's_sleep', 's_autooff', 's_loud'].map(switchSetting),
+    ...['s_modes', 's_accept', 's_lockout'].map(switchSetting),
+    ...(info.sensor ? [...['s_smode', setCur('s_smode') ? 's_smove' : 's_sline'].map(switchSetting),
+      ...(setCur('s_smode') ? ['s_settle', 's_follow'].map(switchSetting) : []), switchSetting('s_beyond'), sensorRow()] : []),
+    ...['s_bright', 's_wake', 's_sleep', 's_autooff', 's_loud'].map(switchSetting),
     tabOn('keyboard') && el('div', { class: 'setting' }, el('div', { class: 'name' }, 'Forget BT devices'), el('div', {}, forget),
       el('div', { class: 'help' }, 'To pair the switch with a different computer or tablet. Also remove it in that device’s Bluetooth settings.')),
     nameRow(),
@@ -1303,10 +1316,97 @@ $('ckSet').addEventListener('click', () =>
   act(() => cmd(`CKEY ${ckMods()} ${$('ckKey').value} ${ckLabel()}`), `Custom key set: ${ckLabel()}`));
 $('ckDel').addEventListener('click', () => act(() => cmd('CKEY 0 0'), 'Custom key removed'));
 
+// ---------------------------------------------------------------- sensor
+// The ToF sensor's live graph (Settings tab): the switch sends each reading
+// while the page asks (SENSE 1, repeated), and the page can record them.
+const SENSE_SECONDS = 10;
+const senseBuf = [];           // [time ms, mm or -1, line mm or -1, pressed]
+let senseRecording = null;     // readings being recorded, or null
+let sensePresses = 0, senseWasPressed = false;
+const senseCanvas = el('canvas', { class: 'sensegraph', 'aria-label': 'Live sensor graph' });
+const senseStats = el('div', { class: 'small' });
+
+function senseReading(mm, line, pressed) {
+  const t = performance.now();
+  senseBuf.push([t, mm, line, pressed]);
+  while (senseBuf.length && senseBuf[0][0] < t - SENSE_SECONDS * 1000) senseBuf.shift();
+  if (pressed && !senseWasPressed) sensePresses++;
+  senseWasPressed = pressed;
+  if (senseRecording) senseRecording.push([Date.now(), mm, line, pressed ? 1 : 0]);
+}
+
+function sensorRow() {
+  const rec = el('button', { class: senseRecording ? 'rec on' : 'rec', onclick: () => {
+    if (senseRecording) { saveSenseCsv(senseRecording); senseRecording = null; } else senseRecording = [];
+    render();
+  } }, senseRecording ? '■ Stop and download' : '● Record');
+  return el('div', { class: 'setting' }, el('div', { class: 'name' }, 'Sensor test'),
+    el('div', {}, senseCanvas, el('div', { class: 'row', style: 'margin-top:6px' }, senseStats,
+      el('button', { onclick: () => { sensePresses = 0; } }, 'Reset count'), rec)),
+    el('div', { class: 'help' }, 'The distance (blue, green while pressed) and the press line (yellow) over the last 10 seconds. Record saves the readings as a spreadsheet file, for assessment.'));
+}
+
+function saveSenseCsv(rows) {
+  const t0 = rows.length ? rows[0][0] : 0;
+  const csv = 'seconds,distance_mm,press_line_mm,pressed\n'
+    + rows.map(([t, mm, ln, pr]) => `${((t - t0) / 1000).toFixed(3)},${mm < 0 ? '' : mm},${ln < 0 ? '' : ln},${pr}`).join('\n');
+  const a = el('a', { href: URL.createObjectURL(new Blob([csv], { type: 'text/csv' })),
+    download: `sensor-${new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-')}.csv` });
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+}
+
+// Drawn every frame while the Settings tab is showing, zoomed to what's on it.
+function drawSenseGraph() {
+  requestAnimationFrame(drawSenseGraph);
+  if (currentTab !== 'settings' || !info || !info.sensor || !senseCanvas.isConnected) return;
+  const W = senseCanvas.clientWidth, H = senseCanvas.clientHeight, dpr = window.devicePixelRatio || 1;
+  if (senseCanvas.width !== Math.round(W * dpr)) { senseCanvas.width = Math.round(W * dpr); senseCanvas.height = Math.round(H * dpr); }
+  const g = senseCanvas.getContext('2d');
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const css = getComputedStyle(document.documentElement);
+  g.fillStyle = css.getPropertyValue('--chip');
+  g.fillRect(0, 0, W, H);
+  const now = performance.now();
+  let lo = Infinity, hi = -Infinity;
+  for (const [, mm, ln] of senseBuf) for (const v of [mm, ln]) if (v >= 0) { lo = Math.min(lo, v); hi = Math.max(hi, v); }
+  if (hi < 0) { lo = 0; hi = 500; }
+  if (hi - lo < 30) { const mid = (lo + hi) / 2; lo = mid - 15; hi = mid + 15; }
+  const pad = (hi - lo) / 10 + 2;
+  lo -= pad; hi += pad;
+  const x = (t) => W - ((now - t) / (SENSE_SECONDS * 1000)) * W;
+  const y = (mm) => H - ((mm - lo) / (hi - lo)) * H;
+  const line = (key, colourOf) => {
+    let prev = null;
+    for (const r of senseBuf) {
+      const v = r[key];
+      if (v < 0) { prev = null; continue; }
+      if (prev) { g.strokeStyle = colourOf(r); g.beginPath(); g.moveTo(x(prev[0]), y(prev[key])); g.lineTo(x(r[0]), y(v)); g.stroke(); }
+      prev = r;
+    }
+  };
+  g.lineWidth = 2;
+  line(2, () => '#e0b000');
+  line(1, (r) => (r[3] ? css.getPropertyValue('--good') : css.getPropertyValue('--accent')));
+  g.fillStyle = css.getPropertyValue('--muted');
+  g.font = '11px system-ui, sans-serif';
+  g.fillText(`${(hi / 10).toFixed(1)} cm`, 4, 12);
+  g.fillText(`${(lo / 10).toFixed(1)} cm`, 4, H - 4);
+  const last = senseBuf[senseBuf.length - 1];
+  senseStats.textContent = (last ? (last[1] < 0 ? 'Nothing there' : `${(last[1] / 10).toFixed(1)} cm`) : 'Waiting for the sensor…')
+    + ` · ${sensePresses} press${sensePresses === 1 ? '' : 'es'}` + (senseRecording ? ` · recording ${senseRecording.length} readings` : '');
+}
+requestAnimationFrame(drawSenseGraph);
+
+// Keep the readings coming while the Settings tab is open.
+function senseStream(on) { if (port && info && info.sensor) cmd(`SENSE ${on ? 1 : 0}`).catch(() => {}); }
+setInterval(() => { if (currentTab === 'settings' && !document.hidden) senseStream(true); }, 5000);
+
 // ---------------------------------------------------------------- tabs
 let currentTab = 'quick';
 function showTab(name) {
   if (!TABS.includes(name)) name = 'quick';
+  if (name !== currentTab) senseStream(name === 'settings');
   currentTab = name;
   for (const b of document.querySelectorAll('.tabs button')) b.setAttribute('aria-selected', String(b.dataset.tab === name));
   for (const t of TABS) $('tab-' + t).classList.toggle('hidden', t !== name);

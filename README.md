@@ -13,7 +13,8 @@ a Bluetooth/USB keyboard key for an AAC device, and an IR remote (Control), all 
 ## Arduino IDE setup
 
 1. **Board package:** Boards Manager → install **esp32 by Espressif Systems**, version 3.3.0 or newer.
-2. **Libraries:** Library Manager → install **M5Unified** (it pulls in M5GFX).
+2. **Libraries:** Library Manager → install **M5Unified** (it pulls in M5GFX) and **VL53L1X** by Pololu (for the
+   ToF distance sensor).
 3. **Board:** *ESP32S3 Dev Module*, then set Tools to:
 
 | Setting | Value |
@@ -116,6 +117,25 @@ up to 5 seconds. Each IR code can have its own sound, e.g. IR code 1 "Bubbles" t
 | CONTROL | Sends the selected IR code, and says its sound if it has one. *IR codes* setting: Staff pick / Repeat held (keeps sending while held, like a remote's volume button) / Student scans (the student chooses by scanning) | code colour |
 | SETTINGS | Keeps doing whatever the previous mode did | as previous mode |
 
+### Touch-free: the ToF sensor
+
+Plug an M5Stack **Unit ToF4M** distance sensor into the Grove port instead of the Unit Key (not together with the
+Unit Key or a jack switch – they share the Grove pins) and restart: the switch finds it by itself and it becomes the
+switch – every mode, scanning, Press must last and Ignore repeats work as with a button.
+
+- **Line:** a press is coming closer than the *Distance*.
+- **Move:** a press is a movement of the *Movement* size towards the sensor from where the hand or finger rests –
+  the resting place is learnt as it goes (*Follow*), so it suits small movements like a finger and copes with the
+  student shifting. If it stays pressed and still for the *Settle* time, that becomes the new resting place.
+- One reading past the line presses (a quick wave counts); it reads about 65 times a second.
+- **Setting it up:** SETTINGS → *Sensor test* shows a live graph on the stick, and the setup page's Settings tab
+  has a bigger live graph next to the sensor settings, with **Record** to download the readings as a spreadsheet
+  file for assessment.
+- A finger works best 5–10 cm away; closer than about 4 cm counts as pressed. Mount it rigidly, keep its window
+  clean, and point it at a plain background.
+- With the sensor there's no switch LED (feedback is on screen and by sound), and the switch doesn't sleep – the
+  sensor can't wake it – so the battery runs down faster.
+
 ### Just a talking switch
 
 For a student who only needs it to talk, set SETTINGS **Modes: Talking only**: A then goes QUICK → TOPICS →
@@ -190,6 +210,13 @@ All of these are on the setup page too, on each mode's tab and the Settings tab.
 | General | Modes | **All**, No KEYBOARD, No CONTROL, Talking only | Turn KEYBOARD and/or CONTROL off for a switch that only talks: A skips them, the setup page hides their tabs, and their settings (and the matching Offer settings) go too. Their key and IR codes are kept |
 | General | Press must last | **Instant**, 0.1s, 0.25s, 0.5s, 1s | Filters accidental brushes |
 | General | Ignore repeats for | Off, 0.2s, **0.4s**, 0.8s, 1.5s | Filters tremor and bounces after a press |
+| General (sensor) | Sensor mode | Line, **Move** | Only with a ToF sensor plugged in – see *Touch-free: the ToF sensor* |
+| General (sensor) | Distance | 5, 6, 8, **10**, 15, 20, 30, 50 cm | Line: closer than this counts as a press |
+| General (sensor) | Movement | 5, **8**, 10, 15, 20, 30 mm | Move: a movement this big towards the sensor counts as a press |
+| General (sensor) | Settle | Off, 1, **2**, 3, 5 s | Move: pressed and still this long becomes the new resting place and lets go |
+| General (sensor) | Follow | Slow, **Medium**, Fast | Move: how quickly the resting place follows drift |
+| General (sensor) | Ignore beyond | Off, 20, **30**, 50 cm | Anything further away counts as nothing there |
+| General (sensor) | Sensor test | hold A | A live graph of the sensor with a press count; presses only beep there. B restarts the count, A closes |
 | General | Brightness | Low, **Medium**, High | Screen brightness while in use. Low saves battery |
 | General | Switch wakes screen | **No**, Yes | Whether student presses light up the screen |
 | General | Sleep after | Off, 2 min, **5 min**, 15 min | On battery, with no presses: sleep to save power. The big switch still works (see below) |

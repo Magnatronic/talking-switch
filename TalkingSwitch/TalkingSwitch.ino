@@ -76,6 +76,11 @@
 //      If the key does nothing, swap PIN_KEY and PIN_LED.
 //    - A standard 3.5mm AT switch can be wired to PIN_KEY and GND
 //      instead of (or alongside) the Unit Key.
+//    - Or an M5Stack Unit ToF4M distance sensor (VL53L1X) on the Grove port,
+//      as a touch-free switch: found by itself at start-up (not together
+//      with the Unit Key or a jack switch - they share the Grove pins). Its
+//      settings appear in SETTINGS; "Sensor test" shows a live graph.
+//      Needs the "VL53L1X" library by Pololu.
 //
 //  Arduino IDE settings: see README.md next to this folder.
 // =====================================================================
@@ -89,6 +94,8 @@
 #include <esp_sleep.h>
 #include <driver/gpio.h>
 #include <esp_mac.h>
+#include <Wire.h>
+#include <VL53L1X.h>
 #if defined(CONFIG_NIMBLE_ENABLED)
 #include "host/ble_hs.h"
 #else
@@ -104,10 +111,15 @@ USBHIDKeyboard UsbKeyboard;
 #define HAS_USB_HID 0
 #endif
 
+// ToF sensor settings that are the same for everyone
+static const int SENSE_MIN_MM = 40;        // closer than this isn't reliable: counts as pressed
+static const int SENSE_STILL_MM = 4;       // Settle: "still" = within this much
+static const int SENSE_GRAPH_W = 224;      // Sensor test graph: one reading per pixel (~3.5 s)
+
 // Firmware version. FW_API goes up whenever the setup page needs to change
 // with it (the page shows a warning if the numbers don't match).
 static const char* FW_VERSION = "27 Sep 2026";
-static const int   FW_API     = 1;
+static const int   FW_API     = 2;
 
 // ---------------------------------------------------------------------
 //  Settings you may want to change
@@ -199,7 +211,7 @@ static const int NUM_KEYS = sizeof(KEYS) / sizeof(KEYS[0]);
 enum SettingId : uint8_t {
   S_VOLUME, S_MODES, S_SPEAK_CHOOSE, S_QUICK_HOW, S_GAP, S_PLAY, S_HOLD, S_CHOOSE_FROM, S_OFFER_QUICK, S_OFFER_CONTROL, S_OFFER_DEVICE, S_IR_CHOOSE, S_ACCESS, S_SCAN_SPEED, S_SCAN_ROUNDS, S_STOP,
   S_KEY_ACTION, S_PRESS_SOUND, S_NO_USB,
-  S_ACCEPT, S_LOCKOUT, S_BRIGHT, S_WAKE, S_SLEEP, S_AUTOOFF, S_LOUD, S_FORGET, S_ABOUT,
+  S_ACCEPT, S_LOCKOUT, S_SENSE_MODE, S_SENSE_LINE, S_SENSE_MOVE, S_SETTLE, S_FOLLOW, S_BEYOND, S_SENSE_TEST, S_BRIGHT, S_WAKE, S_SLEEP, S_AUTOOFF, S_LOUD, S_FORGET, S_ABOUT,
   S_COUNT
 };
 // Which settings screens a setting appears on (a setting can be on several)
@@ -208,8 +220,8 @@ struct Setting {
   const char* name;       // shown on screen
   const char* key;        // Preferences key (nullptr = an action, not a stored value)
   uint8_t count, def;     // number of choices, default choice
-  uint32_t values[6];
-  const char* labels[6];
+  uint32_t values[8];
+  const char* labels[8];
   uint8_t groups;         // SettingGroup bits
 };
 static const Setting SETTINGS[S_COUNT] = {
@@ -257,6 +269,20 @@ static const Setting SETTINGS[S_COUNT] = {
   {"Press must last",     "s_accept",  5, 0, {0, 100, 250, 500, 1000}, {"Instant", "0.1 s", "0.25 s", "0.5 s", "1 s"}, G_GENERAL},
   // ignore new presses this soon after the last one - filters tremor/repeats
   {"Ignore repeats for",  "s_lockout", 5, 2, {0, 200, 400, 800, 1500}, {"Off", "0.2 s", "0.4 s", "0.8 s", "1.5 s"}, G_GENERAL},
+  // ToF distance sensor (only shown when one is plugged in). Line: press closer
+  // than a distance. Move: a movement towards it from where the hand rests.
+  {"Sensor mode",         "s_smode",   2, 1, {0, 1}, {"Line", "Move"}, G_GENERAL},
+  {"Distance",            "s_sline",   8, 3, {50, 60, 80, 100, 150, 200, 300, 500},
+                                             {"5 cm", "6 cm", "8 cm", "10 cm", "15 cm", "20 cm", "30 cm", "50 cm"}, G_GENERAL},
+  {"Movement",            "s_smove",   6, 1, {5, 8, 10, 15, 20, 30}, {"5 mm", "8 mm", "10 mm", "15 mm", "20 mm", "30 mm"}, G_GENERAL},
+  // Move: pressed and still this long -> the new resting place (so it can't stay stuck pressed)
+  {"Settle",              "s_settle",  5, 2, {0, 1000, 2000, 3000, 5000}, {"Off", "1 s", "2 s", "3 s", "5 s"}, G_GENERAL},
+  // Move: how quickly the resting place follows drift (per 1000 readings)
+  {"Follow",              "s_follow",  3, 1, {8, 20, 50}, {"Slow", "Medium", "Fast"}, G_GENERAL},
+  // anything further away counts as nothing there (people passing by)
+  {"Ignore beyond",       "s_beyond",  4, 2, {0, 200, 300, 500}, {"Off", "20 cm", "30 cm", "50 cm"}, G_GENERAL},
+  // action: a live graph of the sensor, to set it up with the student
+  {"Sensor test",         nullptr,     1, 0, {0}, {""}, G_GENERAL},
   // screen brightness while in use; lower saves battery
   {"Brightness",          "s_bright",  3, 1, {40, 128, 220}, {"Low", "Medium", "High"}, G_GENERAL},
   {"Switch wakes screen", "s_wake",    2, 0, {0, 1}, {"No", "Yes"}, G_GENERAL},
@@ -359,6 +385,13 @@ uint16_t statusColor = TFT_YELLOW;
 uint32_t statusUntil = 0;
 float    recProgress = -1;     // 0..1 while recording, else -1
 uint8_t  prevMode = M_SPEAK;   // in SETTINGS, the big switch keeps doing this mode's job
+// ToF distance sensor on the Grove port, instead of the Unit Key / jack switch
+VL53L1X  tof;
+bool     sensorOn = false;      // a sensor was found at start-up: it's the switch
+bool     sensorPressed = false; // the sensor's "press" (the student switch reads this)
+bool     sensorTest = false;    // staff are looking at SETTINGS "Sensor test"
+uint32_t testPresses = 0;       // ...presses counted there (they do nothing else)
+uint32_t senseStreamUntil = 0;  // the setup page is showing the live graph until then
 bool     backupOn = false;     // in the backup mode because KEYBOARD has no USB
 uint32_t backupSince = 0;      // KEYBOARD without USB since (0 = not counting)
 uint8_t  settingIdx = 0;       // setting shown in SETTINGS mode
@@ -392,7 +425,8 @@ const uint8_t* scanColour(const ScanItem& it) {
   }
 }
 
-void ledShow(uint8_t r, uint8_t g, uint8_t b) { rgbLedWrite(PIN_LED, r, g, b); }
+// (no Unit Key LED with the ToF sensor: its pin is the sensor's I2C clock)
+void ledShow(uint8_t r, uint8_t g, uint8_t b) { if (!sensorOn) rgbLedWrite(PIN_LED, r, g, b); }
 void ledIdle() {
   uint8_t m = studentMode();
   const uint8_t* c = scanning ? scanColour(scanItems[scanPos])
@@ -503,6 +537,115 @@ void loadSlots() {
     slotLen[i] = f.read((uint8_t*)slotBuf[i], n * 2) / 2;
     f.close();
   }
+}
+
+// ---------------------------------------------------------------------
+//  ToF distance sensor (touch-free switch)
+//  Line: pressed closer than the Distance. Move: pressed on a movement of
+//  the Movement size towards the sensor from the resting place, which is
+//  learnt while not pressed (Follow) and reset by Settle. One reading past
+//  the line presses (a quick wave counts); two readings back past a margin
+//  let go. Short range, 15 ms readings (~65 a second), full field of view.
+// ---------------------------------------------------------------------
+bool senseMove() { return setting(S_SENSE_MODE) == 1; }
+float    senseRest = -1;        // Move: the resting distance (-1 = not learnt)
+int      senseDist = -1;        // latest reading used (-1 = nothing there)
+bool     senseClose = false;    // ...closer than the sensor can measure
+int      senseStreak = 0;
+int      senseStillMm = -1;
+uint32_t senseStillSince = 0;
+uint32_t senseReadings = 0, senseLost = 0;
+int16_t  senseHist[SENSE_GRAPH_W], senseHistLine[SENSE_GRAPH_W];
+bool     senseHistPressed[SENSE_GRAPH_W];
+int      senseHistPos = 0;
+
+void senseReset() {
+  senseRest = -1;
+  senseStreak = 0;
+  senseStillMm = -1;
+  senseReadings = senseLost = 0;
+  testPresses = 0;
+  for (int i = 0; i < SENSE_GRAPH_W; i++) { senseHist[i] = senseHistLine[i] = -1; senseHistPressed[i] = false; }
+}
+
+// At start-up: is there a sensor on the Grove port?
+bool startSensor() {
+  int sda = M5.getPin(m5::pin_name_t::port_a_sda), scl = M5.getPin(m5::pin_name_t::port_a_scl);
+  Wire.begin(sda, scl, 400000);
+  Wire.beginTransmission(0x29);
+  if (Wire.endTransmission() != 0) { Wire.end(); return false; }
+  tof.setBus(&Wire);
+  tof.setTimeout(500);
+  if (!tof.init()) { Wire.end(); return false; }
+  tof.setDistanceMode(VL53L1X::Short);
+  if (!tof.setMeasurementTimingBudget(15000)) tof.setMeasurementTimingBudget(20000);
+  tof.startContinuous(15);
+  senseReset();
+  return true;
+}
+
+// The press line now, and how far back past it lets go.
+int senseLine() {
+  if (!senseMove()) return setting(S_SENSE_LINE);
+  return senseRest < 0 ? -1 : (int)senseRest - setting(S_SENSE_MOVE);
+}
+int senseMargin() { return senseMove() ? setting(S_SENSE_MOVE) / 2 : max(4, (int)setting(S_SENSE_LINE) / 10); }
+// Ignore beyond: always a little further than Line's distance, so Line can press
+int senseBeyond() {
+  int b = setting(S_BEYOND);
+  return b && !senseMove() ? max(b, (int)setting(S_SENSE_LINE) + 50) : b;
+}
+
+void pollSensor() {
+  if (!sensorOn || !tof.dataReady()) return;
+  int mm = tof.read(false);
+  uint8_t st = tof.ranging_data.range_status;
+  bool timeout = tof.timeoutOccurred();
+  // close up, good readings come back as "min range clipped"; keep those
+  bool valid = !timeout && (st == VL53L1X::RangeValid || st == VL53L1X::RangeValidMinRangeClipped
+                            || st == VL53L1X::RangeValidNoWrapCheckFail);
+  senseReadings++;
+  senseClose = !timeout && (st == VL53L1X::MinRangeFail || (valid && mm < SENSE_MIN_MM));
+  if (senseClose) mm = SENSE_MIN_MM / 2;               // too close: as if very close (pressed)
+  else if (!valid) { mm = -1; senseLost++; }
+  else if (senseBeyond() && mm > senseBeyond()) mm = -1;  // too far: nothing there
+  const bool here = mm >= 0;
+  senseDist = mm;
+
+  // Move: learn the resting distance while not pressed
+  if (senseMove() && !sensorPressed) {
+    if (!here) senseRest = -1;
+    else if (senseRest < 0) senseRest = mm;
+    else senseRest += (mm - senseRest) * setting(S_FOLLOW) / 1000.0f;
+  }
+  // press: past the line; let go: back past it plus the margin
+  const int line = senseLine();
+  bool other = line < 0 ? false : sensorPressed ? (!here || mm > line + senseMargin()) : (here && mm < line);
+  senseStreak = other ? senseStreak + 1 : 0;
+  if (senseStreak >= (sensorPressed ? 2 : 1)) {
+    senseStreak = 0;
+    sensorPressed = !sensorPressed;
+    senseStillMm = -1;
+  }
+  // Move: pressed and still for the Settle time -> the new resting place, let go
+  if (senseMove() && sensorPressed && here && setting(S_SETTLE)) {
+    if (senseStillMm < 0 || abs(mm - senseStillMm) > SENSE_STILL_MM) { senseStillMm = mm; senseStillSince = millis(); }
+    else if (millis() - senseStillSince >= setting(S_SETTLE)) {
+      sensorPressed = false;
+      senseStreak = 0;
+      senseRest = mm;
+      senseStillMm = -1;
+    }
+  }
+
+  senseHist[senseHistPos] = mm;
+  senseHistLine[senseHistPos] = line;
+  senseHistPressed[senseHistPos] = sensorPressed;
+  senseHistPos = (senseHistPos + 1) % SENSE_GRAPH_W;
+  if (sensorTest) needRedraw = true;
+  // the setup page's live graph: tof,<mm or -1>,<line or -1>,<pressed>
+  if (senseStreamUntil && (int32_t)(millis() - senseStreamUntil) < 0)
+    Serial.printf("tof,%d,%d,%d\n", mm, line, sensorPressed ? 1 : 0);
 }
 
 String wordsPath(int i) { return String("/w") + i + ".txt"; }
@@ -1278,6 +1421,46 @@ void drawMain(lgfx::LovyanGFX& c) {
   }
 }
 
+// SETTINGS "Sensor test": the distance, a graph of the last few seconds
+// (zoomed to fit) with the press line, and the presses counted.
+void drawSensorTest(lgfx::LovyanGFX& c) {
+  const int W = c.width();
+  line1(c, senseClose ? "< 4 cm" : senseDist < 0 ? "--" : String(senseDist / 10.0f, 1) + " cm",
+        senseDist < 0 && !senseClose ? TFT_DARKGREY : TFT_WHITE);
+  const int gx = (W - SENSE_GRAPH_W) / 2, gy = 66, gh = 28;
+  int lo = INT16_MAX, hi = -1;
+  for (int i = 0; i < SENSE_GRAPH_W; i++) {
+    if (senseHist[i] >= 0) { lo = min(lo, (int)senseHist[i]); hi = max(hi, (int)senseHist[i]); }
+    if (senseHistLine[i] >= 0) { lo = min(lo, (int)senseHistLine[i]); hi = max(hi, (int)senseHistLine[i]); }
+  }
+  if (hi < 0) { lo = 0; hi = 1000; }
+  if (hi - lo < 30) { int mid = (lo + hi) / 2; lo = mid - 15; hi = mid + 15; }
+  const int pad = (hi - lo) / 10 + 2;
+  lo -= pad;
+  hi += pad;
+  auto yOf = [&](int mm) { return gy + gh - 1 - constrain((int)((long)(mm - lo) * (gh - 1) / (hi - lo)), 0, gh - 1); };
+  c.drawRect(gx - 1, gy - 1, SENSE_GRAPH_W + 2, gh + 2, TFT_DARKGREY);
+  int prevY = -1, prevLine = -1;
+  for (int i = 0; i < SENSE_GRAPH_W; i++) {
+    int k = (senseHistPos + i) % SENSE_GRAPH_W;  // oldest first
+    if (senseHistLine[k] >= 0) {
+      int ly = yOf(senseHistLine[k]);
+      if (prevLine >= 0) c.drawLine(gx + i - 1, prevLine, gx + i, ly, TFT_YELLOW);
+      prevLine = ly;
+    } else prevLine = -1;
+    if (senseHist[k] < 0) { prevY = -1; continue; }
+    int y = yOf(senseHist[k]);
+    uint16_t col = senseHistPressed[k] ? TFT_GREEN : TFT_CYAN;
+    if (prevY >= 0) c.drawLine(gx + i - 1, prevY, gx + i, y, col);
+    else c.drawPixel(gx + i, y, col);
+    prevY = y;
+  }
+  int bad = senseReadings ? (int)(senseLost * 100 / senseReadings) : 0;
+  line3(c, String(senseMove() ? "Move " + String(setting(S_SENSE_MOVE)) + " mm" : "Line " + String(setting(S_SENSE_LINE) / 10) + " cm")
+             + " - " + plural(testPresses, "press", "presses") + " - " + String(bad) + "% lost",
+        sensorPressed ? C_READY : C_DETAIL);
+}
+
 void drawStatus(lgfx::LovyanGFX& c) {
   const int W = c.width();
   c.fillRoundRect(6, HEADER_H + 5, W - 12, FOOTER_Y - HEADER_H - 10, 8, statusColor);
@@ -1322,6 +1505,10 @@ bool settingShown(int i) {
     case S_OFFER_DEVICE: return topicsByStudent() && modeOn(M_KEYBOARD);
     case S_NO_USB: return HAS_USB_HID;  // needs USB Mode: USB-OTG (TinyUSB)
     case S_FORGET: return modeOn(M_KEYBOARD);  // Bluetooth is only for KEYBOARD
+    case S_SENSE_MODE: return sensorOn;
+    case S_SENSE_LINE: return sensorOn && !senseMove();
+    case S_SENSE_MOVE: case S_SETTLE: case S_FOLLOW: return sensorOn && senseMove();
+    case S_BEYOND: case S_SENSE_TEST: return sensorOn;
   }
   return true;
 }
@@ -1348,9 +1535,11 @@ void drawSettings(lgfx::LovyanGFX& c) {
 
 // What the buttons do on this screen (the same words everywhere).
 String buttonGuide() {
+  if (sensorTest) return "B restart count  A close";
   if (settingsView()) {
     if (settingIdx == S_FORGET) return "B next  hold A forget  A " + String(inSettings() ? "mode" : "close");
     if (settingIdx == S_ABOUT) return "B next  A " + String(inSettings() ? "mode" : "close");
+    if (settingIdx == S_SENSE_TEST) return "B next  hold A open  A " + String(inSettings() ? "mode" : "close");
     return "B next  hold A change  A " + String(inSettings() ? "mode" : "close");
   }
   if (gateShown) return "B first  hold A open  A mode";
@@ -1388,6 +1577,7 @@ void drawScreen() {
   drawBattery(c);
 
   if (statusMsg.length() && millis() < statusUntil) drawStatus(c);
+  else if (sensorTest) drawSensorTest(c);
   else if (settingsView()) drawSettings(c);
   else drawMain(c);
   drawFooter(c);
@@ -1456,6 +1646,7 @@ void powerDown() {
 // switch LED keeps its glow. Not used with Bluetooth on (it would drop
 // the connection) or when plugged into USB.
 bool canSleep(uint32_t idle) {
+  if (sensorOn) return false;  // the sensor can't wake it (no spare wire on the Grove port)
   uint32_t mins = setting(S_SLEEP);
   if (!mins || idle < mins * 60000UL) return false;
   if (bleRunning || studentMode() == M_KEYBOARD) return false;
@@ -1743,6 +1934,7 @@ void updateScan(uint32_t now) {
 }
 
 void onActivate() {
+  if (sensorTest) { testPresses++; M5.Speaker.tone(1500, 60); needRedraw = true; return; }  // just testing
   pressCount++;
   markActivity();
   if (setting(S_WAKE)) wakeScreen();
@@ -1814,6 +2006,7 @@ void pressSound() {
 }
 
 void onDeactivate() {
+  if (sensorTest) return;
   if (scanModeActive()) { scanDeactivate(); return; }
   if (studentMode() == M_KEYBOARD && !keyLatched) sendKey(false);
   // Hold to play: letting go stops the message
@@ -1822,7 +2015,7 @@ void onDeactivate() {
 
 void pollStudentSwitch() {
   uint32_t now = millis();
-  bool raw = digitalRead(PIN_KEY) == LOW;
+  bool raw = sensorOn ? sensorPressed : digitalRead(PIN_KEY) == LOW;
   if (raw != swRaw) { swRaw = raw; swRawChange = now; }
   if (now - swRawChange >= DEBOUNCE_MS && swRaw != swStable) {
     swStable = swRaw;
@@ -1916,6 +2109,9 @@ void settingsButtons() {
     } else {
       forgetConfirmUntil = millis() + 4000;
     }
+  } else if (M5.BtnA.wasHold() && settingIdx == S_SENSE_TEST) {
+    sensorTest = true;
+    senseReset();
   } else if (M5.BtnA.wasHold() && SETTINGS[settingIdx].key) {  // (About has nothing to change)
     uint8_t& ch = settingChoice[settingIdx];
     ch = (ch + 1) % SETTINGS[settingIdx].count;
@@ -1972,6 +2168,12 @@ void pollStaffButtons() {
   markActivity();
   stopScan();
   if (wakeScreen()) return;  // screen was dim/off: this press only wakes it
+  if (sensorTest) {  // A: back to the settings; B: start the count again
+    if (M5.BtnA.wasClicked()) sensorTest = false;
+    if (M5.BtnB.wasClicked()) senseReset();
+    needRedraw = true;
+    return;
+  }
   if (settingsView() && (M5.BtnA.wasHold() || M5.BtnB.wasClicked())) { settingsButtons(); return; }
 
   if (M5.BtnB.wasHold()) {  // hear the selected Quick message / IR code's sound
@@ -2063,7 +2265,7 @@ void sendInfo() {
        + ",\"irSlot\":" + String(irSlot);
   j += ",\"key\":" + String(keyIdx) + ",\"vol\":" + String(settingChoice[S_VOLUME]) + ",\"vols\":" + String(sizeof(VOLUMES));
   j += ",\"bat\":" + String(batLevel) + ",\"chg\":" + yes(batCharging) + ",\"bt\":" + yes(bleConnected);
-  j += ",\"usbhid\":" + yes(HAS_USB_HID);
+  j += ",\"usbhid\":" + yes(HAS_USB_HID) + ",\"sensor\":" + yes(sensorOn);
   j += ",\"ver\":" + jsonStr(FW_VERSION) + ",\"api\":" + String(FW_API) + ",\"presses\":" + String(pressCount);
   j += ",\"fsUsed\":" + String((unsigned long)LittleFS.usedBytes()) + ",\"fsTotal\":" + String((unsigned long)LittleFS.totalBytes());
   j += ",\"voice\":" + jsonStr(voiceId) + ",\"vspeed\":" + jsonStr(voiceSpeed);
@@ -2310,6 +2512,11 @@ void handleCommand(String line) {
     prefs.putString("voice", voiceId);
     prefs.putString("vspeed", voiceSpeed);
     reply();
+  } else if (cmd == "SENSE") {
+    // SENSE 1: send the sensor's readings for 10 s (the page repeats it); SENSE 0: stop
+    if (!sensorOn) return reply("no sensor");
+    senseStreamUntil = n ? millis() + 10000 : 0;
+    reply();
   } else if (cmd == "DEVNAME") {
     // DEVNAME <name>: a name in front of "ChatterSwitch 7B70", for Bluetooth and USB ("" = none)
     String t = arg;
@@ -2368,7 +2575,8 @@ void setup() {
   M5.BtnA.setHoldThresh(800);
   M5.BtnB.setHoldThresh(800);
 
-  pinMode(PIN_KEY, INPUT_PULLUP);
+  sensorOn = startSensor();  // a ToF sensor on the Grove port is the switch
+  if (!sensorOn) pinMode(PIN_KEY, INPUT_PULLUP);
   rmtInit(PIN_IR_TX, RMT_TX_MODE, RMT_MEM_NUM_BLOCKS_1, 1000000);
   // carrier_level false = carrier on the HIGH (mark) symbols; duty is a 0-1 fraction
   rmtSetCarrier(PIN_IR_TX, true, false, 38000, IR_DUTY);
@@ -2428,6 +2636,7 @@ void setup() {
 
 void loop() {
   M5.update();
+  pollSensor();
   pollStudentSwitch();
   pollStaffButtons();
   pollSerial();
@@ -2444,8 +2653,9 @@ void loop() {
   static uint32_t lastRefresh = 0;
   if (now - lastRefresh > 5000) { lastRefresh = now; readBattery(); }
   if (forgetConfirmUntil && now >= forgetConfirmUntil) { forgetConfirmUntil = 0; needRedraw = true; }
-  if (inSettings() && now - lastInteraction > SETTINGS_EXIT_MS) { mode = prevMode; ledIdle(); needRedraw = true; }
-  if ((modeSettingsOpen || gateShown || topicOpen) && now - lastInteraction > SETTINGS_EXIT_MS) {
+  if (sensorTest && now - lastInteraction > 300000) { sensorTest = false; needRedraw = true; }
+  if (inSettings() && !sensorTest && now - lastInteraction > SETTINGS_EXIT_MS) { mode = prevMode; ledIdle(); needRedraw = true; }
+  if ((modeSettingsOpen || gateShown || topicOpen) && !sensorTest && now - lastInteraction > SETTINGS_EXIT_MS) {
     modeSettingsOpen = gateShown = topicOpen = false;
     needRedraw = true;
   }
