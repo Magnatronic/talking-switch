@@ -320,7 +320,11 @@ Most student settings are in the SETTINGS mode above. At the top of `TalkingSwit
   white wall or ceiling can help. For longer range, an IR repeater/extender near the device works with any remote.
 - **IR learns nothing:** make sure the remote is 38kHz (most TV remotes are) and point it at the StickS3's IR window from **30cm to 1m** – closer than 30cm can scramble the code. Very long air-con codes may be cut short.
 - **Quiet playback:** B-hold for volume; for a noisy classroom add a small external speaker.
-- **Using a standard 3.5mm switch instead:** wire the jack's tip to `PIN_KEY` and sleeve to GND on the Grove connector.
+- **Using a standard 3.5mm switch instead:** cut a Grove cable and wire a 3.5mm mono socket to two of its wires:
+  **yellow** (the switch signal, GPIO10) and **black** (ground) – either way round, as a switch just joins them. Cut the
+  red (5V) and white wires short and cover them. If it doesn't respond, colours vary between cables: try white instead
+  of yellow. The thin wires hold better in screw terminals if twisted and folded back. Not together with the ToF sensor
+  (it uses the same wires).
 
 ## ToF sensor test (touch-free switch)
 

@@ -71,8 +71,8 @@
 //  Hardware
 //    - M5StickS3 (ESP32-S3), M5Unified library
 //    - M5Stack Unit Key (U144) on the StickS3's Grove port
-//      Grove white wire  -> GPIO10 -> key   (PIN_KEY)
-//      Grove yellow wire -> GPIO9  -> LED   (PIN_LED)
+//      GPIO10 -> key (PIN_KEY): the yellow wire on a standard Grove cable
+//      GPIO9  -> LED (PIN_LED): the white wire (colours can vary between cables)
 //      If the key does nothing, swap PIN_KEY and PIN_LED.
 //    - A standard 3.5mm AT switch can be wired to PIN_KEY and GND
 //      instead of (or alongside) the Unit Key.
