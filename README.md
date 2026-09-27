@@ -105,9 +105,20 @@ up to 5 seconds. Each IR code can have its own sound, e.g. IR code 1 "Bubbles" t
 |---|---|---|
 | SPEAK | *Messages* setting: **Staff pick** – plays the selected Quick message (see *Play style* for hold-to-play and latch; with Tap, keep holding to move to the next Quick message). **Student scans** – the student chooses one of the Quick messages by scanning (see below) | message colour: 1 green, 2 blue, 3 purple, 4 orange |
 | CHOOSE | The student **chooses** from the Topics by scanning, see below | colour of the choice on offer |
-| KEYBOARD | Holds down the chosen key while pressed | purple |
+| KEYBOARD | Holds down the chosen key while pressed. With *No USB* set to SPEAK or CHOOSE it's also a **backup**: see below | purple |
 | IR | Sends the selected IR code, and says its sound if it has one. *IR codes* setting: Staff pick / Repeat held (keeps sending while held, like a remote's volume button) / Student scans (the student chooses by scanning) | code colour |
 | SETTINGS | Keeps doing whatever the previous mode did | as previous mode |
+
+### Backup mode: a switch for the AAC device, and a talker when it isn't there
+
+With KEYBOARD's **No USB** set to SPEAK or CHOOSE, the switch works the student's AAC device over USB, and when
+there's no USB connection (the device isn't there, is flat, or the cable is out) for 10 seconds it changes to
+SPEAK or CHOOSE by itself, with a falling two-note sound and "No USB" on screen, so the student can still talk.
+While counting down, the KEYBOARD screen says "No USB – SPEAK in 8 s". In the backup mode the bottom line starts
+with "Backup", and Bluetooth stays off, so it doesn't use extra battery (and the switch can sleep as usual).
+When USB is connected again it goes back to KEYBOARD (rising two notes), once any choice the student is making is
+finished. If it's asleep, that happens when it wakes. Choosing a mode with A (or on the setup page) ends the
+backup. Fill the Quick messages and topics with what the student needs when their AAC device isn't there.
 
 ### Staff buttons – one rule everywhere
 
@@ -171,6 +182,7 @@ All of these are on the setup page too, on each mode's tab and the Settings tab.
 | SPEAK, CHOOSE, IR | Scan speed | 1.5s, 2s, **3s**, 4s, 5s | How long each choice is offered |
 | SPEAK, CHOOSE, IR | Scan rounds | 1, **2**, 3 | Press twice: how many times round before it stops by itself |
 | SPEAK, CHOOSE, IR | Stop choice | **Off**, On | Offers "Stop" last, so the student can choose none of them |
+| KEYBOARD | No USB | **Bluetooth**, SPEAK, CHOOSE | With no USB connection: *Bluetooth* sends keys over Bluetooth. *SPEAK* / *CHOOSE*: the backup mode (below). Only with USB Mode: USB-OTG (TinyUSB) |
 | KEYBOARD | Key action | **Momentary**, Latch | *Momentary* holds the key while the switch is held; *Latch* – one press holds the key down, the next lets it go. The screen says "Key held" and the LED glows brighter while latched |
 | KEYBOARD, IR | Press sound | **Off**, Click, Beep | A sound on each press, as feedback (IR: only for codes with no sound of their own) |
 | IR | IR codes | **Staff pick**, Repeat held, Student scans | See the IR mode above |

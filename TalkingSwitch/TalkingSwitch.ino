@@ -21,6 +21,10 @@
 //              in the AAC software still work. When a computer is using it
 //              as a USB keyboard, keys go over USB only; otherwise they go
 //              over Bluetooth. (Never both, so no double presses.)
+//              "No USB" setting: Bluetooth, or a backup mode - with no USB
+//              connection (the AAC device isn't there) it changes to SPEAK
+//              or CHOOSE by itself, with Bluetooth off, and comes back to
+//              KEYBOARD when USB is connected again.
 //    IR        Sends the selected learned infrared code (TV, fibre optics,
 //              bubble tube), and plays that code's own sound if it has one
 //              (e.g. "Bubbles!"). "IR codes" setting: Staff pick / Repeat
@@ -135,6 +139,7 @@ static const uint8_t  SCREEN_DIMMED = 16;     // faint glow when idle
 static const uint32_t SCREEN_DIM_MS = 30000;  // dim the screen after this long without a staff button press
 static const uint32_t SCREEN_OFF_MS = 120000; // then switch it off completely
 static const uint32_t SETTINGS_EXIT_MS = 30000; // SETTINGS goes back to the previous mode after this long untouched
+static const uint32_t BACKUP_MS = 10000;        // KEYBOARD with no USB this long: change to the backup mode
 static const int      LOW_BATTERY   = 15;     // warn below this battery %
 
 // ---------------------------------------------------------------------
@@ -175,7 +180,7 @@ static const int NUM_KEYS = sizeof(KEYS) / sizeof(KEYS[0]);
 // ---------------------------------------------------------------------
 enum SettingId : uint8_t {
   S_VOLUME, S_SPEAK_CHOOSE, S_PLAY, S_HOLD, S_CHOOSE_FROM, S_IR_CHOOSE, S_ACCESS, S_SCAN_SPEED, S_SCAN_ROUNDS, S_STOP,
-  S_KEY_ACTION, S_PRESS_SOUND,
+  S_KEY_ACTION, S_PRESS_SOUND, S_NO_USB,
   S_ACCEPT, S_LOCKOUT, S_WAKE, S_SLEEP, S_AUTOOFF, S_LOUD, S_FORGET,
   S_COUNT
 };
@@ -215,6 +220,9 @@ static const Setting SETTINGS[S_COUNT] = {
   {"Key action",          "s_keyact",  2, 0, {0, 1}, {"Momentary", "Latch"}, G_KEYBOARD},
   // KEYBOARD and IR: a sound on each student press (they're silent otherwise)
   {"Press sound",         "s_psound",  3, 0, {0, 1, 2}, {"Off", "Click", "Beep"}, G_KEYBOARD | G_IR},
+  // KEYBOARD with no USB connection: keys go over Bluetooth, or the switch
+  // talks instead (backup mode, Bluetooth off) until USB is back
+  {"No USB",              "s_nousb",   3, 0, {0, 1, 2}, {"Bluetooth", "SPEAK", "CHOOSE"}, G_KEYBOARD},
   // press must be held this long to count - filters accidental brushes
   {"Press must last",     "s_accept",  5, 0, {0, 100, 250, 500, 1000}, {"Instant", "0.1 s", "0.25 s", "0.5 s", "1 s"}, G_GENERAL},
   // ignore new presses this soon after the last one - filters tremor/repeats
@@ -304,6 +312,8 @@ uint16_t statusColor = TFT_YELLOW;
 uint32_t statusUntil = 0;
 float    recProgress = -1;     // 0..1 while recording, else -1
 uint8_t  prevMode = M_SPEAK;   // in SETTINGS, the big switch keeps doing this mode's job
+bool     backupOn = false;     // in the backup mode because KEYBOARD has no USB
+uint32_t backupSince = 0;      // KEYBOARD without USB since (0 = not counting)
 uint8_t  settingIdx = 0;       // setting shown in SETTINGS mode
 uint32_t forgetConfirmUntil = 0; // "Forget BT devices": waiting for the second B press
 
@@ -362,7 +372,7 @@ void migrateFiles() {
 String nameKey(int i) { return "nm" + String(i); }
 
 void saveSettings() {
-  prefs.putUChar("mode3", studentMode());  // never save a SETTINGS page as the mode
+  prefs.putUChar("mode3", backupOn ? M_KEYBOARD : studentMode());  // never a SETTINGS page or the backup
   prefs.putUChar("slot", slot);
   prefs.putUChar("topic", group);
   prefs.putUChar("irslot", irSlot);
@@ -766,7 +776,7 @@ void forgetBluetooth() {
 // clicking past it doesn't), and stop it when leaving. Pairing is kept.
 void manageBle(uint32_t now) {
   static uint32_t keyboardSince = 0;
-  if (studentMode() != M_KEYBOARD) {
+  if (studentMode() != M_KEYBOARD || backupMode() != M_COUNT) {  // with a backup mode, Bluetooth stays off
     keyboardSince = 0;
     if (bleRunning && !swActive) bleEnd();
     return;
@@ -812,6 +822,59 @@ void checkVbus(uint32_t now) {
 KbOut kbOutput() {
   if (usbHostActive()) return OUT_USB;
   return bleConnected ? OUT_BLE : OUT_NONE;
+}
+
+// The mode KEYBOARD changes to with no USB (M_COUNT = none: use Bluetooth).
+uint8_t backupMode() {
+#if HAS_USB_HID
+  switch (setting(S_NO_USB)) {
+    case 1: return M_SPEAK;
+    case 2: return M_CHOOSE;
+  }
+#endif
+  return M_COUNT;
+}
+
+void setStudentMode(uint8_t m) {
+  if (inSettings()) prevMode = m; else mode = m;
+}
+
+// KEYBOARD with no USB for BACKUP_MS: change to the backup mode, and back
+// to KEYBOARD when USB returns (not in the middle of a student's choice).
+void manageBackup(uint32_t now) {
+  const bool usb = usbHostActive();
+  const uint8_t to = backupMode();
+  if (backupOn) {
+    if ((usb || to == M_COUNT) && !scanning && !swActive) {
+      backupOn = false;
+      stopPlay();
+      setStudentMode(M_KEYBOARD);
+      ledIdle();
+      setStatus("USB connected\nBack to KEYBOARD", TFT_GREEN);
+      beep(1200, 60); beep(1800, 60);
+      needRedraw = true;
+    }
+    return;
+  }
+  // count only while KEYBOARD is on screen and staff aren't busy with it
+  if (to == M_COUNT || usb || mode != M_KEYBOARD || modeSettingsOpen || gateShown || swActive || keyLatched) {
+    if (backupSince) { backupSince = 0; needRedraw = true; }
+    return;
+  }
+  if (!backupSince) backupSince = now;
+  static uint32_t lastSec = 0;
+  uint32_t sec = (now - backupSince) / 1000;
+  if (sec != lastSec) { lastSec = sec; needRedraw = true; }  // the countdown on screen
+  if (now - backupSince < BACKUP_MS) return;
+  backupSince = 0;
+  releaseKey();
+  backupOn = true;
+  mode = to;
+  scanInGroup = false;
+  ledIdle();
+  setStatus("No USB\n" + String(MODE_NAMES[to]) + " until it's back", TFT_ORANGE);
+  beep(1800, 60); beep(1200, 60);
+  needRedraw = true;
 }
 
 // The key-up always goes to wherever the key-down went.
@@ -1000,8 +1063,11 @@ void drawChoices(lgfx::LovyanGFX& c, int n, const String& what, const String& fr
     drawFit(c, String(n) + (n == 1 ? what.substring(0, what.length() - 1) : what), 52, TFT_WHITE);
     drawCentered(c, holdToChoose() ? "Hold to start" : "Press to start", 84, &fonts::FreeSans9pt7b, TFT_GREEN);
   }
-  drawCentered(c, "From: " + from, 104, &fonts::Font2, TFT_LIGHTGREY);
+  drawFitIn(c, backupTag() + "From: " + from, 104, backupOn ? TFT_ORANGE : TFT_LIGHTGREY, {&fonts::Font2}, c.width() - 12);
 }
+
+// Start of the bottom line while in the backup mode.
+String backupTag() { return backupOn ? "Backup - " : ""; }
 
 void drawMain(lgfx::LovyanGFX& c) {
   const int W = c.width();
@@ -1028,9 +1094,11 @@ void drawMain(lgfx::LovyanGFX& c) {
       if (speakScanning()) {
         int n = 0;
         for (int i = 0; i < NUM_QUICK; i++) n += slotLen[i] ? 1 : 0;
-        drawCentered(c, "Student scans " + String(n) + (n == 1 ? " message" : " messages"), 106, &fonts::Font2, TFT_CYAN);
+        drawCentered(c, backupTag() + "Student scans " + String(n) + (n == 1 ? " message" : " messages"), 106, &fonts::Font2,
+                     backupOn ? TFT_ORANGE : TFT_CYAN);
       } else {
-        drawCentered(c, "Quick " + String(slot + 1) + " of " + String(NUM_QUICK), 106, &fonts::Font2, hint);
+        drawCentered(c, backupTag() + "Quick " + String(slot + 1) + " of " + String(NUM_QUICK), 106, &fonts::Font2,
+                     backupOn ? TFT_ORANGE : hint);
       }
       break;
     }
@@ -1071,9 +1139,14 @@ void drawMain(lgfx::LovyanGFX& c) {
       c.drawString(name, x, 56);
       KbOut o = kbOutput();
       if (keyLatched) drawCentered(c, "Key held - press to let go", 91, &fonts::FreeSansBold9pt7b, TFT_YELLOW);
-      else drawCentered(c, o == OUT_USB ? "Sending by USB" : o == OUT_BLE ? "Sending by Bluetooth" : "Not connected",
-                        91, &fonts::FreeSans9pt7b, o == OUT_NONE ? TFT_ORANGE : TFT_GREEN);
-      drawCentered(c, "BT name: " + bleName, 106, &fonts::Font2, TFT_LIGHTGREY);
+      else if (backupSince) {
+        int left = (int)((BACKUP_MS - min(BACKUP_MS, millis() - backupSince) + 999) / 1000);
+        drawCentered(c, "No USB - " + String(MODE_NAMES[backupMode()]) + " in " + String(left) + " s", 91,
+                     &fonts::FreeSans9pt7b, TFT_ORANGE);
+      } else drawCentered(c, o == OUT_USB ? "Sending by USB" : o == OUT_BLE ? "Sending by Bluetooth" : "Not connected",
+                          91, &fonts::FreeSans9pt7b, o == OUT_NONE ? TFT_ORANGE : TFT_GREEN);
+      if (backupMode() != M_COUNT) drawCentered(c, String("No USB: ") + MODE_NAMES[backupMode()], 106, &fonts::Font2, TFT_LIGHTGREY);
+      else drawCentered(c, "BT name: " + bleName, 106, &fonts::Font2, TFT_LIGHTGREY);
       break;
     }
     case M_IR: {
@@ -1136,6 +1209,7 @@ bool settingShown(int i) {
     case S_ACCESS: case S_SCAN_SPEED: return scan;
     case S_SCAN_ROUNDS: return scan && !holdToChoose();
     case S_STOP: return scan;
+    case S_NO_USB: return HAS_USB_HID;  // needs USB Mode: USB-OTG (TinyUSB)
   }
   return true;
 }
@@ -1719,6 +1793,7 @@ void pollStaffButtons() {
     stopPlay();
     if (!inSettings()) prevMode = mode;
     mode = (mode + 1) % M_COUNT;
+    if (!inSettings()) backupOn = false;  // staff chose a mode
     gateShown = false;
     if (inSettings()) settingIdx = nextSettingInView(S_COUNT - 1);
     scanInGroup = false;
@@ -1768,6 +1843,7 @@ void sendInfo() {
        + ",\"irSlot\":" + String(irSlot);
   j += ",\"key\":" + String(keyIdx) + ",\"vol\":" + String(settingChoice[S_VOLUME]) + ",\"vols\":" + String(sizeof(VOLUMES));
   j += ",\"bat\":" + String(batLevel) + ",\"chg\":" + yes(batCharging) + ",\"bt\":" + yes(bleConnected);
+  j += ",\"usbhid\":" + yes(HAS_USB_HID);
   j += ",\"voice\":" + jsonStr(voiceId) + ",\"vspeed\":" + jsonStr(voiceSpeed);
   j += ",\"modes\":[";
   for (int i = 0; i < M_SETTINGS; i++) j += (i ? "," : "") + jsonStr(MODE_NAMES[i]);
@@ -1880,6 +1956,7 @@ void handleCommand(String line) {
     releaseKey();
     stopPlay();
     mode = prevMode = n;
+    backupOn = false;
     saveSettings();
     ledIdle();
     reply();
@@ -2132,6 +2209,7 @@ void loop() {
     needRedraw = true;
   }
   updateScan(now);
+  manageBackup(now);
   manageBle(now);
   managePower(now);
   if (needRedraw && scr != SCR_OFF) drawScreen();

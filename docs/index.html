@@ -186,7 +186,8 @@ ol { padding-left: 1.2em; margin: 8px 0 0; }
         <div class="setting">
           <div class="name">Bluetooth</div>
           <div class="small">The switch appears as <b id="btName"></b> (<span id="btState"></span>).</div>
-          <div class="help">Keys go over USB when plugged into a computer, otherwise over Bluetooth. To pair with a
+          <div class="help">Keys go over USB when plugged into a computer, otherwise over Bluetooth (with No USB set to
+            Bluetooth). To pair with a
             different computer or tablet, use <i>Forget BT devices</i> on the Settings tab.</div>
         </div>
       </div>
@@ -804,6 +805,7 @@ const HELP = {
   s_scanrnd: 'Times round the choices before it stops by itself.',
   s_stop: 'Offers “Stop” last, so the student can choose none of them.',
   s_irmode: 'Staff pick: sends the selected code. Repeat held: keeps sending while held, like a remote’s volume button. Student scans: the student chooses the code.',
+  s_nousb: 'With no USB connection (e.g. the AAC device isn’t there): Bluetooth sends keys over Bluetooth. SPEAK or CHOOSE: after 10 s the switch talks instead, with Bluetooth off to save battery, and goes back to KEYBOARD when USB is connected again.',
   s_keyact: 'Momentary: the key is held while the switch is. Latch: one press holds the key down, the next lets it go.',
   s_psound: 'A click or beep on each press (IR: only for codes with no sound of their own).',
   s_accept: 'A press must last this long to count – filters accidental brushes.',
@@ -820,7 +822,7 @@ const TAB_SETTINGS = {  // [setting, shown only when]
     ['s_access', speakScanning], ['s_scanspd', speakScanning], ['s_scanrnd', () => speakScanning() && pressTwice()],
     ['s_stop', speakScanning]],
   choose: [['s_topics'], ['s_access'], ['s_scanspd'], ['s_scanrnd', pressTwice], ['s_stop']],
-  keyboard: [['s_keyact'], ['s_psound']],
+  keyboard: [['s_keyact'], ['s_psound'], ['s_nousb', () => info.usbhid]],
   ir: [['s_irmode'], ['s_access', irScanning], ['s_scanspd', irScanning],
     ['s_scanrnd', () => irScanning() && pressTwice()], ['s_stop', irScanning], ['s_psound']],
 };
