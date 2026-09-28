@@ -376,6 +376,7 @@ after the stick has started.
 - Compile-checked against esp32 core 3.3.11 with M5Unified 0.2.23 / M5GFX 0.2.30 and VL53L1X 1.3.1, in both USB
   modes.
 - Tested on hardware: the Unit Key and a 3.5mm jack switch, the modes and their settings, the setup page, and the
-  ToF sensor (Line and Move), Left click over USB. Not yet tested on hardware: Left click over Bluetooth, IR, the USB keyboard, sleep, auto power-off and the backup
+  ToF sensor (Line and Move), IR (learning and sending), Left click over USB. Not yet tested on hardware: Left click
+  over Bluetooth, the USB keyboard, sleep, auto power-off and the backup
   mode.
 - This is a DIY device, not a certified AT product. Check it's robust and safe for each student before use.
