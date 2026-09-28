@@ -403,8 +403,11 @@ async function connect() {
     return;
   }
   try {
-    // DTR on (needed for the switch to send), RTS off (RTS can reset it)
-    try { await port.setSignals({ dataTerminalReady: true, requestToSend: false }); } catch {}
+    // DTR and RTS both on, and left on. The switch's USB serial restarts it for
+    // programming (download mode) when it sees RTS only -> both -> DTR only ->
+    // neither - which turning RTS off here and the browser turning both off at
+    // the end used to make, leaving it stuck as "USB JTAG".
+    try { await port.setSignals({ dataTerminalReady: true, requestToSend: true }); } catch {}
     writer = port.writable.getWriter();
     reader = port.readable.getReader();
     readLoop();
@@ -429,6 +432,9 @@ async function connect() {
 async function disconnect() {
   try { reader && (await reader.cancel()); } catch {}
   try { writer && writer.releaseLock(); } catch {}
+  // DTR off first, then RTS (never RTS first - see connect())
+  try { port && (await port.setSignals({ dataTerminalReady: false })); } catch {}
+  try { port && (await port.setSignals({ requestToSend: false })); } catch {}
   try { port && (await port.close()); } catch {}
   port = writer = reader = null;
 }
