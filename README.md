@@ -20,7 +20,7 @@ a Bluetooth/USB keyboard key for an AAC device, and an IR remote (Control), all 
 
 | Setting | Value |
 |---|---|
-| USB CDC On Boot | **Disabled** – the firmware starts the USB serial port itself, after giving the USB device the switch's name (with *Enabled*, the setup page's Connect list shows "ESP32S3_DEV"). With USB Mode *Hardware CDC and JTAG*, set it to *Enabled* |
+| USB CDC On Boot | **Enabled** – the setup page talks to the switch over it (the firmware won't build without it) |
 | Flash Size | 8MB (64Mb) |
 | Partition Scheme | Huge APP (3MB No OTA/1MB SPIFFS) |
 | PSRAM | OPI PSRAM |
@@ -39,8 +39,8 @@ partition layout automatically (2MB for the firmware, ~5.9MB for recordings). Ke
 
 If the screen says **"No PSRAM!"**, change PSRAM to *QSPI PSRAM* and upload again.
 
-In TinyUSB mode the StickS3 still shows up as a COM port (named after the switch, e.g. "ChatterSwitch 7B70") and
-uploads normally reset it automatically. If an upload fails, put the StickS3 into download mode
+In TinyUSB mode the StickS3 still shows up as a COM port (the setup page's Connect list calls it "ESP32S3_DEV –
+TinyUSB CDC") and uploads normally reset it automatically. If an upload fails, put the StickS3 into download mode
 (see M5Stack's StickS3 docs for the button sequence) and upload again.
 
 ## Setup page (USB)
@@ -76,11 +76,9 @@ nothing with the current choices are hidden), and what it uses below.
   change).
 - **Settings:** the switch's SETTINGS in the same order – Volume, Modes, Press must last, Ignore repeats, (with a ToF
   sensor: its settings and a live **Sensor test** graph), Brightness, Switch wakes screen, Sleep after, Auto power
-  off, Recording boost, Forget BT devices. Recording boost also sets the loudness of messages made on the page. Then **Switch name**: a name (up to 10 characters) put in front of the
-  switch's own for Bluetooth and the setup page's Connect list, e.g. "Sam" shows as "Sam ChatterSwitch 7B70" (it's always
-  "ChatterSwitch" and the stick's ID). Unplug and plug the switch in
-  again for computers to see a new name; Windows may keep the old one until the switch is removed in Device
-  Manager. **About this switch** shows the firmware version, storage used (red when nearly full – delete sounds
+  off, Recording boost, Forget BT devices. Recording boost also sets the loudness of messages made on the page. Then **Switch name**: a name (up to 10 characters) put in front
+  of the switch's own Bluetooth name, e.g. "Sam" shows as "Sam ChatterSwitch 7B70" (it's always "ChatterSwitch" and
+  the stick's ID). **About this switch** shows the firmware version, storage used (red when nearly full – delete sounds
   you don't use), student presses since it was turned on, the input (switch or ToF sensor) and whether it can be a
   USB keyboard. If the page and
   the switch's firmware don't match, the page says **Update the switch** (or to reload the page).
@@ -311,7 +309,7 @@ Most student settings are in the SETTINGS mode above. At the top of `TalkingSwit
 | `MAX_SECONDS` | 5 | Longest recording per message |
 | `MIC_PGA` | 8 | Microphone analogue gain (3dB steps, 0–10). Lower it if loud voices sound distorted |
 | `SCREEN_DIM_MS` / `SCREEN_OFF_MS` | 30000 / 120000 | Screen dims, then switches off, when idle |
-| `BLE_NAME` | "ChatterSwitch" | Default name (Bluetooth and USB); each stick's own ID is added to it |
+| `BLE_NAME` | "ChatterSwitch" | Default Bluetooth name; each stick's own ID is added to it |
 | `FW_VERSION` / `FW_API` | "27 Sep 2026" / 2 | Version shown in About. Raise `FW_API` (and `PAGE_API` in `docs/index.html`) when the page and firmware must change together |
 
 ## Troubleshooting
@@ -326,9 +324,8 @@ Most student settings are in the SETTINGS mode above. At the top of `TalkingSwit
 - **IR learns nothing:** make sure the remote is 38kHz (most TV remotes are) and point it at the StickS3's IR window from **30cm to 1m** – closer than 30cm can scramble the code. Very long air-con codes may be cut short.
 - **Quiet playback:** raise *Volume* in SETTINGS (or on the setup page's Settings tab); for a noisy classroom add
   a small external speaker.
-- **The Connect list shows "ESP32S3_DEV":** set *USB CDC On Boot: Disabled* (see the board settings) and upload
-  again. If it still shows an old name, Windows is remembering it: in Device Manager, under *Ports*, uninstall the
-  switch's COM port, then unplug it and plug it in again.
+- **The page says the switch didn't answer:** check *USB CDC On Boot: Enabled* and close the Arduino Serial Monitor.
+  The Connect list always calls the switch "ESP32S3_DEV – TinyUSB CDC" (the switch's own name is used for Bluetooth).
 - **Using a standard 3.5mm switch instead:** cut a Grove cable and wire a 3.5mm mono socket to two of its wires:
   **yellow** (the switch signal, GPIO10) and **black** (ground) – either way round, as a switch just joins them. Cut the
   red (5V) and white wires short and cover them. If it doesn't respond, colours vary between cables: try white instead

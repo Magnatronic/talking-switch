@@ -86,8 +86,7 @@
 //      settings appear in SETTINGS; "Sensor test" shows a live graph.
 //      Needs the "VL53L1X" library by Pololu.
 //
-//  Arduino IDE settings: sketch.yaml / README.md (USB CDC On Boot: Disabled,
-//  so the USB device gets the switch's name - see UsbSerial below).
+//  Arduino IDE settings: sketch.yaml / README.md.
 // =====================================================================
 
 #include <M5Unified.h>
@@ -111,19 +110,10 @@
 #include "USB.h"
 #include "USBHIDKeyboard.h"
 #define HAS_USB_HID 1
-#if !ARDUINO_USB_CDC_ON_BOOT
-// "USB CDC On Boot: Disabled": this sketch starts the USB serial port itself,
-// after giving the USB device the switch's name. (With it Enabled, the core
-// starts USB before setup() under the board's name, "ESP32S3_DEV".) Made
-// before the keyboard, so the serial port stays the USB device's first part,
-// as it was with CDC On Boot - Windows remembers a device's layout.
-#include "USBCDC.h"
-USBCDC UsbSerial(0);
-#define Serial UsbSerial
-#else
-#warning "Set Tools > USB CDC On Boot: Disabled, so the USB device gets the switch's name"
-#endif
 USBHIDKeyboard UsbKeyboard;
+#if !ARDUINO_USB_CDC_ON_BOOT
+#error "Set Tools > USB CDC On Boot: Enabled - the setup page talks to the switch over it"
+#endif
 #else
 #define HAS_USB_HID 0
 #endif
@@ -170,7 +160,7 @@ static const int SND_TOPIC = NUM_QUICK, SND_IR = SND_TOPIC + NUM_TOPICS * PER_TO
 static const int NAME_TOPIC = SND_PMSG, NUM_NAMES = NAME_TOPIC + NUM_TOPICS;
 static const uint8_t  MIC_PGA     = 8;     // mic analogue gain, 3dB steps (0-10). Lower if loud voices distort
 
-static const char*    BLE_NAME      = "ChatterSwitch";  // default name (Bluetooth, USB); the last 4 characters of the
+static const char*    BLE_NAME      = "ChatterSwitch";  // default Bluetooth name; the last 4 characters of the
                                                         // stick's address are added, e.g. "ChatterSwitch 7B70"
 static const uint8_t  VOLUMES[]     = {128, 180, 220, 255}; // output power is volume squared: ~25/50/75/100%
 static const uint8_t  SPK_GAIN      = 8;   // speaker magnification: 8 = volume 4 is exactly full scale
@@ -2588,7 +2578,7 @@ void handleCommand(String line) {
     senseStreamUntil = n ? millis() + 10000 : 0;
     reply();
   } else if (cmd == "DEVNAME") {
-    // DEVNAME <name>: a name in front of "ChatterSwitch 7B70", for Bluetooth and USB ("" = none)
+    // DEVNAME <name>: a name in front of "ChatterSwitch 7B70", for Bluetooth ("" = none)
     String t = arg;
     t.trim();
     devName = t.substring(0, 10);  // + " ChatterSwitch 7B70" keeps the whole name a sensible length
@@ -2690,9 +2680,6 @@ void setup() {
   loadIr();
 
 #if HAS_USB_HID
-  // the name computers (and the setup page's connect list) show
-  USB.productName(bleName.c_str());
-  USB.manufacturerName("Magnatronic");
   USB.onEvent(onUsbEvent);
   UsbKeyboard.begin();
   USB.begin();
