@@ -592,12 +592,16 @@ void senseReset() {
 // At start-up: is there a sensor on the Grove port?
 bool startSensor() {
   int sda = M5.getPin(m5::pin_name_t::port_a_sda), scl = M5.getPin(m5::pin_name_t::port_a_scl);
+  // Look for it with M5Unified's own I2C, which is released cleanly afterwards,
+  // so nothing is left to undo when there's no sensor (the usual case: the Unit
+  // Key, a jack switch or nothing). Arduino's Wire only starts once it's found.
+  bool there = M5.Ex_I2C.begin(I2C_NUM_0, sda, scl) && M5.Ex_I2C.scanID(0x29, 100000);
+  M5.Ex_I2C.release();
+  if (!there) return false;
   Wire.begin(sda, scl, 400000);
-  Wire.beginTransmission(0x29);
-  if (Wire.endTransmission() != 0) { Wire.end(); return false; }
   tof.setBus(&Wire);
   tof.setTimeout(500);
-  if (!tof.init()) { Wire.end(); return false; }
+  if (!tof.init()) return false;
   tof.setDistanceMode(VL53L1X::Short);
   if (!tof.setMeasurementTimingBudget(15000)) tof.setMeasurementTimingBudget(20000);
   tof.startContinuous(15);
