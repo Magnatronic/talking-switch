@@ -324,6 +324,9 @@ Most student settings are in the SETTINGS mode above. At the top of `TalkingSwit
 - **IR learns nothing:** make sure the remote is 38kHz (most TV remotes are) and point it at the StickS3's IR window from **30cm to 1m** – closer than 30cm can scramble the code. Very long air-con codes may be cut short.
 - **Quiet playback:** raise *Volume* in SETTINGS (or on the setup page's Settings tab); for a noisy classroom add
   a small external speaker.
+- **After an upload the switch shows as "USB JTAG/serial debug unit" and doesn't answer:** it's waiting in download
+  mode instead of running the firmware – press the stick's power button once to restart it. It then shows as
+  "ESP32S3_DEV – TinyUSB CDC" on a different COM port.
 - **The page says the switch didn't answer:** check *USB CDC On Boot: Enabled* and close the Arduino Serial Monitor.
   The Connect list always calls the switch "ESP32S3_DEV – TinyUSB CDC" (the switch's own name is used for Bluetooth).
 - **Using a standard 3.5mm switch instead:** cut a Grove cable and wire a 3.5mm mono socket to two of its wires:
