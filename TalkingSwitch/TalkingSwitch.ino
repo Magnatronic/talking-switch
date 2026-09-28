@@ -681,11 +681,22 @@ void pollSensor() {
 
 String wordsPath(int i) { return String("/w") + i + ".txt"; }
 
+// Storage used, remembered: working it out reads the whole file system (~0.3 s),
+// so only after files change. Everything that writes or deletes files calls fsChanged().
+size_t fsUsedBytes = 0;
+bool   fsUsedKnown = false;
+void fsChanged() { fsUsedKnown = false; }
+size_t fsUsed() {
+  if (!fsUsedKnown) { fsUsedBytes = LittleFS.usedBytes(); fsUsedKnown = true; }
+  return fsUsedBytes;
+}
+
 // Typed words for message i (first line the voice, then the words); "" clears them.
 void setWords(int i, const String& voice, const String& words) {
   if (i < 0 || i >= SND_PMSG) return;
   slotWords[i] = words;
   slotWordsVoice[i] = words.length() ? voice : "";
+  fsChanged();
   if (!words.length()) { LittleFS.remove(wordsPath(i)); return; }
   File f = LittleFS.open(wordsPath(i), "w");
   if (f) { f.print(voice + "\n" + words); f.close(); }
@@ -706,7 +717,7 @@ void loadWords() {
 // Recording space used (flash), and nearly full (over 90%).
 int storagePercent() {
   size_t total = LittleFS.totalBytes();
-  return total ? (int)(LittleFS.usedBytes() * 100 / total) : 0;
+  return total ? (int)(fsUsed() * 100 / total) : 0;
 }
 bool storageNearlyFull() { return storagePercent() >= 90; }
 
@@ -716,6 +727,7 @@ bool saveSlot(int i) {
   if (!f) return false;
   size_t w = f.write((uint8_t*)slotBuf[i], slotLen[i] * 2);
   f.close();
+  fsChanged();
   return w == slotLen[i] * 2;
 }
 
@@ -739,11 +751,13 @@ void saveIr(int i) {
   if (!f) return;
   f.write((uint8_t*)irCode[i], irLen[i] * sizeof(rmt_data_t));
   f.close();
+  fsChanged();
 }
 
 void deleteIr(int i) {
   irLen[i] = 0;
   LittleFS.remove(irPath(i));
+  fsChanged();
 }
 
 // ---------------------------------------------------------------------
@@ -2353,7 +2367,7 @@ void sendInfo() {
   j += ",\"bat\":" + String(batLevel) + ",\"chg\":" + yes(batCharging) + ",\"bt\":" + yes(bleConnected);
   j += ",\"usbhid\":" + yes(HAS_USB_HID) + ",\"sensor\":" + yes(sensorOn);
   j += ",\"ver\":" + jsonStr(FW_VERSION) + ",\"api\":" + String(FW_API) + ",\"presses\":" + String(pressCount);
-  j += ",\"fsUsed\":" + String((unsigned long)LittleFS.usedBytes()) + ",\"fsTotal\":" + String((unsigned long)LittleFS.totalBytes());
+  j += ",\"fsUsed\":" + String((unsigned long)fsUsed()) + ",\"fsTotal\":" + String((unsigned long)LittleFS.totalBytes());
   j += ",\"voice\":" + jsonStr(voiceId) + ",\"vspeed\":" + jsonStr(voiceSpeed);
   j += ",\"modes\":[";
   for (int i = 0; i < M_SETTINGS; i++) j += (i ? "," : "") + jsonStr(MODE_NAMES[i]);

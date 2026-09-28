@@ -476,8 +476,13 @@ async function refresh() {
 }
 
 function segment(box, labels, current, onPick) {
+  // the clicked choice lights up straight away; the switch's reply then redraws the page
+  const pick = (i) => {
+    [...box.children].forEach((b, k) => { b.className = k === i ? 'on' : ''; b.setAttribute('aria-checked', String(k === i)); });
+    onPick(i);
+  };
   box.replaceChildren(...labels.map((label, i) => el('button', {
-    class: i === current ? 'on' : '', role: 'radio', 'aria-checked': String(i === current), onclick: () => onPick(i),
+    class: i === current ? 'on' : '', role: 'radio', 'aria-checked': String(i === current), onclick: () => pick(i),
   }, label)));
 }
 
