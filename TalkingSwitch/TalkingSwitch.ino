@@ -1687,15 +1687,17 @@ void drawScreen() {
 // ---------------------------------------------------------------------
 //  Power saving
 // ---------------------------------------------------------------------
-// Returns true if the screen was dim or off (so the press only wakes it).
+// Returns true if the screen was off (so the press only wakes it). A dim
+// screen can still be read, so that press brightens it and works as normal.
 bool wakeScreen() {
   lastInteraction = millis();
   if (scr == SCR_ON) return false;
-  if (scr == SCR_OFF) M5.Display.wakeup();
+  const bool wasOff = scr == SCR_OFF;
+  if (wasOff) M5.Display.wakeup();
   M5.Display.setBrightness(setting(S_BRIGHT));
   scr = SCR_ON;
   needRedraw = true;
-  return true;
+  return wasOff;
 }
 
 void markActivity() {
@@ -2262,7 +2264,7 @@ void pollStaffButtons() {
   if (!any) return;
   markActivity();
   stopScan();
-  if (wakeScreen()) return;  // screen was dim/off: this press only wakes it
+  if (wakeScreen()) return;  // screen was off: this press only wakes it
   if (aboutOpen) {  // A: back to the settings
     if (M5.BtnA.wasClicked()) aboutOpen = false;
     needRedraw = true;
@@ -2672,8 +2674,8 @@ void setup() {
   Serial.setRxBufferSize(16384);  // room for recordings sent from the setup page
   Serial.begin(115200);
 
-  M5.BtnA.setHoldThresh(800);
-  M5.BtnB.setHoldThresh(800);
+  M5.BtnA.setHoldThresh(600);
+  M5.BtnB.setHoldThresh(600);
 
   sensorOn = startSensor();  // a ToF sensor on the Grove port is the switch
   if (!sensorOn) pinMode(PIN_KEY, INPUT_PULLUP);

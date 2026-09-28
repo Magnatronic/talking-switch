@@ -165,7 +165,8 @@ The bottom line of the screen always shows what the buttons do right now.
 | **Hold A** | Do it: QUICK – record the selected Quick message (release to stop); TOPICS – open the topic, to look through its messages; CONTROL – learn the selected code (remote 30cm+ from the end of the stick, within 8s); on **Settings** – open them; in settings – change the value, or open About / Sensor test |
 | **Hold B** | Hear it: QUICK – the selected Quick message; an open topic – the message; CONTROL – the code's sound (without sending it) |
 
-When the screen is dim or off, the first press of A or B only wakes it.
+A hold is 0.6s. When the screen is off, the first press of A or B only wakes it; when it's just dim, presses work
+as normal.
 
 ### Scanning: choice-making with one switch
 
