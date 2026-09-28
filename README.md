@@ -238,7 +238,7 @@ All of these are on the setup page too, on each mode's tab and the Settings tab.
 | QUICK, TOPICS, CONTROL | Scan speed | 1.5s, 2s, **3s**, 4s, 5s | How long each choice is offered |
 | QUICK, TOPICS, CONTROL | Scan rounds | 1, **2**, 3 | Press twice: how many times round before it stops by itself |
 | QUICK, TOPICS, CONTROL | Stop choice | **Off**, On | Offers "Stop" last, so the student can choose none of them |
-| KEYBOARD | No USB | **Bluetooth**, QUICK, TOPICS | With no USB connection: *Bluetooth* sends keys over Bluetooth. *QUICK* / *TOPICS*: the backup mode (below). Only with USB Mode: USB-OTG (TinyUSB) |
+| KEYBOARD | No USB | **Bluetooth**, QUICK, TOPICS | What to do when the switch isn't plugged into a computer or AAC device by USB. *Bluetooth*: send the key over Bluetooth instead. *QUICK* / *TOPICS*: after 10 seconds, talk instead, using that mode – Bluetooth stays off to save battery. Plugging USB back in switches it back to KEYBOARD (see the backup mode above). Only with USB Mode: USB-OTG (TinyUSB) |
 | KEYBOARD | Key action | **Momentary**, Latch | *Momentary* holds the key while the switch is held; *Latch* – one press holds the key down, the next lets it go. The screen says "Key held" and the LED glows brighter while latched |
 | KEYBOARD, CONTROL | Press sound | **Off**, Click, Beep | A sound on each press, as feedback (CONTROL: only for codes with no sound of their own) |
 | CONTROL | IR codes | **Staff pick**, Repeat held, Student scans | See the CONTROL mode above |
