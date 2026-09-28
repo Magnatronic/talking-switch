@@ -111,20 +111,21 @@
 #include "USB.h"
 #include "USBHIDKeyboard.h"
 #define HAS_USB_HID 1
-USBHIDKeyboard UsbKeyboard;
-#else
-#define HAS_USB_HID 0
-#endif
-
-#if HAS_USB_HID && !ARDUINO_USB_CDC_ON_BOOT
+#if !ARDUINO_USB_CDC_ON_BOOT
 // "USB CDC On Boot: Disabled": this sketch starts the USB serial port itself,
 // after giving the USB device the switch's name. (With it Enabled, the core
-// starts USB before setup() under the board's name, "ESP32S3_DEV".)
+// starts USB before setup() under the board's name, "ESP32S3_DEV".) Made
+// before the keyboard, so the serial port stays the USB device's first part,
+// as it was with CDC On Boot - Windows remembers a device's layout.
 #include "USBCDC.h"
 USBCDC UsbSerial(0);
 #define Serial UsbSerial
-#elif HAS_USB_HID
+#else
 #warning "Set Tools > USB CDC On Boot: Disabled, so the USB device gets the switch's name"
+#endif
+USBHIDKeyboard UsbKeyboard;
+#else
+#define HAS_USB_HID 0
 #endif
 
 // ToF sensor settings that are the same for everyone
