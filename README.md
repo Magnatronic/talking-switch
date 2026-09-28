@@ -46,8 +46,9 @@ TinyUSB CDC") and uploads normally reset it automatically. If an upload fails, p
 ## Setup page (USB)
 
 The setup page is `docs/index.html`, published with **GitHub Pages** so staff just open a link in **Chrome or
-Edge** (Firefox and Safari can't talk to USB devices). Plug the StickS3 in, close the Arduino Serial Monitor,
-click **Connect** and pick the switch. The switch is set up over the USB cable – no Wi-Fi – and recordings and
+Edge** (Firefox and Safari can't talk to USB devices). Turn the StickS3 on and plug it in (don't hold the power
+button while plugging it in – that starts it for programming), close the Arduino IDE, click **Connect** and pick
+**ESP32S3_DEV – TinyUSB CDC**. The switch is set up over the USB cable – no Wi-Fi – and recordings and
 typed words stay on the computer.
 
 The page has a tab for each mode – QUICK, TOPICS, KEYBOARD, CONTROL – then **Voice** and **Settings**, like the

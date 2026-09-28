@@ -142,9 +142,10 @@ ol { padding-left: 1.2em; margin: 8px 0 0; }
   <section id="intro" class="card">
     <h2>Connect the switch</h2>
     <ol>
-      <li>Plug the switch into this computer with a USB cable.</li>
-      <li>Close the Arduino Serial Monitor if it's open.</li>
-      <li>Click <b>Connect</b> and choose the switch from the list.</li>
+      <li>Turn the switch on, then plug it into this computer with a USB cable. (Don't hold its power button while
+        plugging it in – that starts it for programming.)</li>
+      <li>Close the Arduino IDE if it's open – its Serial Monitor holds the switch's port.</li>
+      <li>Click <b>Connect</b> and choose <b>ESP32S3_DEV – TinyUSB CDC</b> from the list.</li>
     </ol>
     <p class="muted small">Setup happens over the USB cable – no Wi-Fi. Recordings and typed words stay on this computer.</p>
   </section>
@@ -270,7 +271,7 @@ function toast(msg, isErr = false) {
   t.textContent = msg;
   t.className = 'show' + (isErr ? ' err' : '');
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => (t.className = ''), isErr ? 5000 : 2500);
+  toastTimer = setTimeout(() => (t.className = ''), isErr ? 5000 + msg.length * 40 : 2500);
 }
 
 // ---------------------------------------------------------------- serial link
@@ -393,16 +394,23 @@ async function connect() {
   try {
     port = await navigator.serial.requestPort({ filters: [{ usbVendorId: 0x303a }] });
   } catch { return; }  // chooser cancelled
+  toast('Connecting…');
   try {
     await port.open({ baudRate: 115200, bufferSize: 65536 });
+  } catch {
+    toast('That port is in use – close the Arduino IDE (its Serial Monitor holds the port), then Connect again.', true);
+    port = null;
+    return;
+  }
+  try {
     // DTR on (needed for the switch to send), RTS off (RTS can reset it)
     try { await port.setSignals({ dataTerminalReady: true, requestToSend: false }); } catch {}
     writer = port.writable.getWriter();
     reader = port.readable.getReader();
     readLoop();
-    // The switch may restart when the port opens, so give it a few tries.
-    for (let t = 0; t < 8; t++) {
-      try { await refresh(); break; } catch (e) { if (t === 7) throw e; await sleep(700); }
+    // The switch may restart when the port opens, so give it a few tries (~15 s).
+    for (let t = 0; t < 4; t++) {
+      try { await refresh(); break; } catch (e) { if (t === 3) throw e; await sleep(700); }
     }
     $('connectBtn').textContent = 'Disconnect';
     $('connectBtn').classList.remove('primary');
@@ -411,7 +419,9 @@ async function connect() {
     showTab(tabOfMode(info.mode));
     toast('Connected to ' + info.name);
   } catch {
-    toast("The switch didn't answer. Is the latest firmware on it, and the Serial Monitor closed?", true);
+    toast("The switch didn't answer. Turn it on normally (don't hold the power button while plugging it in – that "
+      + "starts it for programming), choose “ESP32S3_DEV – TinyUSB CDC” and close the Arduino IDE. If it still "
+      + "doesn't answer, check it has the latest firmware.", true);
     await disconnect();
   }
 }
