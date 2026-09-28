@@ -196,7 +196,9 @@ ol { padding-left: 1.2em; margin: 8px 0 0; }
           <div class="small">The switch appears as <b id="btName"></b> (<span id="btState"></span>).</div>
           <div class="help">Keys go over USB when plugged into a computer, otherwise over Bluetooth (with No USB set to
             Bluetooth). To pair with a
-            different computer or tablet, use <i>Forget BT devices</i> on the Settings tab.</div>
+            different computer or tablet, use <i>Forget BT devices</i> on the Settings tab. Paired before Left click
+            was added (28 Sep 2026)? Remove the switch in the device's Bluetooth settings, use <i>Forget BT devices</i>,
+            and pair again.</div>
         </div>
       </div>
     </section>
@@ -254,7 +256,7 @@ let typed = '';           // words typed in the editor
 const MODE_HELP = {
   'QUICK': 'The 4 Quick messages: each press plays the selected one, or the student chooses one – by scanning or by counting presses.',
   'TOPICS': 'The student chooses from the Topics by scanning.',
-  'KEYBOARD': 'Each press presses a keyboard key, over USB or Bluetooth.',
+  'KEYBOARD': 'Each press presses a keyboard key (or clicks the mouse), over USB or Bluetooth.',
   'CONTROL': 'Each press sends the selected remote-control code, and says its sound if it has one.',
 };
 const TABS = ['quick', 'topics', 'keyboard', 'control', 'voice', 'settings'];
@@ -939,7 +941,7 @@ function renderSettings() {
   for (const [tab, list] of Object.entries(TAB_SETTINGS))
     $('set-' + tab).replaceChildren(...list.filter(([, when]) => !when || when()).map(([k]) => switchSetting(k)).filter(Boolean));
   $('set-keyboard').prepend(settingRow('Key', info.keys, info.key, (i) => act(() => cmd(`KEY ${i}`)),
-    'The key the switch presses, e.g. Space or Enter for Grid 3 or Mind Express.'));
+    'The key the switch presses, e.g. Space or Enter for Grid 3 or Mind Express. Left click clicks the mouse wherever the pointer is.'));
 
   $('speakIntro').replaceChildren(...(speakScanning()
     ? ['The switch offers these messages one at a time and the student chooses one. Click ', el('b', {}, 'Add'), ' or ', el('b', {}, 'Change'),

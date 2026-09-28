@@ -18,7 +18,8 @@
 //                  IR codes are offered like a topic's messages, and My
 //                  device changes to KEYBOARD for the student's AAC device.
 //    KEYBOARD  Acts as a USB or Bluetooth keyboard key, e.g. Space/Enter
-//              for Grid 3 or Mind Express switch access. Key goes down on
+//              for Grid 3 or Mind Express switch access, or the left mouse
+//              button (Left click; it's a keyboard and mouse in one). Key goes down on
 //              press and up on release, so dwell and hold-to-scan settings
 //              in the AAC software still work. When a computer is using it
 //              as a USB keyboard, keys go over USB only; otherwise they go
@@ -47,8 +48,8 @@
 //              The big switch keeps doing the previous mode's job.
 //
 //  Staff controls on the StickS3 - one rule everywhere (the bottom line of
-//  the screen always shows what they do; when the screen is dim or off, the
-//  first press only wakes it):
+//  the screen always shows what they do; a hold is 0.6 s; when the screen is
+//  off, the first press only wakes it - when it's just dim, presses work):
 //    A click .... next mode (in a mode's settings, an open topic, About or
 //                 Sensor test: close it)
 //    B click .... next: Quick message / topic / key / IR code, then the

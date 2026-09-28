@@ -65,8 +65,8 @@ nothing with the current choices are hidden), and what it uses below.
 - **TOPICS:** Choose from, Choosing, Scan speed, Scan rounds; the 4 **topics** of up to 4 messages each (up to 5
   seconds per message). Name each topic and message – the names become the spoken prompts. With *Choose from: One
   topic*, *Use this topic* picks it.
-- **KEYBOARD:** the key, Key action, Press sound; a **custom key or shortcut** such as Win+H (dictation); the
-  Bluetooth name.
+- **KEYBOARD:** the key (including Left click), Key action, Press sound, No USB; a **custom key or shortcut** such
+  as Win+H (dictation); the Bluetooth name.
 - **CONTROL:** IR codes (and the scanning settings when students scan), Press sound; 4 remote-control codes, separate
   from the messages. For each: a name, **Learn / Test / Delete**, and an optional **sound** (made the same three
   ways) that the switch says as it sends the code.
@@ -276,7 +276,8 @@ AssistiveTouch on.
 - **USB:** plug into the computer with a data cable. Nothing to pair, and it charges at the same time.
 - **Bluetooth:** the StickS3 appears as **"ChatterSwitch XXXX"** – each stick has its own 4-character ID, shown on the
   KEYBOARD screen, so you can tell switches apart – with any *Switch name* from the setup page in front, e.g.
-  "Sam ChatterSwitch 7B70". Pair it from Windows, iPad or Android like a keyboard.
+  "Sam ChatterSwitch 7B70". Pair it from Windows, iPad or Android like a keyboard (it's a keyboard and mouse in
+  one, for Left click).
   To move it to a different computer or tablet, use *Forget BT devices* in SETTINGS.
   **Paired before Left click was added (28 Sep 2026)?** Remove the switch in the device's Bluetooth settings, use
   *Forget BT devices* on the stick, and pair again – the device remembers it as keyboard-only.
@@ -318,7 +319,7 @@ Most student settings are in the SETTINGS mode above. At the top of `TalkingSwit
 | `MIC_PGA` | 8 | Microphone analogue gain (3dB steps, 0–10). Lower it if loud voices sound distorted |
 | `SCREEN_DIM_MS` / `SCREEN_OFF_MS` | 30000 / 120000 | Screen dims, then switches off, when idle |
 | `BLE_NAME` | "ChatterSwitch" | Default Bluetooth name; each stick's own ID is added to it |
-| `FW_VERSION` / `FW_API` | "27 Sep 2026" / 2 | Version shown in About. Raise `FW_API` (and `PAGE_API` in `docs/index.html`) when the page and firmware must change together |
+| `FW_VERSION` / `FW_API` | "28 Sep 2026" / 2 | Version shown in About. Raise `FW_API` (and `PAGE_API` in `docs/index.html`) when the page and firmware must change together |
 
 ## Troubleshooting
 
@@ -375,6 +376,6 @@ after the stick has started.
 - Compile-checked against esp32 core 3.3.11 with M5Unified 0.2.23 / M5GFX 0.2.30 and VL53L1X 1.3.1, in both USB
   modes.
 - Tested on hardware: the Unit Key and a 3.5mm jack switch, the modes and their settings, the setup page, and the
-  ToF sensor (Line and Move). Not yet tested on hardware: IR, the USB keyboard, sleep, auto power-off and the backup
+  ToF sensor (Line and Move), Left click over USB. Not yet tested on hardware: Left click over Bluetooth, IR, the USB keyboard, sleep, auto power-off and the backup
   mode.
 - This is a DIY device, not a certified AT product. Check it's robust and safe for each student before use.
