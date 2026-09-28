@@ -109,8 +109,10 @@
 #if ARDUINO_USB_MODE == 0  // "USB Mode: USB-OTG (TinyUSB)" selected
 #include "USB.h"
 #include "USBHIDKeyboard.h"
+#include "USBHIDMouse.h"
 #define HAS_USB_HID 1
 USBHIDKeyboard UsbKeyboard;
+USBHIDMouse UsbMouse;
 #if !ARDUINO_USB_CDC_ON_BOOT
 #error "Set Tools > USB CDC On Boot: Enabled - the setup page talks to the switch over it"
 #endif
@@ -125,7 +127,7 @@ static const int SENSE_GRAPH_W = 224;      // Sensor test graph: one reading per
 
 // Firmware version. FW_API goes up whenever the setup page needs to change
 // with it (the page shows a warning if the numbers don't match).
-static const char* FW_VERSION = "27 Sep 2026";
+static const char* FW_VERSION = "28 Sep 2026";
 static const int   FW_API     = 2;
 
 // ---------------------------------------------------------------------
@@ -204,10 +206,12 @@ struct ScanItem { uint8_t kind, idx; };
 
 enum Arrow : uint8_t { A_NONE, A_UP, A_DOWN, A_LEFT, A_RIGHT };
 struct KeyDef { const char* name; uint8_t usage; Arrow arrow; };
+static const uint8_t USAGE_LCLICK = 0xF0;  // not a real key (0xE8-0xFF are unused): the left mouse button
 static const KeyDef KEYS[] = {
   {"SPACE", 0x2C, A_NONE}, {"ENTER", 0x28, A_NONE},
   {"UP",    0x52, A_UP},   {"DOWN",  0x51, A_DOWN},
-  {"LEFT",  0x50, A_LEFT}, {"RIGHT", 0x4F, A_RIGHT}
+  {"LEFT",  0x50, A_LEFT}, {"RIGHT", 0x4F, A_RIGHT},
+  {"LEFT CLICK", USAGE_LCLICK, A_NONE}
 };
 static const int NUM_KEYS = sizeof(KEYS) / sizeof(KEYS[0]);
 
@@ -942,11 +946,20 @@ static const uint8_t HID_REPORT_MAP[] = {
   0x29, 0x05, 0x91, 0x02, 0x95, 0x01, 0x75, 0x03, 0x91, 0x01,
   0x95, 0x06, 0x75, 0x08, 0x15, 0x00, 0x25, 0x73,  // 6 keys
   0x05, 0x07, 0x19, 0x00, 0x29, 0x73, 0x81, 0x00,
-  0xC0
+  0xC0,
+  0x05, 0x01, 0x09, 0x02, 0xA1, 0x01, 0x85, 0x02,  // Mouse, report ID 2
+  0x09, 0x01, 0xA1, 0x00,
+  0x05, 0x09, 0x19, 0x01, 0x29, 0x03, 0x15, 0x00,  // 3 buttons
+  0x25, 0x01, 0x95, 0x03, 0x75, 0x01, 0x81, 0x02,
+  0x95, 0x01, 0x75, 0x05, 0x81, 0x03,              // padding
+  0x05, 0x01, 0x09, 0x30, 0x09, 0x31, 0x09, 0x38,  // X, Y, wheel (always 0: it only clicks)
+  0x15, 0x81, 0x25, 0x7F, 0x75, 0x08, 0x95, 0x03, 0x81, 0x06,
+  0xC0, 0xC0
 };
 
 BLEHIDDevice* hid = nullptr;
 BLECharacteristic* kbInput = nullptr;
+BLECharacteristic* mouseInput = nullptr;
 volatile bool bleConnected = false;
 volatile bool bleRunning = false;  // Bluetooth is only switched on in KEYBOARD mode
 
@@ -965,6 +978,7 @@ void bleBegin() {
   server->setCallbacks(new ServerCallbacks());
   hid = new BLEHIDDevice(server);
   kbInput = hid->inputReport(1);
+  mouseInput = hid->inputReport(2);
   hid->manufacturer()->setValue("DIY AT");
   hid->pnp(0x02, 0xE502, 0xA111, 0x0210);
   hid->hidInfo(0x00, 0x01);
@@ -994,6 +1008,7 @@ void bleEnd() {
   BLEDevice::deinit(false);     // false: keeps it possible to start again later
   hid = nullptr;                // owned by the deleted server
   kbInput = nullptr;
+  mouseInput = nullptr;
   bleConnected = false;
   needRedraw = true;
 }
@@ -1132,13 +1147,24 @@ void sendKey(bool down) {
     keyDownUsage = keyIsCustom() ? customUsage : KEYS[keyIdx].usage;
     keyDownMods = keyIsCustom() ? customMods : 0;
   }
-  if (keyDownOut == OUT_BLE && kbInput) {
+  if (keyDownUsage == USAGE_LCLICK) {  // the left mouse button
+    if (keyDownOut == OUT_BLE && mouseInput) {
+      uint8_t report[4] = {(uint8_t)(down ? 1 : 0), 0, 0, 0};
+      mouseInput->setValue(report, sizeof(report));
+      mouseInput->notify();
+    }
+#if HAS_USB_HID
+    if (keyDownOut == OUT_USB) {
+      if (down) UsbMouse.press(MOUSE_LEFT); else UsbMouse.release(MOUSE_LEFT);
+    }
+#endif
+  } else if (keyDownOut == OUT_BLE && kbInput) {
     uint8_t report[8] = {(uint8_t)(down ? keyDownMods : 0), 0, (uint8_t)(down ? keyDownUsage : 0), 0, 0, 0, 0, 0};
     kbInput->setValue(report, sizeof(report));
     kbInput->notify();
   }
 #if HAS_USB_HID
-  if (keyDownOut == OUT_USB) {
+  if (keyDownOut == OUT_USB && keyDownUsage != USAGE_LCLICK) {
     // modifiers are HID usages 0xE0 + bit number
     if (down) {
       for (int b = 0; b < 8; b++) if (keyDownMods & (1 << b)) UsbKeyboard.pressRaw(0xE0 + b);
@@ -2682,6 +2708,7 @@ void setup() {
 #if HAS_USB_HID
   USB.onEvent(onUsbEvent);
   UsbKeyboard.begin();
+  UsbMouse.begin();
   USB.begin();
 #endif
 

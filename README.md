@@ -265,14 +265,20 @@ silence trimmed, hiss between words turned down, level evened out.
 
 ### Keyboard (USB or Bluetooth)
 
-Keys: **Space, Enter, Up, Down, Left, Right**, and a custom key or shortcut set on the setup page (B-click to choose). In Grid 3 / Mind Express,
+Keys: **Space, Enter, Up, Down, Left, Right, Left click**, and a custom key or shortcut set on the setup page (B-click to choose). In Grid 3 / Mind Express,
 set switch input to the key shown on screen.
+
+**Left click** clicks the left mouse button wherever the pointer is (it doesn't move the pointer). With *Key action:
+Latch* it holds the button down until the next press, for dragging. On an iPad the pointer only shows with
+AssistiveTouch on.
 
 - **USB:** plug into the computer with a data cable. Nothing to pair, and it charges at the same time.
 - **Bluetooth:** the StickS3 appears as **"ChatterSwitch XXXX"** – each stick has its own 4-character ID, shown on the
   KEYBOARD screen, so you can tell switches apart – with any *Switch name* from the setup page in front, e.g.
   "Sam ChatterSwitch 7B70". Pair it from Windows, iPad or Android like a keyboard.
   To move it to a different computer or tablet, use *Forget BT devices* in SETTINGS.
+  **Paired before Left click was added (28 Sep 2026)?** Remove the switch in the device's Bluetooth settings, use
+  *Forget BT devices* on the stick, and pair again – the device remembers it as keyboard-only.
 
 It picks automatically: when a computer is using it as a USB keyboard, keys go over USB only;
 otherwise over Bluetooth. A phone charger doesn't count, so Bluetooth keeps working while charging.
