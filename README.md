@@ -373,6 +373,32 @@ The sensor isn't reliable closer than about 4 cm, and a finger works best 5–10
 window clean, and point it at a plain background. Readings also go to the serial port for the Serial Plotter – open it
 after the stick has started.
 
+## Mouse test (motion sensor as a mouse)
+
+`MouseTest/MouseTest.ino` is a separate test sketch: the StickS3's motion sensor moves the pointer, worn on the head
+(headband or cap) or held in the hand. Turn left/right to move left/right, tip down/up to move down/up. It works over
+USB, or Bluetooth as "ChatterSwitch XXXX" (the same identity as ChatterSwitch, so a paired device keeps working).
+
+- **Clicks:** the big switch is the left button (held while the switch is, so it drags) or the right button
+  (*Switch* setting). **Dwell click:** keep the pointer in one small area for the *Dwell* time to click; move away to
+  click again.
+- **Calibrate** (hold A; also at the first start): *Keep still*, then *Tip down* – nod down or tip the front down,
+  then back. This works whichever way round the stick is worn. Later starts only need *Keep still*.
+- **Buttons:** A = pause / move, hold A = calibrate, B = next speed, hold B = settings (B next, hold A change,
+  A close).
+- The screen shows the turn as a dot in a box (the grey ring is *Steady*). The rates also go to the Serial Plotter.
+
+| Setting | Choices | What it does |
+|---|---|---|
+| Speed | 1–6 (**4**) | How far the pointer goes per turn. The computer's pointer speed also applies |
+| Speed-up | Off, Low, **Medium**, High | Faster turns go further, so slow turns stay precise |
+| Steady | Off, **Low**, Medium, High | Ignores turns slower than this – steadies tremor and drift |
+| Smoothing | Off, **Low**, Medium, High | Smooths out shakes, with a little lag |
+| Dwell click | **Off**, 0.8, 1, 1.5, 2, 3 s | Time in one place to click |
+| Dwell area | Small, **Medium**, Large | How far the pointer may wander and still count as one place |
+| Switch | **Left click**, Right click | What the big switch does |
+| Flip left/right, Flip up/down | **Off**, On | If the pointer goes the wrong way |
+
 ## Notes
 
 - Compile-checked against esp32 core 3.3.11 with M5Unified 0.2.23 / M5GFX 0.2.30 and VL53L1X 1.3.1, in both USB
