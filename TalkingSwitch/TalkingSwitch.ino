@@ -54,12 +54,13 @@
 //                 Sensor test: close it)
 //    B click .... next: Quick message / topic / key / IR code, then the
 //                 mode's "Settings" item; in settings, the next setting
-//    Hold A ..... do it: QUICK record the message, CONTROL learn the code,
+//    Hold A ..... do it: QUICK record the message (one already there: hold
+//                 again to replace it), CONTROL learn the code,
 //                 TOPICS open the topic (B then steps through its messages,
 //                 A closes it), on "Settings" open them, in settings change
 //                 the value (or open About / Sensor test)
 //    Hold B ..... hear it: QUICK the message, an open topic's message,
-//                 CONTROL the code's sound
+//                 CONTROL the code's sound; in settings, back a value
 //                 (B itself is silent, to save battery)
 //
 //  Power saving: the screen dims, then switches off, when idle. Bluetooth
@@ -128,7 +129,7 @@ static const int SENSE_GRAPH_W = 224;      // Sensor test graph: one reading per
 
 // Firmware version. FW_API goes up whenever the setup page needs to change
 // with it (the page shows a warning if the numbers don't match).
-static const char* FW_VERSION = "28 Sep 2026";
+static const char* FW_VERSION = "29 Sep 2026";
 static const int   FW_API     = 2;
 
 // ---------------------------------------------------------------------
@@ -240,9 +241,9 @@ static const Setting SETTINGS[S_COUNT] = {
   {"Volume",              "vol",       4, 2, {0, 1, 2, 3}, {"1", "2", "3", "4"}, G_GENERAL},
   // which modes this switch uses (QUICK and TOPICS always)
   {"Modes",               "s_modes",   4, 0, {0, 1, 2, 3}, {"All", "No KEYBOARD", "No CONTROL", "Talking only"}, G_GENERAL},
-  // QUICK: play the Quick message staff selected, or the student chooses one by scanning
-  {"Messages",            "s_spkmode", 2, 0, {0, 1}, {"Staff pick", "Student chooses"}, G_SPEAK},
-  // QUICK, Student chooses: how - scanning (Press twice / Hold & release, as TOPICS
+  // QUICK "Plays": the selected Quick message, or one is chosen (scanning or counting presses)
+  {"Plays",               "s_spkmode", 2, 0, {0, 1}, {"Selected", "Choose one"}, G_SPEAK},
+  // QUICK, Choose one: how - scanning (Press twice / Hold & release, as TOPICS
   // and CONTROL's Choosing), or Count presses (1-4 presses = message 1-4)
   {"Choosing",            "s_qhow",    3, 0, {0, 1, 2}, {"Press twice", "Hold & release", "Count presses"}, G_SPEAK},
   // QUICK, Count presses: this long without a press ends the count
@@ -261,7 +262,7 @@ static const Setting SETTINGS[S_COUNT] = {
   {"Offer Control",       "s_offctl",  2, 0, {0, 1}, {"Off", "On"}, G_CHOOSE},
   {"Offer My device",     "s_offdev",  2, 0, {0, 1}, {"Off", "On"}, G_CHOOSE},
   // IR: send the selected code; the same, repeating while held; or the student chooses by scanning
-  {"IR codes",            "s_irmode",  3, 0, {0, 1, 2}, {"Staff pick", "Repeat held", "Student scans"}, G_IR},
+  {"IR codes",            "s_irmode",  3, 0, {0, 1, 2}, {"Selected", "Repeat held", "Scan"}, G_IR},
   // scanning: press to start, press to choose; or hold to step, let go to choose
   {"Choosing",            "s_access",  2, 0, {0, 1}, {"Press twice", "Hold & release"}, G_CHOOSE | G_IR},
   // scanning: how long each choice is offered, and how many times round before stopping
@@ -297,7 +298,7 @@ static const Setting SETTINGS[S_COUNT] = {
   {"Sensor test",         nullptr,     1, 0, {0}, {""}, G_GENERAL},
   // screen brightness while in use; lower saves battery
   {"Brightness",          "s_bright",  3, 1, {40, 128, 220}, {"Low", "Medium", "High"}, G_GENERAL},
-  {"Switch wakes screen", "s_wake",    2, 0, {0, 1}, {"No", "Yes"}, G_GENERAL},
+  {"Press wakes screen",  "s_wake",    2, 0, {0, 1}, {"No", "Yes"}, G_GENERAL},
   // on battery, sleep after this many idle minutes; the big switch still works
   {"Sleep after",         "s_sleep",   4, 2, {0, 2, 5, 15}, {"Off", "2 min", "5 min", "15 min"}, G_GENERAL},
   // on battery, power off completely after this many idle minutes
@@ -339,7 +340,7 @@ bool     keyLatched = false;    // Latch key action: key is being held down
 bool     playLatched = false;   // Latch play style: message is looping
 uint8_t  pressTally = 0;        // QUICK, Count presses: presses so far (0 = not counting)
 uint32_t tallyEnds = 0;         // ...and when the count ends
-// Scanning (TOPICS, and IR with "Student scans")
+// Scanning (TOPICS, and IR with "Scan")
 ScanItem scanItems[NUM_TOPICS + 4];  // top: Quick, 4 topics, Control, My device, Stop  // the choices on offer: topics, messages (+ Back) or IR codes, + Stop
 int      scanCount = 0;
 bool     scanning = false;      // offering choices now
@@ -409,6 +410,7 @@ bool     backupOn = false;     // in the backup mode because KEYBOARD has no USB
 uint32_t backupSince = 0;      // KEYBOARD without USB since (0 = not counting)
 uint8_t  settingIdx = 0;       // setting shown in SETTINGS mode
 uint32_t forgetConfirmUntil = 0; // "Forget BT devices": waiting for the second B press
+uint32_t recordConfirmUntil = 0; // QUICK: the message has a recording - waiting for a second hold of A to replace it
 
 M5Canvas canvas(&M5.Display);
 bool canvasOk = false;
@@ -1402,10 +1404,15 @@ void drawMain(lgfx::LovyanGFX& c) {
       }
       // the Quick message B and hold A (record) work on - also when the student scans
       line1(c, titleOf(slot));
+      if (recordConfirmUntil) {  // a hold of A on a recorded message asks first
+        line2(c, "Hold A again to replace", C_PROBLEM);
+        detailLine(c, "Anything else keeps it");
+        break;
+      }
       if (playLatched) line2(c, "Playing - press to stop", C_DO);
       else if (slotLen[slot]) line2(c, String(slotLen[slot] / (float)SAMPLE_RATE, 1) + " s recorded", C_READY);
       else line2(c, "Empty - hold A to record", C_PROBLEM);
-      detailLine(c, speakScanning() ? "Student scans " + plural(countQuick(), "message", "messages")
+      detailLine(c, speakScanning() ? "Scans " + plural(countQuick(), "message", "messages")
                     : countPresses() ? "Count 1-4 presses - Quick " + String(slot + 1)
                                      : "Quick " + String(slot + 1) + " of " + String(NUM_QUICK)
                                       + (slotLen[slot] ? " - hold B to hear" : ""));
@@ -1428,7 +1435,7 @@ void drawMain(lgfx::LovyanGFX& c) {
         if (names.length()) line2(c, names, C_READY);
         else line2(c, "Empty - add messages on the setup page", C_PROBLEM);
         String where = "topic " + String(group + 1) + " of " + String(NUM_TOPICS);
-        detailLine(c, topicsByStudent() ? "Student picks - " + where
+        detailLine(c, topicsByStudent() ? "Choosing - " + where
                                         : "T" + where.substring(1) + (names.length() ? holdToChoose() ? " - hold to start" : " - press to start" : ""));
         break;
       }
@@ -1481,7 +1488,7 @@ void drawMain(lgfx::LovyanGFX& c) {
       line1(c, titleOf(snd));
       if (!irLen[irSlot]) line2(c, "No code - hold A to learn", C_PROBLEM);
       else line2(c, slotLen[snd] ? "Code learned, with sound" : "Code learned", C_READY);
-      line3(c, irScanning() ? "Student scans " + plural(countIr(), "IR code", "IR codes")
+      line3(c, irScanning() ? "Scans " + plural(countIr(), "IR code", "IR codes")
                             : "IR code " + String(irSlot + 1) + " of " + String(NUM_SLOTS)
                               + (slotLen[snd] ? " - hold B to hear" : ""));
       break;
@@ -1633,9 +1640,10 @@ String buttonGuide() {
     if (settingIdx == S_FORGET) return "B next  hold A forget  A " + String(inSettings() ? "mode" : "close");
     if (settingIdx == S_ABOUT) return "B next  hold A open  A " + String(inSettings() ? "mode" : "close");
     if (settingIdx == S_SENSE_TEST) return "B next  hold A open  A " + String(inSettings() ? "mode" : "close");
-    return "B next  hold A change  A " + String(inSettings() ? "mode" : "close");
+    return "B next  hold A/B change  A " + String(inSettings() ? "mode" : "close");
   }
   if (gateShown) return "B first  hold A open  A mode";
+  if (recordConfirmUntil && mode == M_SPEAK) return "hold A replace  B keep";
   switch (mode) {
     case M_SPEAK: return "B next  hold A record  A mode";
     case M_CHOOSE: return topicOpen ? "B next  hold B hear  A close" : "B next topic  hold A open  A mode";
@@ -1813,7 +1821,7 @@ void managePower(uint32_t now) {
 //  Student switch actions
 // ---------------------------------------------------------------------
 // ---------------------------------------------------------------------
-//  Choosing by scanning (TOPICS mode, and QUICK and IR with "Student scans").
+//  Choosing by scanning (TOPICS mode, and QUICK and IR with "Scan").
 //  The switch offers each choice in turn - LED colour, name on screen and a
 //  quiet spoken prompt - and the student picks one:
 //    Press twice ..... a press starts the offers, the next press chooses
@@ -2194,7 +2202,7 @@ int nextSettingInView(int from) {
   return from;
 }
 
-// Settings screens: B = next setting, hold A = change it (saved straight away)
+// Settings screens: B = next setting, hold A = next value, hold B = back a value (saved straight away)
 void settingsButtons() {
   if (M5.BtnB.wasClicked()) { settingIdx = nextSettingInView(settingIdx); forgetConfirmUntil = 0; }
   if (M5.BtnA.wasHold() && settingIdx == S_FORGET) {
@@ -2210,9 +2218,10 @@ void settingsButtons() {
   } else if (M5.BtnA.wasHold() && settingIdx == S_SENSE_TEST) {
     sensorTest = true;
     senseReset();
-  } else if (M5.BtnA.wasHold() && SETTINGS[settingIdx].key) {  // (About has nothing to change)
+  } else if ((M5.BtnA.wasHold() || M5.BtnB.wasHold()) && SETTINGS[settingIdx].key) {  // (About has nothing to change)
     uint8_t& ch = settingChoice[settingIdx];
-    ch = (ch + 1) % SETTINGS[settingIdx].count;
+    const uint8_t n = SETTINGS[settingIdx].count;
+    ch = M5.BtnB.wasHold() ? (ch + n - 1) % n : (ch + 1) % n;
     prefs.putUChar(SETTINGS[settingIdx].key, ch);
     settingChanged(settingIdx);
   }
@@ -2266,6 +2275,13 @@ void pollStaffButtons() {
   markActivity();
   stopScan();
   if (wakeScreen()) return;  // screen was off: this press only wakes it
+  // "Hold A again to replace": only a second hold of A records; B just keeps the message
+  uint32_t confirmUntil = recordConfirmUntil;
+  if (confirmUntil) {
+    recordConfirmUntil = 0;
+    needRedraw = true;
+    if (M5.BtnB.wasClicked()) return;
+  }
   if (aboutOpen) {  // A: back to the settings
     if (M5.BtnA.wasClicked()) aboutOpen = false;
     needRedraw = true;
@@ -2277,7 +2293,7 @@ void pollStaffButtons() {
     needRedraw = true;
     return;
   }
-  if (settingsView() && (M5.BtnA.wasHold() || M5.BtnB.wasClicked())) { settingsButtons(); return; }
+  if (settingsView() && (M5.BtnA.wasHold() || M5.BtnB.wasHold() || M5.BtnB.wasClicked())) { settingsButtons(); return; }
 
   if (M5.BtnB.wasHold()) {  // hear the selected Quick message / IR code's sound
     int snd = mode == M_SPEAK ? slot : mode == M_IR ? irSound(irSlot)
@@ -2295,7 +2311,9 @@ void pollStaffButtons() {
     } else if (mode == M_IR) {
       learnIr(irSlot);
     } else if (mode == M_SPEAK) {
-      recordSlot(slot);
+      // a message already there needs a second hold, so a knock can't record over it
+      if (slotLen[slot] && millis() >= confirmUntil) recordConfirmUntil = millis() + 4000;
+      else recordSlot(slot);
     }
     lastInteraction = millis();
     needRedraw = true;
@@ -2754,6 +2772,7 @@ void loop() {
   static uint32_t lastRefresh = 0;
   if (now - lastRefresh > 5000) { lastRefresh = now; readBattery(); }
   if (forgetConfirmUntil && now >= forgetConfirmUntil) { forgetConfirmUntil = 0; needRedraw = true; }
+  if (recordConfirmUntil && now >= recordConfirmUntil) { recordConfirmUntil = 0; needRedraw = true; }
   if (sensorTest && now - lastInteraction > 300000) { sensorTest = false; needRedraw = true; }
   if (aboutOpen && now - lastInteraction > SETTINGS_EXIT_MS) { aboutOpen = false; needRedraw = true; }
   if (inSettings() && !sensorTest && now - lastInteraction > SETTINGS_EXIT_MS) { mode = prevMode; ledIdle(); needRedraw = true; }

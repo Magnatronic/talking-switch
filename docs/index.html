@@ -8,13 +8,13 @@
 :root {
   --bg: #f4f5f7; --card: #ffffff; --text: #1d2330; --muted: #5d6677; --line: #dde1e8;
   --accent: #1f6feb; --accent-soft: #e7f0ff; --accent-text: #ffffff;
-  --good: #1a7f37; --bad: #c62828; --chip: #eef1f5; --rec: #d32f2f;
+  --good: #1a7f37; --bad: #c62828; --chip: #eef1f5; --rec: #d32f2f; --warn: #b45309;
 }
 @media (prefers-color-scheme: dark) {
   :root {
     --bg: #14171c; --card: #1d2129; --text: #e7eaf0; --muted: #9aa3b2; --line: #313745;
     --accent: #4c8dff; --accent-soft: #1b2a45; --accent-text: #0b0d10;
-    --good: #4ac26b; --bad: #ff6b6b; --chip: #272c36; --rec: #ff5a5a;
+    --good: #4ac26b; --bad: #ff6b6b; --chip: #272c36; --rec: #ff5a5a; --warn: #f0a040;
   }
 }
 * { box-sizing: border-box; }
@@ -48,11 +48,17 @@ button.link { background: none; border: none; color: var(--accent); padding: 4px
 .dot { width: 12px; height: 12px; border-radius: 50%; background: var(--line); display: inline-block; vertical-align: -1px; transition: background .15s; }
 .dot.lit { background: var(--good); }
 
-/* mode / volume bar */
-.modeline { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; padding: 10px 12px; margin-bottom: 14px;
+/* mode bar: which mode the switch is in, this mode's settings as chips, and the settings button */
+.modeline { display: flex; flex-wrap: wrap; gap: 8px 10px; align-items: center; padding: 8px 12px; margin-bottom: 14px;
   border-radius: 10px; background: var(--chip); }
 .modeline.inuse { background: var(--accent-soft); }
-.modeline b { font-size: 1.02rem; }
+.modeline .inuse-label { font-weight: 600; color: var(--good); }
+.modeline .grow { flex: 1 1 auto; }
+.chip { background: var(--card); border: 1px solid var(--line); border-radius: 999px; padding: 2px 10px; font-size: .85rem; }
+.list-head { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; justify-content: space-between; margin: 4px 0 10px; }
+.list-head h2 { margin: 0; }
+.tag { font-size: .8rem; font-weight: 600; color: var(--accent); background: var(--card); border: 1px solid var(--accent);
+  border-radius: 999px; padding: 1px 9px; }
 .seg { display: flex; flex-wrap: wrap; gap: 6px; }
 .label { font-weight: 600; font-size: .9rem; margin-bottom: 4px; }
 
@@ -74,7 +80,22 @@ button.link { background: none; border: none; color: var(--accent); padding: 4px
 .slot-main .name { flex: 1 1 160px; min-width: 120px; }
 .slot-main .status { width: 6.5em; font-size: .9rem; color: var(--muted); }
 .slot-main .status.has { color: var(--good); font-weight: 600; }
-.sel { display: flex; align-items: center; gap: 4px; font-size: .85rem; color: var(--muted); cursor: pointer; min-width: 7.5em; }
+.slot.pickable { cursor: pointer; }
+.num-btn { width: 32px; height: 32px; min-height: 0; padding: 0; border-radius: 50%; font-weight: 700; }
+.num-btn.on { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+button.add { color: var(--accent); border-color: var(--accent); background: var(--card); font-weight: 600; }
+
+/* ⋯ menu: the less-used actions of a row */
+details.more { position: relative; }
+details.more > summary { list-style: none; cursor: pointer; width: 40px; min-height: 40px; display: flex; align-items: center;
+  justify-content: center; border: 1px solid var(--line); border-radius: 8px; background: var(--chip); font-weight: 700; }
+details.more > summary::-webkit-details-marker { display: none; }
+details.more > summary:hover { border-color: var(--accent); }
+details.more .menu { position: absolute; right: 0; top: calc(100% + 4px); z-index: 5; min-width: 180px; padding: 4px;
+  display: flex; flex-direction: column; background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, .18); }
+details.more .menu button { background: none; border: none; text-align: left; min-height: 36px; border-radius: 6px; }
+details.more .menu button:hover { background: var(--chip); }
 /* phones: a little less padding so rows and tabs fit */
 @media (max-width: 560px) {
   main { padding: 12px; }
@@ -87,9 +108,17 @@ button.link { background: none; border: none; color: var(--accent); padding: 4px
   .slot-main button { padding: 6px 10px; }
 }
 
-/* message editor */
-.editor { margin-top: 10px; border-top: 1px dashed var(--line); padding-top: 12px; display: flex; flex-direction: column; gap: 12px; }
-.editor .how { display: flex; flex-wrap: wrap; gap: 6px; }
+/* sound editor: 1 make it, 2 check it, 3 save */
+.editor { margin-top: 10px; border-top: 1px dashed var(--line); padding-top: 12px; display: grid;
+  grid-template-columns: 110px minmax(0, 1fr); gap: 12px 16px; align-items: start; }
+.editor .step { font-weight: 600; font-size: .9rem; padding-top: 9px; }
+.editor .stack { display: flex; flex-direction: column; gap: 8px; }
+.editor .pad { padding-top: 9px; }
+.unsaved { color: var(--warn); font-weight: 600; font-size: .9rem; }
+.seg.joined { gap: 0; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; width: max-content; max-width: 100%; }
+.seg.joined button { border: none; border-radius: 0; border-left: 1px solid var(--line); }
+.seg.joined button:first-child { border-left: none; }
+@media (max-width: 560px) { .editor { grid-template-columns: 1fr; gap: 6px; } .editor .step { padding-top: 6px; } .editor .pad { padding-top: 0; } }
 .editor textarea { font: inherit; color: var(--text); background: var(--chip); border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; width: 100%; min-height: 60px; resize: vertical; }
 .preview { background: var(--chip); border-radius: 8px; padding: 10px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .meter { height: 10px; background: var(--line); border-radius: 5px; overflow: hidden; flex: 1 1 200px; }
@@ -100,17 +129,33 @@ button.link { background: none; border: none; color: var(--accent); padding: 4px
 /* settings */
 .settings { border: 1px solid var(--line); border-radius: 10px; padding: 2px 12px; margin-bottom: 14px; }
 .settings:empty { display: none; }
-.setting { display: grid; grid-template-columns: 170px 1fr; gap: 4px 12px; align-items: center; padding: 10px 0; border-top: 1px solid var(--line); }
-.settings .setting:first-child { border-top: none; }
-.setting > .name { font-weight: 600; font-size: .95rem; }
+.panel-head { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; padding: 10px 0; }
+.panel-head b { flex: 1 1 auto; }
+.setting { display: grid; grid-template-columns: 190px 1fr; gap: 4px 12px; align-items: center; padding: 8px 0; border-top: 1px solid var(--line); }
+.settings .setting:first-child, .group h3 + .setting { border-top: none; }
+.setting > .name { font-weight: 600; font-size: .95rem; display: flex; align-items: center; gap: 6px; }
 .setting .seg button { min-height: 36px; padding: 6px 12px; }
 .setting .help { grid-column: 2; font-size: .85rem; color: var(--muted); }
+.setting .help.tip { color: var(--text); background: var(--accent-soft); border-radius: 8px; padding: 6px 10px; }
+button.help-btn { width: 24px; height: 24px; min-height: 0; padding: 0; border-radius: 50%; font-size: .8rem; font-weight: 700;
+  color: var(--muted); background: var(--card); flex: none; }
+button.help-btn.on { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); }
 @media (max-width: 560px) { .setting { grid-template-columns: 1fr; } .setting .help { grid-column: 1; } }
+
+/* Settings tab: the switch's settings in groups */
+.groups { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 400px), 1fr)); gap: 12px; }
+.group { border: 1px solid var(--line); border-radius: 10px; padding: 4px 12px 6px; }
+.group.wide { grid-column: 1 / -1; }
+.group h3 { font-size: 1rem; margin: 8px 0 2px; }
+.group .setting { grid-template-columns: 150px 1fr; }
+@media (max-width: 560px) { .group .setting { grid-template-columns: 1fr; } }
+.about { display: flex; flex-wrap: wrap; gap: 6px 24px; align-items: center; padding: 6px 0 8px; font-size: .92rem; }
+.about .k { color: var(--muted); margin-right: 6px; }
 
 .card.warn { border-color: var(--bad); }
 .card.warn h2 { color: var(--bad); }
 .sensegraph { width: 100%; height: 150px; border-radius: 8px; display: block; }
-.usage { height: 8px; background: var(--line); border-radius: 4px; overflow: hidden; margin-top: 4px; max-width: 260px; }
+.usage { height: 8px; background: var(--line); border-radius: 4px; overflow: hidden; width: 120px; display: inline-block; vertical-align: middle; margin-left: 8px; }
 .usage > div { height: 100%; background: var(--good); }
 .usage.full > div { background: var(--bad); }
 #toast { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); background: var(--text); color: var(--bg);
@@ -163,14 +208,14 @@ ol { padding-left: 1.2em; margin: 8px 0 0; }
 
     <section id="tab-quick" class="card" role="tabpanel">
       <div id="set-quick" class="settings"></div>
-      <p id="speakIntro" class="muted small"></p>
+      <div class="list-head"><h2>Messages</h2><span id="speakIntro" class="muted small"></span></div>
       <div id="quickScan" class="preview hidden" style="margin-bottom:10px"></div>
       <div id="quickList" class="slots"></div>
     </section>
 
     <section id="tab-topics" class="card" role="tabpanel">
       <div id="set-topics" class="settings"></div>
-      <p id="chooseIntro" class="muted small"></p>
+      <div class="list-head"><h2>Topics</h2><span id="chooseIntro" class="muted small"></span></div>
       <div id="msgScan" class="preview hidden" style="margin-bottom:10px"></div>
       <div id="msgList" class="slots"></div>
     </section>
@@ -178,6 +223,7 @@ ol { padding-left: 1.2em; margin: 8px 0 0; }
     <section id="tab-keyboard" class="card" role="tabpanel">
       <div id="set-keyboard" class="settings"></div>
       <div class="settings">
+        <div id="keyRow"></div>
         <div class="setting">
           <div class="name">Custom key</div>
           <div class="row">
@@ -189,25 +235,22 @@ ol { padding-left: 1.2em; margin: 8px 0 0; }
             <button id="ckSet">Use <span id="ckPreview"></span></button>
             <button id="ckDel" class="danger">Remove</button>
           </div>
-          <div class="help">A key or shortcut of your own, added to the Key choices – e.g. Win + H starts Windows dictation.</div>
+          <div class="help">Added to the Key choices – e.g. Win + H starts Windows dictation.</div>
         </div>
         <div class="setting">
           <div class="name">Bluetooth</div>
-          <div class="small">The switch appears as <b id="btName"></b> (<span id="btState"></span>).</div>
-          <div class="help">Keys go over USB when plugged into a computer, otherwise over Bluetooth (with No USB set to
-            Bluetooth). To pair with a
-            different computer or tablet, use <i>Forget BT devices</i> on the Settings tab. Paired before Left click
-            was added (28 Sep 2026)? Remove the switch in the device's Bluetooth settings, use <i>Forget BT devices</i>,
-            and pair again.</div>
+          <div class="small">Shows as <b id="btName"></b> (<span id="btState"></span>).</div>
+          <div class="help">USB when plugged in, otherwise Bluetooth. New computer or tablet: <i>Forget paired
+            devices</i> on the Settings tab. Paired before 28 Sep 2026? Remove it in the device's Bluetooth settings,
+            forget, and pair again.</div>
         </div>
       </div>
     </section>
 
     <section id="tab-control" class="card" role="tabpanel">
       <div id="set-control" class="settings"></div>
-      <p class="muted small">Give a code a <b>sound</b> (e.g. "Bubbles!") and the switch says it as it sends – leave it
-        out for silence. To learn a code: click <b>Learn</b>, point the remote at the <b>end</b> of the switch from
-        30cm–1m away and press its button within 8 seconds.</p>
+      <div class="list-head"><h2>IR codes</h2><span class="muted small">Learn: point the remote at the <b>end</b> of
+        the switch, 30cm–1m away, and press its button. A sound is said as the code is sent.</span></div>
       <div id="irScan" class="preview hidden" style="margin-bottom:10px"></div>
       <div id="irList" class="slots"></div>
     </section>
@@ -217,9 +260,7 @@ ol { padding-left: 1.2em; margin: 8px 0 0; }
     </section>
 
     <section id="tab-settings" class="card" role="tabpanel">
-      <div id="set-settings" class="settings"></div>
-      <div class="label">About this switch</div>
-      <div id="about" class="settings"></div>
+      <div id="set-settings" class="groups"></div>
     </section>
   </div>
 
@@ -254,10 +295,10 @@ let ttsBusy = false;
 let typed = '';           // words typed in the editor
 
 const MODE_HELP = {
-  'QUICK': 'The 4 Quick messages: each press plays the selected one, or the student chooses one – by scanning or by counting presses.',
-  'TOPICS': 'The student chooses from the Topics by scanning.',
-  'KEYBOARD': 'Each press presses a keyboard key (or clicks the mouse), over USB or Bluetooth.',
-  'CONTROL': 'Each press sends the selected remote-control code, and says its sound if it has one.',
+  'QUICK': 'Up to 4 messages: plays the selected one, or one is chosen by scanning or counting presses.',
+  'TOPICS': 'Messages in topics, chosen by scanning.',
+  'KEYBOARD': 'Each press is a key or a mouse click, over USB or Bluetooth.',
+  'CONTROL': 'Each press sends a remote-control code, and says its sound if it has one.',
 };
 const TABS = ['quick', 'topics', 'keyboard', 'control', 'voice', 'settings'];
 function tabOfMode(i) { return (info.modes[i] || '').toLowerCase(); }
@@ -537,32 +578,64 @@ function render() {
   placeModeLine();
 }
 
-// Top of each mode's tab: the mode the switch is in, or a button to use this one.
+// Top of each mode's tab, one line: the mode the switch is in (or a button to use
+// this one), this mode's settings as chips, and a button that opens them.
 function placeModeLine() {
   const line = $('modeLine');
   const m = info ? info.modes.findIndex((x) => x.toLowerCase() === currentTab) : -1;
   line.classList.toggle('hidden', m < 0);
   if (m < 0) return;
-  const cur = info.modes[info.mode];
-  if (m === info.mode) {
-    line.className = 'modeline inuse';
-    line.replaceChildren(el('b', {}, `● The switch is in ${cur} mode`), el('span', { class: 'small' }, MODE_HELP[cur] || ''));
-  } else {
-    line.className = 'modeline';
-    line.replaceChildren(el('span', {}, `The switch is in ${cur} mode.`),
-      el('button', { class: 'primary', onclick: async () => {
-        await act(() => cmd(`MODE ${m}`), `The switch is in ${info.modes[m]} mode`);
+  const cur = info.modes[info.mode], name = info.modes[m];
+  const open = openSettings.has(currentTab);
+  const status = m === info.mode
+    ? [el('span', { class: 'inuse-label', title: MODE_HELP[name] || '' }, '● In use')]
+    : [el('span', {}, `Switch is in ${cur}`),
+      el('button', { class: 'primary', title: MODE_HELP[name] || '', onclick: async () => {
+        await act(() => cmd(`MODE ${m}`), `The switch is in ${name} mode`);
         makeMissingPrompts();
-      } }, `Use ${info.modes[m]}`),
-      el('span', { class: 'small muted' }, MODE_HELP[info.modes[m]] || ''));
-  }
+      } }, `Use ${name}`)];
+  line.className = 'modeline' + (m === info.mode ? ' inuse' : '');
+  const hasSettings = !!TAB_SETTINGS[currentTab];
+  line.replaceChildren(...status,
+    ...(hasSettings ? settingChips(currentTab).map(([title, text]) => el('span', { class: 'chip', title }, text)) : []),
+    el('span', { class: 'grow' }),
+    ...(hasSettings ? [el('button', { class: open ? 'on' : '', 'aria-expanded': String(open), onclick: () => toggleSettings(currentTab) },
+      `⚙ ${name} settings`)] : []));
   $('tab-' + currentTab).prepend(line);
 }
 
-function selectRadio(i, group, current, command, on = 'Selected', off = 'Select') {
-  return el('label', { class: 'sel', title: 'The switch uses the selected one' },
-    el('input', { type: 'radio', name: group, checked: i === current, onchange: () => act(() => cmd(`${command} ${i}`)) }),
-    i === current ? on : off);
+// This tab's settings that are showing, as short chips; "Off" ones are left out.
+function settingChips(tab) {
+  return visibleSettings(tab).map((k) => {
+    const st = k === 'plays' ? { name: 'Plays', choices: PLAYS, cur: playsCur() } : info.settings.find((x) => x.key === k);
+    if (!st) return null;
+    const v = st.choices[st.cur];
+    if (/^(Off|Never)$/.test(v)) return null;
+    return [st.name, /^(On|Yes|No|Selected|Scan|\d.*)$/.test(v) ? `${st.name}: ${v}` : v];
+  }).filter(Boolean);
+}
+
+const openSettings = new Set();  // mode tabs whose settings are open
+function toggleSettings(tab) {
+  if (openSettings.has(tab)) openSettings.delete(tab); else openSettings.add(tab);
+  render();
+}
+
+// A ⋯ button with the row's less-used actions: [label, fn, danger]
+function moreMenu(items) {
+  const d = el('details', { class: 'more' });
+  d.append(el('summary', { 'aria-label': 'More actions', title: 'More' }, '⋯'),
+    el('div', { class: 'menu' }, ...items.map(([label, fn, danger]) =>
+      el('button', { class: danger ? 'danger' : '', onclick: () => { d.open = false; fn(); } }, label))));
+  return d;
+}
+document.addEventListener('click', (e) => {
+  for (const d of document.querySelectorAll('details.more[open]')) if (!d.contains(e.target)) d.open = false;
+});
+
+// Click anywhere on a row (not on its buttons or boxes) to select it.
+function rowPick(fn) {
+  return (e) => { if (!e.target.closest('button, input, textarea, select, details, .editor')) fn(); };
 }
 
 // ---------------------------------------------------------------- quick and topics tabs
@@ -575,7 +648,7 @@ const openTopics = new Set();  // topic sections shown open
 function renderTopics() {
   if (!renderTopics.started) { openTopics.add(info.topic); renderTopics.started = true; }
   if (editing !== null && editing >= TOPIC0 && editing < IRS) openTopics.add(Math.floor((editing - TOPIC0) / PER));
-  const staffTopics = setCur('s_topics') === 0;
+  const oneTopic = setCur('s_topics') === 0;
   $('msgList').replaceChildren(...info.topics.map((tp, t) => {
     const open = openTopics.has(t);
     const count = tp.msgs.filter((m) => m.len).length;
@@ -583,7 +656,8 @@ function renderTopics() {
       type: 'text', class: 'name', maxLength: 24, value: tp.name, placeholder: `Name, e.g. "Snack time"`,
       'aria-label': `Name for topic ${t + 1}`, onchange: () => renameItem(TOPICN + t, name.value),
     });
-    return el('div', { class: 'group-box' + (staffTopics && t === info.topic ? ' selected' : '') },
+    const inUse = oneTopic && t === info.topic;
+    return el('div', { class: 'group-box' + (inUse ? ' selected' : '') },
       el('div', { class: 'slot-main' },
         el('button', { class: 'link', 'aria-expanded': String(open),
           onclick: () => { if (open) openTopics.delete(t); else openTopics.add(t); render(); } },
@@ -591,36 +665,45 @@ function renderTopics() {
         name,
         el('span', { class: 'status' + (count ? ' has' : '') }, `${count} of ${PER}`),
         promptBadge(tp),
-        staffTopics ? selectRadio(t, 'topicSel', info.topic, 'TOPIC', 'In use', 'Use this topic') : null),
+        inUse ? el('span', { class: 'tag' }, 'In use')
+          : oneTopic ? el('button', { onclick: () => act(() => cmd(`TOPIC ${t}`)), title: 'The switch offers this topic’s messages' }, 'Use')
+          : null),
       open ? el('div', { class: 'slots', style: 'margin-top:8px' }, ...tp.msgs.map((m, k) => messageRow(topicMsg(t, k), m, false))) : null);
   }));
 }
 
-// One message row. Quick messages can be selected for QUICK; topic messages
-// show whether they have a spoken prompt.
+// One message row: number (click to select, Quick only), name, length, Play,
+// Edit sound and a ⋯ menu.
 function messageRow(i, s, quick) {
+  const num = (quick ? i : (i - TOPIC0) % PER) + 1;
   const name = el('input', {
     type: 'text', class: 'name', maxLength: 24, value: s.name, placeholder: `Name, e.g. "Drink"`,
-    'aria-label': `Name for message ${(quick ? i : (i - TOPIC0) % PER) + 1}`,
+    'aria-label': `Name for message ${num}`,
     onchange: () => renameItem(i, name.value),
   });
   const open = editing === i;
-  return el('div', { class: 'slot' + (quick && i === info.slot ? ' selected' : '') },
+  const sel = quick && i === info.slot;
+  const pick = () => { if (!sel) act(() => cmd(`SLOT ${i}`)); };
+  return el('div', { class: 'slot' + (sel ? ' selected' : '') + (quick ? ' pickable' : ''), onclick: quick ? rowPick(pick) : null },
     el('div', { class: 'slot-main' },
-      el('span', { class: 'num' }, String((quick ? i : (i - TOPIC0) % PER) + 1)),
+      quick ? el('button', { class: 'num-btn' + (sel ? ' on' : ''), 'aria-pressed': String(sel), onclick: pick,
+        'aria-label': `Select message ${num}`, title: 'Select it' }, String(num))
+        : el('span', { class: 'num' }, String(num)),
       name,
-      el('span', { class: 'status' + (s.len ? ' has' : '') }, s.len ? secs(s.len) : 'No message'),
+      sel ? el('span', { class: 'tag' }, 'Selected') : null,
+      el('span', { class: 'status' + (s.len ? ' has' : '') }, s.len ? secs(s.len) : 'Empty'),
       quick && !speakScanning() ? null : promptBadge(s),
-      el('button', { disabled: !s.len, onclick: () => act(() => cmd(`PLAY ${i}`)), title: 'Play it on the switch' }, '▶ Play'),
-      el('button', { class: open ? 'on' : '', onclick: () => toggleEditor(i) }, open ? 'Close' : s.len ? 'Change' : 'Add'),
-      el('button', { class: 'danger', disabled: !s.len, onclick: () => {
-        if (confirm(`Delete "${s.name || 'this message'}"?`)) act(() => cmd(`DEL ${i}`), 'Message deleted');
-      } }, 'Delete'),
-      quick ? selectRadio(i, 'quickSel', info.slot, 'SLOT') : null),
+      s.len ? el('button', { onclick: () => act(() => cmd(`PLAY ${i}`)), title: 'Play it on the switch' }, '▶ Play') : null,
+      el('button', { class: open ? 'on' : s.len ? '' : 'add', onclick: () => toggleEditor(i) },
+        open ? 'Close' : s.len ? 'Edit sound' : '+ Add sound'),
+      s.len ? moreMenu([['▶ Listen here', () => listenSaved(i)], ['Download .wav', () => saveWav(i)],
+        ['Delete', () => { if (confirm(`Delete "${s.name || 'this message'}"?`)) act(() => cmd(`DEL ${i}`), 'Message deleted'); }, true]])
+        : null),
     open ? renderEditor(i) : null);
 }
 
 function toggleEditor(i) {
+  if (pending && editing !== null && !confirm('The new sound isn’t saved. Close without saving it?')) return;
   if (recState) stopRecording();
   editing = editing === i ? null : i;
   pending = null;
@@ -628,60 +711,61 @@ function toggleEditor(i) {
   render();
 }
 
+// The sound editor, in three steps: make it (type, record or a file), check it, save it.
 function renderEditor(i) {
-  const how = (id, label) => el('button', { class: editHow === id ? 'on' : '', disabled: !!recState || ttsBusy,
-    onclick: () => { editHow = id; pending = null; render(); } }, label);
-  const body = [];
+  const busy = !!recState || ttsBusy;
+  const p = pending && pending.slot === i ? pending : null;
+  const how = el('div', { class: 'seg joined', role: 'radiogroup', 'aria-label': 'How to make the sound' },
+    ...[['type', 'Type'], ['record', 'Record'], ['upload', 'Audio file']].map(([id, label]) =>
+      el('button', { class: editHow === id ? 'on' : '', role: 'radio', 'aria-checked': String(editHow === id), disabled: busy,
+        onclick: () => { editHow = id; pending = null; render(); } }, label)));
+  const make = [how];
 
   if (editHow === 'record') {
     const recording = !!recState;
-    body.push(el('div', { class: 'row' },
+    make.push(el('div', { class: 'row' },
       el('button', { class: 'rec' + (recording ? ' on' : ''), onclick: () => (recording ? stopRecording() : startRecording(i)) },
-        recording ? '■ Stop' : '● Start recording'),
+        recording ? '■ Stop' : '● Record'),
       recording ? el('div', { class: 'meter' }, el('div', { id: 'meterBar' })) : null,
-      el('span', { id: 'recTime', class: 'small muted' },
-        recording ? 'Recording…' : 'Speak clearly, about 30cm from the microphone or headset.')));
+      el('span', { id: 'recTime', class: 'small muted' }, recording ? 'Recording…' : 'About 30cm from the microphone.')));
   } else if (editHow === 'type') {
-    const text = el('textarea', { placeholder: 'Type the words to say…', value: typed, maxLength: 200,
+    const text = el('textarea', { placeholder: 'Words to say…', value: typed, maxLength: 200, rows: 1,
       'aria-label': 'Words to say', oninput: () => (typed = text.value),
       onkeydown: (e) => {
         if (e.key === 'Enter' && !e.shiftKey && !ttsBusy) { e.preventDefault(); makeSpeech(i, text.value, savedVoice(), +savedSpeed()); }
       } });
     if (!ttsAvailable()) {
-      body.push(el('p', { class: 'small muted' }, 'Typed speech works when this page is opened from its web address, not as a file.'));
+      make.push(el('p', { class: 'small muted' }, 'Typing works when this page is opened from its web address, not as a file.'));
     } else {
-      body.push(text, el('div', { class: 'row' },
-        el('button', { class: 'primary', disabled: ttsBusy, onclick: () => makeSpeech(i, text.value, savedVoice(), +savedSpeed()) },
-          ttsBusy ? 'Making…' : 'Make speech'),
-        el('span', { class: 'small muted' }, `In ${voiceName()}'s voice – change it on the Voice tab.`)),
+      make.push(text, el('div', { class: 'row' },
+        el('button', { class: p ? '' : 'primary', disabled: ttsBusy, onclick: () => makeSpeech(i, text.value, savedVoice(), +savedSpeed()) },
+          ttsBusy ? 'Making…' : 'Make sound'),
+        el('span', { class: 'small muted' }, `Voice: ${voiceName()}, ${speedName().toLowerCase()} · `,
+          el('button', { class: 'link', onclick: () => showTab('voice') }, 'change'))),
       el('div', { id: 'ttsProgress', class: 'hidden' },
         el('span', { id: 'ttsProgressText', class: 'small muted' }),
-        el('div', { class: 'progress' }, el('div', { id: 'ttsProgressBar' }))),
-      ttsBusy ? el('span', { class: 'small muted' }, 'Making the speech – natural voices take a few seconds…') : null);
+        el('div', { class: 'progress' }, el('div', { id: 'ttsProgressBar' }))));
     }
   } else {
     const file = el('input', { type: 'file', accept: 'audio/*', class: 'hidden',
       onchange: () => file.files[0] && loadFile(i, file.files[0]) });
-    body.push(el('div', { class: 'row' }, el('button', { onclick: () => file.click() }, 'Choose an audio file…'),
-      el('span', { class: 'small muted' }, 'MP3, WAV, M4A and most other sound files.'), file));
+    make.push(el('div', { class: 'row' }, el('button', { class: p ? '' : 'primary', onclick: () => file.click() }, 'Choose a file…'),
+      el('span', { class: 'small muted' }, 'MP3, WAV, M4A and most others.'), file));
   }
-
-  if (pending && pending.slot === i) {
-    body.push(el('div', { class: 'preview' },
-      el('b', {}, `New sound: ${pending.seconds.toFixed(1)} s`),
-      pending.truncated ? el('span', { class: 'small muted' }, `(cut to ${info.maxSec} s)`) : null,
-      el('button', { onclick: () => playPcm(pending.pcm) }, '▶ Listen'),
-      el('button', { class: 'primary', onclick: () => savePending() }, 'Save to the switch'),
-      el('button', { onclick: () => { pending = null; render(); } }, 'Discard')));
-  }
-
-  if (soundInfo(i).len) body.push(el('div', { class: 'row small muted' },
-    soundInfo(i).len ? el('button', { class: 'link', onclick: () => listenSaved(i) }, 'Listen to the current sound here') : null,
-    soundInfo(i).len ? el('button', { class: 'link', onclick: () => saveWav(i) }, 'Download it (.wav)') : null));
 
   return el('div', { class: 'editor' },
-    el('div', { class: 'how' }, how('record', '● Record'), how('type', 'Aa Type words'), how('upload', '⤒ Upload file')),
-    ...body);
+    el('div', { class: 'step' }, '1 · Make it'), el('div', { class: 'stack' }, ...make),
+    el('div', { class: 'step' }, '2 · Check it'),
+    p ? el('div', { class: 'preview' },
+      el('button', { onclick: () => playPcm(p.pcm) }, '▶ Listen'),
+      el('b', {}, `${p.seconds.toFixed(1)} s`),
+      p.truncated ? el('span', { class: 'small muted' }, `cut to ${info.maxSec} s`) : null)
+      : el('div', { class: 'small muted pad' }, ttsBusy ? 'Making it – natural voices take a few seconds…' : 'It plays here once made.'),
+    el('div', { class: 'step' }, '3 · Save'),
+    el('div', { class: 'row' },
+      el('button', { class: 'primary', disabled: !p, onclick: () => savePending() }, 'Save to switch'),
+      p ? el('button', { onclick: () => { pending = null; render(); } }, 'Discard') : null,
+      p ? el('span', { class: 'unsaved' }, 'Not saved yet') : null));
 }
 
 // ---------------------------------------------------------------- about
@@ -698,21 +782,25 @@ function renderAbout() {
       ? 'The switch has newer firmware than this page knows about. Reload the page (Ctrl+F5) to get the latest version.'
       : 'This page is for newer firmware than the switch has, so some settings may be missing or not work. Upload the latest ChatterSwitch firmware (TalkingSwitch.ino) from the Arduino IDE.'));
 
+}
+
+// Settings tab: About, as one line
+function aboutGroup() {
   const mb = (b) => (b / 1048576).toFixed(1);
-  const row = (name, value, help) => el('div', { class: 'setting' }, el('div', { class: 'name' }, name), value,
-    help ? el('div', { class: 'help' }, help) : null);
   const pct = info.fsTotal ? Math.round((100 * info.fsUsed) / info.fsTotal) : 0;
-  $('about').replaceChildren(
-    row('Firmware', el('div', {}, info.ver || 'older than 27 Sep 2026')),
-    info.fsTotal ? row('Storage', el('div', {}, `${mb(info.fsUsed)} of ${mb(info.fsTotal)} MB used (${pct}%)`,
-      el('div', { class: 'usage' + (storageFull() ? ' full' : '') }, el('div', { style: `width:${pct}%` }))),
-      storageFull() ? 'Nearly full – delete messages, sounds or topics you don’t use.' : 'Recordings, typed messages and spoken prompts.') : null,
-    row('Presses', el('div', {}, String(info.presses ?? '–')), 'Student presses since the switch was turned on.'),
-    row('Input', el('div', {}, info.sensor ? 'ToF sensor' : 'Switch (Unit Key or jack)'),
-      'A ToF sensor is found when the switch turns on.'),
-    row('USB keyboard', el('div', {}, info.usbhid ? 'Yes' : 'No – Bluetooth only'),
-      info.usbhid ? null : 'The firmware was built with USB Mode: Hardware CDC. Use USB-OTG (TinyUSB) for a USB keyboard and No USB.'),
-  );
+  const item = (k, ...v) => el('span', {}, el('span', { class: 'k' }, k), ...v);
+  return el('section', { class: 'group wide' }, el('h3', {}, 'About'),
+    el('div', { class: 'about' },
+      item('Firmware', info.ver || 'older than 27 Sep 2026'),
+      info.fsTotal ? item('Storage', `${mb(info.fsUsed)} of ${mb(info.fsTotal)} MB`,
+        el('span', { class: 'usage' + (storageFull() ? ' full' : '') }, el('div', { style: `width:${pct}%` }))) : null,
+      item('Presses since on', String(info.presses ?? '–')),
+      item('Input', info.sensor ? 'ToF sensor' : 'Switch'),
+      item('USB keyboard', info.usbhid ? 'Yes' : 'No – Bluetooth only')),
+    storageFull() ? el('div', { class: 'small', style: 'color: var(--bad); padding-bottom: 6px' },
+      'Storage nearly full – delete messages, sounds or topics you don’t use.') : null,
+    info.usbhid ? null : el('div', { class: 'small muted', style: 'padding-bottom: 6px' },
+      'Built with USB Mode: Hardware CDC. Use USB-OTG (TinyUSB) for a USB keyboard and No USB.'));
 }
 
 async function savePending() {
@@ -748,12 +836,12 @@ async function saveWav(i) {
 
 // ---------------------------------------------------------------- scanning prompts
 // Every message, group and IR code with a name gets a short spoken prompt of
-// that name (used when scanning), plus "Back" when students choose groups.
+// that name (used when scanning), plus "Back" when choosing from all topics.
 function promptBadge(item) {
-  if (!item.name && !item.len && !item.ir) return null;  // empty: nothing to say
+  // only shown when something's missing
+  if ((!item.name && !item.len && !item.ir) || item.pr) return null;
   if (!item.name) return el('span', { class: 'small muted', title: 'Give it a name to get a spoken prompt' }, 'no prompt');
-  return el('span', { class: 'small ' + (item.pr ? 'muted' : ''), style: item.pr ? '' : 'color: var(--bad)' },
-    item.pr ? 'prompt ✓' : 'no prompt');
+  return el('span', { class: 'small', style: 'color: var(--bad)', title: 'The spoken name offered when scanning' }, 'no prompt');
 }
 
 async function renameItem(n, value) {
@@ -813,19 +901,20 @@ async function makeMissingPrompts() {
 function renderScanNotes() {
   const note = (boxId, show, text, items) => {
     const box = $(boxId);
-    box.classList.toggle('hidden', !show);
-    if (!show) return;
-    const missing = items.filter((x) => x.name && !x.pr).length;
-    const unnamed = items.filter((x) => (x.len || x.ir) && !x.name).length;
+    const missing = show ? items.filter((x) => x.name && !x.pr).length : 0;
+    const unnamed = show ? items.filter((x) => (x.len || x.ir) && !x.name).length : 0;
+    // only when a spoken prompt is missing
+    box.classList.toggle('hidden', !missing && !unnamed);
+    if (!missing && !unnamed) return;
     box.replaceChildren(...[
-      el('span', { class: 'small' }, text + (unnamed ? ' Name the rest to give them a spoken prompt.' : '')),
+      el('span', { class: 'small' }, text + (unnamed ? ` ${unnamed} ${unnamed > 1 ? 'have' : 'has'} no name yet.` : '')),
       missing ? el('button', { onclick: () => makeMissingPrompts() }, `Make ${missing} missing prompt${missing > 1 ? 's' : ''}`) : null,
     ].filter(Boolean));
   };
-  note('quickScan', speakScanning(), 'The student scans these: each message’s name is spoken quietly as it’s offered.', info.quick);
-  note('msgScan', true, 'When scanning, each topic’s and message’s name is spoken quietly as it’s offered.',
-    [...info.topics, ...info.topics.flatMap((tp) => tp.msgs)]);
-  note('irScan', irScanning(), 'Students choose IR codes by scanning: each code’s name is spoken quietly as it’s offered.', info.irs);
+  const said = 'When scanning, each name is spoken quietly as it’s offered.';
+  note('quickScan', speakScanning(), said, info.quick);
+  note('msgScan', true, said, [...info.topics, ...info.topics.flatMap((tp) => tp.msgs)]);
+  note('irScan', irScanning(), said, info.irs);
 }
 
 // ---------------------------------------------------------------- CONTROL tab
@@ -843,72 +932,88 @@ function renderIr() {
       'aria-label': `Name for IR code ${i + 1}`,
       onchange: () => renameItem(snd, name.value),
     });
-    return el('div', { class: 'slot' + (i === info.irSlot ? ' selected' : '') },
+    const sel = i === info.irSlot;
+    const pick = () => { if (!sel) act(() => cmd(`IRSLOT ${i}`)); };
+    return el('div', { class: 'slot pickable' + (sel ? ' selected' : ''), onclick: rowPick(pick) },
       el('div', { class: 'slot-main' },
-        el('span', { class: 'num' }, String(i + 1)),
+        el('button', { class: 'num-btn' + (sel ? ' on' : ''), 'aria-pressed': String(sel), onclick: pick,
+          'aria-label': `Select IR code ${i + 1}`, title: 'Select it' }, String(i + 1)),
         name,
+        sel ? el('span', { class: 'tag' }, 'Selected') : null,
         el('span', { class: 'status' + (c.ir ? ' has' : '') }, c.ir ? 'Code saved' : 'No code'),
         irScanning() ? promptBadge(c) : null,
-        el('button', { onclick: () => learnIr(i) }, c.ir ? 'Learn again' : 'Learn'),
-        el('button', { disabled: !c.ir, onclick: () => act(() => cmd(`IRSEND ${i}`), 'Sent') }, 'Test'),
-        el('button', { class: 'danger', disabled: !c.ir, onclick: () => {
+        c.ir ? el('button', { onclick: () => act(() => cmd(`IRSEND ${i}`), 'Sent') }, 'Test') : null,
+        el('button', { class: c.ir ? '' : 'add', onclick: () => learnIr(i) }, c.ir ? 'Learn again' : 'Learn'),
+        c.ir ? moreMenu([['Delete code', () => {
           if (confirm(`Delete IR code ${i + 1}?`)) act(() => cmd(`IRDEL ${i}`), 'IR code deleted');
-        } }, 'Delete'),
-        selectRadio(i, 'irSel', info.irSlot, 'IRSLOT')),
+        }, true]]) : null),
       el('div', { class: 'slot-main', style: 'margin-top:6px' },
         el('span', { class: 'num' }),
         el('span', { class: 'small muted' }, 'Sound:'),
-        el('span', { class: 'status' + (c.len ? ' has' : '') }, c.len ? secs(c.len) : 'None (silent)'),
+        el('span', { class: 'status' + (c.len ? ' has' : '') }, c.len ? secs(c.len) : 'None'),
         c.len ? el('button', { onclick: () => act(() => cmd(`PLAY ${snd}`)), title: 'Play it on the switch' }, '▶ Play') : null,
-        el('button', { class: open ? 'on' : '', onclick: () => toggleEditor(snd) }, open ? 'Close' : c.len ? 'Change sound' : 'Add sound'),
-        c.len ? el('button', { class: 'danger', onclick: () => {
-          if (confirm(`Remove the sound from IR code ${i + 1}?`)) act(() => cmd(`DEL ${snd}`), 'Sound removed');
-        } }, 'Remove sound') : null),
+        el('button', { class: open ? 'on' : c.len ? '' : 'add', onclick: () => toggleEditor(snd) },
+          open ? 'Close' : c.len ? 'Edit sound' : '+ Add sound'),
+        c.len ? moreMenu([['▶ Listen here', () => listenSaved(snd)], ['Download .wav', () => saveWav(snd)],
+          ['Remove sound', () => { if (confirm(`Remove the sound from IR code ${i + 1}?`)) act(() => cmd(`DEL ${snd}`), 'Sound removed'); }, true]])
+          : null),
       open ? renderEditor(snd) : null);
   }));
 }
 
 // ---------------------------------------------------------------- settings
-// Each mode's tab shows its own settings at the top; the Settings tab has the
-// rest. Settings that do nothing with the current choices are hidden.
+// Each mode's settings open from its bar (⚙); the Settings tab has the rest,
+// in groups. Settings that do nothing with the current choices are hidden.
+// Help is one line, shown with the ? next to a setting's name.
 const HELP = {
-  s_play: 'Tap: a press plays the whole message. Hold to play: plays only while held. Latch: one press starts it, the next stops it.',
-  s_hold: 'Keep holding the switch this long to move to the next Quick message. Off for students who can’t let go quickly.',
-  s_spkmode: 'Staff pick: each press plays the selected message. Student chooses: the student picks one of the messages.',
-  s_qhow: 'Press twice: a press starts the offers, the next press chooses. Hold & release: hold to step through, let go to choose (these two are the same as TOPICS and CONTROL’s Choosing). Count presses, QUICK only: press 1 to 4 times quickly for message 1 to 4 (a tick and the LED colour for each press) – not for students with tremor or accidental double presses.',
-  s_gap: 'Count presses: this long without a press ends the count and plays the message. With Count presses, Ignore repeats only filters bounces under 0.15 s.',
-  s_topics: 'One topic: the messages in the topic marked “In use”. All topics: the student picks a topic first, then a message.',
-  s_access: 'Press twice: a press starts the offers, the next press chooses. Hold & release: hold to step through, let go to choose.',
-  s_scanspd: 'How long each choice is offered. Go at the student’s pace.',
-  s_scanrnd: 'Times round the choices before it stops by itself.',
-  s_offq: 'Offers “Quick” next to the topics: the Quick messages, chosen like a topic’s messages.',
-  s_offctl: 'Offers “Control” next to the topics: the IR codes (from the CONTROL tab), chosen like a topic’s messages.',
-  s_offdev: 'Offers “My device” next to the topics: changes to KEYBOARD so the student can use their AAC device or computer. Staff (or No USB) bring it back.',
-  s_stop: 'Offers “Stop” last, so the student can choose none of them.',
-  s_irmode: 'Staff pick: sends the selected code. Repeat held: keeps sending while held, like a remote’s volume button. Student scans: the student chooses the code.',
-  s_nousb: 'What to do when the switch isn’t plugged into a computer or AAC device by USB. Bluetooth: send the key over Bluetooth instead. QUICK / TOPICS: after 10 seconds, talk instead, using that mode – Bluetooth stays off to save battery. Plugging USB back in switches it back to KEYBOARD.',
-  s_keyact: 'Momentary: the key is held while the switch is. Latch: one press holds the key down, the next lets it go.',
-  s_psound: 'A click or beep on each press (CONTROL: only for codes with no sound of their own).',
-  s_smode: 'The ToF distance sensor is the switch. Line: press by coming closer than a distance. Move: press by moving towards it from where the hand or finger rests – best for small movements.',
-  s_sline: 'Line: closer than this counts as a press.',
-  s_smove: 'Move: a movement this big towards the sensor counts as a press.',
-  s_settle: 'Move: after being pressed this long, where the finger is becomes the new resting place and it lets go, so a relaxed finger can’t leave it pressed. Off for students who hold presses on purpose.',
-  s_follow: 'Move: how quickly the resting place follows drift. Slow catches slow presses; Fast copes with a restless student.',
-  s_beyond: 'Anything further away counts as nothing there – stops people walking past from pressing.',
-  s_modes: 'Turn KEYBOARD and/or CONTROL off for a switch that only talks: the stick’s A button and this page skip them. Their key and IR codes are kept.',
-  s_bright: 'Screen brightness while in use. Low saves battery. The screen still dims, then turns off, when it isn’t being used.',
-  s_accept: 'A press must last this long to count – filters accidental brushes.',
-  s_lockout: 'Presses this soon after the last one are ignored – filters tremor and bounces.',
-  s_sleep: 'On battery, sleeps after this long without presses. The big switch still works and wakes it. (Not with the ToF sensor, which can’t wake it.)',
-  s_autooff: 'On battery, turns off completely after this long without presses.',
-  s_wake: 'Whether presses of the big switch light up the screen.',
-  s_loud: 'Louder messages, at some cost in clarity – for recordings, typed and uploaded messages.',
+  plays: 'Selected message: each press plays it. Scan: the messages are offered one by one – press twice (a press starts, the next chooses) or hold & release (hold to step, let go to choose). Count presses: 1–4 quick presses play message 1–4.',
+  s_play: 'Tap: plays the whole message. Hold to play: only while held. Latch: one press starts it, the next stops it.',
+  s_hold: 'Keep the switch pressed this long to move to the next message. Off if letting go quickly is hard.',
+  s_gap: 'How long without a press ends the count. Ignore repeats only filters bounces under 0.15 s here.',
+  s_topics: 'One topic: the messages of the topic marked “In use”. All topics: a topic first, then its messages.',
+  s_access: 'Press twice: a press starts the offers, the next chooses. Hold & release: hold to step, let go to choose.',
+  s_scanspd: 'How long each choice is offered.',
+  s_scanrnd: 'Times round before it stops by itself.',
+  s_offq: 'Adds “Quick” to the topics: the Quick messages.',
+  s_offctl: 'Adds “Control” to the topics: the IR codes.',
+  s_offdev: 'Adds “My device” to the topics: changes to KEYBOARD for an AAC device or computer. A on the stick (or No USB) brings it back.',
+  s_stop: 'Offers “Stop” last, to choose none of them.',
+  s_irmode: 'Selected: sends the selected code. Repeat held: keeps sending while held, like a volume button. Scan: the codes are offered to choose from.',
+  s_nousb: 'With no USB connection: Bluetooth sends the key over Bluetooth. QUICK / TOPICS: after 10 s the switch talks instead (Bluetooth off). USB back = KEYBOARD again.',
+  s_keyact: 'Momentary: the key is held while the switch is. Latch: one press holds it down, the next lets go.',
+  s_psound: 'A click or beep on each press (CONTROL: only codes without a sound).',
+  s_smode: 'Line: a press is coming closer than a distance. Move: a press is moving towards it – best for small movements.',
+  s_sline: 'Closer than this is a press.',
+  s_smove: 'A movement this big towards the sensor is a press.',
+  s_settle: 'After a press this long, where the finger is becomes the resting place, so it can’t stay pressed. Off to allow long holds.',
+  s_follow: 'How fast the resting place follows drift. Slow catches slow presses; Fast copes with restless movement.',
+  s_beyond: 'Further than this counts as nothing there – stops people walking past from pressing.',
+  s_modes: 'Modes you don’t use are skipped on the stick and hidden here. Their key and IR codes are kept.',
+  s_bright: 'Screen brightness in use. Low saves battery.',
+  s_accept: 'A press must last this long to count – filters brushes.',
+  s_lockout: 'Presses this soon after the last are ignored – filters tremor and bounces.',
+  s_sleep: 'On battery, sleeps after this long without presses. The switch still works and wakes it. (Not with the ToF sensor.)',
+  s_autooff: 'On battery, turns off after this long without presses.',
+  s_wake: 'Whether switch presses light up the screen.',
+  s_loud: 'Louder messages, a little less clear – for recordings, typed and uploaded messages.',
+  vol: 'How loud messages play.',
 };
+
+// QUICK's "Plays": the switch's Messages and Choosing settings as one choice
+const PLAYS = ['Selected message', 'Scan: press twice', 'Scan: hold & release', 'Count presses'];
+function playsCur() { return setCur('s_spkmode') === 0 ? 0 : 1 + setCur('s_qhow'); }
+async function setPlays(i) {
+  await act(async () => {
+    await cmd(`SET s_spkmode ${i ? 1 : 0}`);
+    if (i) await cmd(`SET s_qhow ${i - 1}`);
+  });
+  makeMissingPrompts();  // scanning needs spoken prompts
+}
 
 const pressTwice = () => setCur('s_access') === 0;
 const allTopics = () => setCur('s_topics') === 1;
 const TAB_SETTINGS = {  // [setting, shown only when]
-  quick: [['s_spkmode'], ['s_qhow', () => setCur('s_spkmode') === 1], ['s_gap', countingPresses],
+  quick: [['plays'], ['s_gap', countingPresses],
     ['s_play', () => setCur('s_spkmode') === 0], ['s_hold', () => setCur('s_spkmode') === 0 && setCur('s_play') === 0],
     ['s_scanspd', speakScanning], ['s_scanrnd', () => speakScanning() && setCur('s_qhow') === 0],
     ['s_stop', speakScanning]],
@@ -918,68 +1023,99 @@ const TAB_SETTINGS = {  // [setting, shown only when]
   control: [['s_irmode'], ['s_access', irScanning], ['s_scanspd', irScanning],
     ['s_scanrnd', () => irScanning() && pressTwice()], ['s_stop', irScanning], ['s_psound']],
 };
+function visibleSettings(tab) {
+  return (TAB_SETTINGS[tab] || []).filter(([, when]) => !when || when()).map(([k]) => k);
+}
 
 async function setSetting(k, v) {
   await act(() => cmd(`SET ${k} ${v}`));
-  makeMissingPrompts();  // e.g. students choosing topics need a "Back" prompt
+  makeMissingPrompts();  // e.g. choosing from all topics needs a "Back" prompt
 }
 
-function settingRow(name, choices, cur, onPick, help) {
+const helpOpen = new Set();  // settings whose help line is showing
+function settingRow(name, choices, cur, onPick, help, key = name) {
   const seg = el('div', { class: 'seg', role: 'radiogroup', 'aria-label': name });
   segment(seg, choices, cur, onPick);
-  return el('div', { class: 'setting' }, el('div', { class: 'name' }, name), seg,
-    help ? el('div', { class: 'help' }, help) : null);
+  const shown = help && helpOpen.has(key);
+  return el('div', { class: 'setting' },
+    el('div', { class: 'name' }, name, help ? el('button', { class: 'help-btn' + (shown ? ' on' : ''), 'aria-expanded': String(!!shown),
+      'aria-label': `What ${name} does`, onclick: () => { if (shown) helpOpen.delete(key); else helpOpen.add(key); render(); } }, '?') : null),
+    seg, shown ? el('div', { class: 'help tip' }, help) : null);
 }
 
 function switchSetting(k) {
+  if (k === 'plays') return settingRow('Plays', PLAYS, playsCur(), setPlays, HELP.plays, k);
   const st = info.settings.find((x) => x.key === k);
   if (!st) return null;
-  return settingRow(st.name, st.choices, st.cur, (i) => setSetting(k, i), HELP[k]);
+  return settingRow(st.name, st.choices, st.cur, (i) => setSetting(k, i), HELP[k], k);
+}
+
+// A row with its own control and a short note that's always shown
+function plainRow(name, control, note) {
+  return el('div', { class: 'setting' }, el('div', { class: 'name' }, name), control,
+    note ? el('div', { class: 'help' }, note) : null);
 }
 
 function renderSettings() {
-  for (const [tab, list] of Object.entries(TAB_SETTINGS))
-    $('set-' + tab).replaceChildren(...list.filter(([, when]) => !when || when()).map(([k]) => switchSetting(k)).filter(Boolean));
-  $('set-keyboard').prepend(settingRow('Key', info.keys, info.key, (i) => act(() => cmd(`KEY ${i}`)),
-    'The key the switch presses, e.g. Space or Enter for Grid 3 or Mind Express. Left click clicks the mouse wherever the pointer is.'));
+  for (const tab of Object.keys(TAB_SETTINGS)) {
+    const box = $('set-' + tab);
+    const open = openSettings.has(tab);
+    const name = info.modes.find((x) => x.toLowerCase() === tab) || tab.toUpperCase();
+    box.replaceChildren(...(open ? [
+      el('div', { class: 'panel-head' }, el('b', {}, `${name} settings`),
+        el('span', { class: 'small muted' }, 'Saved on the switch as you click'),
+        el('button', { class: 'primary', onclick: () => toggleSettings(tab) }, 'Done')),
+      ...visibleSettings(tab).map(switchSetting).filter(Boolean)] : []));
+  }
+  $('keyRow').replaceChildren(settingRow('Key', info.keys, info.key, (i) => act(() => cmd(`KEY ${i}`)),
+    'The key the switch presses, e.g. Space or Enter for Grid 3 or Mind Express. Left click clicks wherever the pointer is.', 'key'));
 
-  $('speakIntro').replaceChildren(...(speakScanning()
-    ? ['The switch offers these messages one at a time and the student chooses one. Click ', el('b', {}, 'Add'), ' or ', el('b', {}, 'Change'),
-      ' to type, record or upload a message.']
-    : countingPresses()
-    ? ['Press the switch 1 to 4 times quickly to play message 1 to 4. Click ', el('b', {}, 'Add'), ' or ', el('b', {}, 'Change'),
-      ' to type, record or upload a message.']
-    : ['The switch plays the ', el('b', {}, 'selected'), ' message. Click ', el('b', {}, 'Add'), ' or ', el('b', {}, 'Change'),
-      ' to type, record or upload a message.']));
-  $('chooseIntro').textContent = '4 topics of up to 4 messages. Name each topic and message – the names are spoken as the prompts.';
+  $('speakIntro').textContent = speakScanning() ? 'Offered one by one to choose from'
+    : countingPresses() ? '1–4 quick presses play message 1–4'
+    : 'Click a message to select the one that plays';
+  $('chooseIntro').textContent = setCur('s_topics') === 0 ? 'The topic “In use” is offered' : 'Every topic is offered';
 
-  // the switch's SETTINGS, in the same order as on the switch
+  // the switch's general settings, in groups
+  const group = (title, rows, wide) => {
+    rows = rows.filter(Boolean);
+    return rows.length ? el('section', { class: 'group' + (wide ? ' wide' : '') }, el('h3', {}, title), ...rows) : null;
+  };
   const forget = el('button', { class: 'danger', onclick: () => {
     if (confirm('Forget every paired computer and tablet? You will need to pair again.'))
       act(() => cmd('FORGET'), 'Paired devices forgotten');
   } }, 'Forget all');
   $('set-settings').replaceChildren(...[
-    settingRow('Volume', Array.from({ length: info.vols }, (_, i) => String(i + 1)), info.vol,
-      (i) => act(() => cmd(`VOL ${i}`)), 'How loud messages play. 4 is the loudest the switch can go.'),
-    ...['s_modes', 's_accept', 's_lockout'].map(switchSetting),
-    ...(info.sensor ? [...['s_smode', setCur('s_smode') ? 's_smove' : 's_sline'].map(switchSetting),
-      ...(setCur('s_smode') ? ['s_settle', 's_follow'].map(switchSetting) : []), switchSetting('s_beyond'), sensorRow()] : []),
-    ...['s_bright', 's_wake', 's_sleep', 's_autooff', 's_loud'].map(switchSetting),
-    tabOn('keyboard') && el('div', { class: 'setting' }, el('div', { class: 'name' }, 'Forget BT devices'), el('div', {}, forget),
-      el('div', { class: 'help' }, 'To pair the switch with a different computer or tablet. Also remove it in that device’s Bluetooth settings.')),
-    nameRow(),
+    group('Sound', [
+      settingRow('Volume', Array.from({ length: info.vols }, (_, i) => String(i + 1)), info.vol,
+        (i) => act(() => cmd(`VOL ${i}`)), HELP.vol, 'vol'),
+      switchSetting('s_loud'),
+      plainRow('Voice', el('div', { class: 'small' }, `${voiceName()}, ${speedName().toLowerCase()} · `,
+        el('button', { class: 'link', onclick: () => showTab('voice') }, 'change'))),
+    ]),
+    group('Presses', ['s_accept', 's_lockout'].map(switchSetting)),
+    info.sensor ? group('ToF sensor', [...['s_smode', setCur('s_smode') ? 's_smove' : 's_sline'].map(switchSetting),
+      ...(setCur('s_smode') ? ['s_settle', 's_follow'].map(switchSetting) : []), switchSetting('s_beyond'), sensorRow()], true) : null,
+    group('Screen and power', ['s_bright', 's_wake', 's_sleep', 's_autooff'].map(switchSetting)),
+    group('Switch', [
+      switchSetting('s_modes'),
+      nameRow(),
+      tabOn('keyboard') && plainRow('Paired devices', el('div', { class: 'row' }, forget,
+        el('span', { class: 'small muted' }, info.bt ? 'Connected' : 'Not connected')),
+        'For a new computer or tablet. Also remove the switch in its Bluetooth settings.'),
+    ]),
+    aboutGroup(),
   ].filter(Boolean));
   $('set-voice').replaceChildren(...renderVoiceSetting());
 }
 
 // A name in front of the switch's own ("Sam ChatterSwitch 7B70"), for Bluetooth (only on this page).
 function nameRow() {
-  const input = el('input', { type: 'text', maxLength: 10, value: info.devname || '',
+  const input = el('input', { type: 'text', maxLength: 10, value: info.devname || '', size: 10,
     placeholder: 'e.g. Sam', 'aria-label': 'Name in front of the switch’s name' });
   const save = el('button', { onclick: () => act(() => cmd(`DEVNAME ${input.value.trim()}`),
     'Name saved') }, 'Save');
-  return el('div', { class: 'setting' }, el('div', { class: 'name' }, 'Switch name'), el('div', { class: 'row' }, input, save),
-    el('div', { class: 'help' }, `Goes in front of the switch’s Bluetooth name: “Sam” shows as “Sam ${info.defname}”. Leave empty for just “${info.defname}”.`));
+  return plainRow('Name', el('div', { class: 'row' }, input, save,
+    el('span', { class: 'small muted' }, info.defname)), 'Bluetooth name. Empty for just ' + info.defname + '.');
 }
 
 // ---------------------------------------------------------------- audio
@@ -1186,8 +1322,8 @@ function renderVoiceSetting() {
   return [
     el('div', { class: 'setting' }, el('div', { class: 'name' }, 'Voice'), el('div', { class: 'row' }, voiceSelect(), listen),
       el('div', { class: 'help' }, ttsAvailable()
-        ? 'Speaks typed messages and the scanning prompts. Stored on the switch, so every computer uses the same one. Changing it remakes the prompts; typed messages keep their voice until you type them again.'
-        : 'Typed speech works when this page is opened from its web address.')),
+        ? 'For typed messages and scanning prompts. Kept on the switch, so every computer uses it. Changing it remakes the prompts.'
+        : 'Typing works when this page is opened from its web address.')),
     settingRow('Speed', SPEEDS.map(([, n]) => n), SPEEDS.findIndex(([v]) => v === savedSpeed()),
       (i) => setVoice(savedVoice(), SPEEDS[i][0])),
     remakeRow(),
@@ -1209,8 +1345,8 @@ function remakeRow() {
     onclick: () => remakeTyped() }, remaking ? 'Remaking…' : `Remake ${old.length || ''} in this voice`.replace('  ', ' '));
   return el('div', { class: 'setting' }, el('div', { class: 'name' }, 'Typed messages'), el('div', {}, btn),
     el('div', { class: 'help' }, old.length
-      ? `${old.length} typed message${old.length > 1 ? 's were' : ' was'} made in a different voice or speed. Recorded and uploaded messages don’t change.`
-      : 'All typed messages are in this voice. Recorded and uploaded messages don’t change.'));
+      ? `${old.length} made in another voice or speed. Recordings and files don’t change.`
+      : 'All in this voice. Recordings and files don’t change.'));
 }
 
 // Speaks each typed message again in the switch's voice and saves it.
@@ -1240,6 +1376,7 @@ async function remakeTyped() {
 }
 
 function voiceName() { return VOICES.find((x) => x.id === savedVoice()).name.split(' – ')[0]; }
+function speedName() { return SPEEDS.find(([v]) => v === savedSpeed())[1]; }
 
 async function previewVoice() {
   try {
