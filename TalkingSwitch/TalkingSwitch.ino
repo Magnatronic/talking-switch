@@ -1266,7 +1266,6 @@ static const uint32_t MS_BACK_MS = 250;          // ...for this long
 static const uint32_t MS_WAIT_MS = 10000;        // nothing within this: the step is skipped
 static const uint32_t MS_STEP_MS = 8000;         // a movement step ends after this anyway
 static const float    MS_MIN_RANGE = 3.0f;       // the smallest range (deg)
-static const float    MS_DEF_RANGE = 10.0f;      // Left or Up not seen: this range (deg)
 static const float    MS_UPDOWN = 0.6f;          // up/down goes this much of Speed (screens are wider than tall)
 static const float    MS_MOVED_DEG = 25.0f;      // at start: tilted more than this from last time -> calibrate again
 static const uint32_t MS_SEND_MS = 10;           // send movement at most 100 times a second
@@ -1448,8 +1447,9 @@ void mouseFinishCal() {
   float x[3], y[3];
   mouseSoFarX(x);
   mouseSoFarY(x, y);
-  float r[4] = {v3dot(mPk[0], x), mGot[1] ? -v3dot(mPk[1], x) : MS_DEF_RANGE,
-                v3dot(mPk[2], y), mGot[3] ? -v3dot(mPk[3], y) : MS_DEF_RANGE};
+  float r[4] = {v3dot(mPk[0], x), 0, v3dot(mPk[2], y), 0};
+  r[1] = mGot[1] ? -v3dot(mPk[1], x) : r[0];  // Left or Up not seen: the same as the other side
+  r[3] = mGot[3] ? -v3dot(mPk[3], y) : r[2];
   for (int k = 0; k < 3; k++) { mAxX[k] = x[k]; mAxY[k] = y[k]; }
   for (int k = 0; k < 4; k++) mRange[k] = max(r[k], MS_MIN_RANGE);
   mHaveAxes = true;

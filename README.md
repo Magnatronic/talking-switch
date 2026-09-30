@@ -161,7 +161,7 @@ with the same pairing as KEYBOARD (on an iPad, if no pointer shows, turn on Assi
   2. *Right*, 3. *Left*, 4. *Down*, 5. *Up* – each as far as is comfortable, and back. A beep starts each one;
      the screen shows how far it has gone. It can be any movement: a head turn or nod, a wrist roll or bend.
   Each side gets its own speed from its own range, so a stiff side still reaches the screen edge. If a movement
-  isn't seen within 10 s it moves on (Left or Up then get a small range; without Right or Down it keeps the old
+  isn't seen within 10 s it moves on (Left or Up then get the same range as the other side; without Right or Down it keeps the old
   calibration). Each time MOUSE starts after that it only needs *Keep still* (a second), unless it's worn at a
   clearly different angle, when it asks for the whole calibration again.
 - **Screen edges:** the pointer stops at the edge while the head keeps going. That's also how to bring the pointer

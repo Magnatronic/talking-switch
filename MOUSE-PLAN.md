@@ -93,7 +93,7 @@ Sources: [Quha Zono X](https://www.quha.com/products/quha-zono-x/),
 
 **What was built:** the 5-step training below (`MC_REST`, `MC_RIGHT`, `MC_LEFT`, `MC_DOWN`, `MC_UP` in
 `mouseCalSample()`); the axes come from Right − Left and Down − Up (up/down made at right angles to left/right),
-ranges from each peak. Prefs `m_up`, `m_x`, `m_y`, `m_rng` (the old `m_down` is unused, so it asks to calibrate
+ranges from each peak (a missed Left or Up copies the other side). Prefs `m_up`, `m_x`, `m_y`, `m_rng` (the old `m_down` is unused, so it asks to calibrate
 once). Movement is still "follow"; each side's gain = Speed / that side's range (up/down × 0.6). `Speed` is now
 `m_reach` (counts for a full comfortable movement: 300–2200). Flip settings removed (training learns the
 directions). Small wear changes at start turn the axes with "up". Setup page: live picture (`MSTREAM 1|0`,
