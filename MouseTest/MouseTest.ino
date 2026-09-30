@@ -476,6 +476,7 @@ void draw() {
   else {
     l1 = swStable ? (val(T_SWITCH) == MOUSE_LEFT ? "Left held" : "Right held") : "Moving";
     l2 = String("Speed ") + label(T_SPEED) + "  Dwell " + label(T_DWELL);
+    if (!HAS_USB_HID && output() == OUT_NONE) { l2 = "No USB mouse: set USB Mode to TinyUSB"; c2 = TFT_ORANGE; }
   }
   canvas.setTextDatum(middle_left);
   canvas.setFont(&fonts::FreeSansBold12pt7b);
