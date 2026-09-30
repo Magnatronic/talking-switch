@@ -51,7 +51,7 @@ button while plugging it in – that starts it for programming), close the Ardui
 **ESP32S3_DEV – TinyUSB CDC**. The switch is set up over the USB cable – no Wi-Fi – and recordings and
 typed words stay on the computer.
 
-The page has a tab for each mode – QUICK, TOPICS, KEYBOARD, CONTROL – then **Voice** and **Settings**, like the
+The page has a tab for each mode – QUICK, TOPICS, KEYBOARD, CONTROL (and MOUSE, when it's on) – then **Voice** and **Settings**, like the
 modes on the switch. The tab of the mode the switch is in has a green dot. At the top of each mode's tab is one line:
 **In use** (or a **Use** button to switch to that mode), the mode's settings as short chips, and **⚙ settings**,
 which opens them (click **?** next to a setting for a one-line explanation; settings that do nothing with the
@@ -73,6 +73,8 @@ current choices are hidden). Below that is what the mode uses.
 - **CONTROL:** 4 remote-control codes, separate from the messages. For each: a name, **Test / Learn**, Delete (⋯),
   and an optional **sound** that the switch says as it sends the code. Settings: IR codes (and scanning settings
   with *Scan*), Press sound.
+- **MOUSE:** **Calibrate** (with what it's doing now), **Pause / Move**, and the connection; settings: Speed,
+  Speed-up, Steady, Smoothing, Dwell click, Switch, Hold to pause, Press sound, Flip.
 - **Voice:** the switch's **voice** and speed for typed messages and scanning prompts (natural: Emma, Isabella,
   George, Fable; quick: Cori, Alba, Southern English female, Northern English male). It's stored on the switch, so
   every computer uses the same one. Changing it remakes the prompts, and **Remake in this voice** remakes the typed
@@ -118,6 +120,7 @@ up to 5 seconds. Each IR code can have its own sound, e.g. IR code 1 "Bubbles" t
 | TOPICS | Messages are **chosen** from the Topics by scanning, see below | colour of the choice on offer |
 | KEYBOARD | Holds down the chosen key while pressed. With *No USB* set to QUICK or TOPICS it's also a **backup**: see below | purple |
 | CONTROL | Sends the selected IR code, and says its sound if it has one. *IR codes* setting: Selected / Repeat held (keeps sending while held, like a remote's volume button) / Scan (chosen by scanning) | code colour |
+| MOUSE | (Off unless *MOUSE mode* is on.) Clicks the mouse button; head or hand movement moves the pointer. See *MOUSE* below | pink |
 | SETTINGS | Keeps doing whatever the previous mode did | as previous mode |
 
 ### Touch-free: the ToF sensor
@@ -145,6 +148,26 @@ switch – every mode, scanning, Press must last and Ignore repeats work as with
 For a switch that only needs to talk, set SETTINGS **Modes: Talking only**: A then goes QUICK → TOPICS →
 SETTINGS, and the setup page shows only QUICK, TOPICS, Voice and Settings.
 
+### MOUSE: head or hand movement moves the pointer
+
+Turn on SETTINGS **MOUSE mode**. The stick's motion sensor then works a mouse pointer, worn on the head (headband or
+cap) or on a hand: turn left/right to move left/right, tip down/up to move down/up. It goes over USB, or Bluetooth
+with the same pairing as KEYBOARD (on an iPad, if no pointer shows, turn on AssistiveTouch).
+
+- **Calibrate:** the first time MOUSE starts, and whenever you choose it (B to **Calibrate**, hold A; or the setup
+  page): *Keep still*, then *Tip down* – nod down, or tip the hand down, and back up. Wear it as it will be used;
+  it works whichever way round it's worn. Each time MOUSE starts after that it only needs *Keep still* (a second),
+  unless it's worn at a clearly different angle, when it asks for *Tip down* again.
+- **Clicks:** the big switch is the left (or right, *Switch* setting) button. **Dwell click:** keep the pointer in
+  one small area for the *Dwell click* time to click; move away to click again. A green bar on the screen fills up
+  before it clicks.
+- **Pause:** hold A, or **hold the switch** for the *Hold to pause* time (2 s): two falling notes = paused, two
+  rising = moving. With Hold to pause on, a short press clicks when it's let go; set it Off to drag (the button is
+  then held while the switch is).
+- It doesn't sleep in MOUSE mode.
+- Coming next: training it on the student's own movements (left, right, up and down as far as is comfortable), so
+  the pointer and head stay in step at the screen edges, and a tilt (joystick) style for small movements.
+
 ### Backup mode: a switch for the AAC device, and a talker when it isn't there
 
 With KEYBOARD's **No USB** set to QUICK or TOPICS, the switch works an AAC device over USB, and when
@@ -162,9 +185,9 @@ The bottom line of the screen always shows what the buttons do right now.
 
 | Button | Does |
 |---|---|
-| **A click** | Next mode (QUICK → TOPICS → KEYBOARD → CONTROL → SETTINGS, skipping modes turned off in *Modes*). In a mode's settings, an open topic, About or Sensor test: close it |
-| **B click** | Next: Quick message / topic / key / IR code, then the mode's **Settings** item, then back to the first. In an open topic: its next message. In settings: the next setting. B itself is silent, to save battery |
-| **Hold A** | Do it: QUICK – record the selected Quick message (release to stop; if it already has one, the screen says "Hold A again to replace" – hold A again within 4s to record, B keeps it); TOPICS – open the topic, to look through its messages; CONTROL – learn the selected code (remote 30cm+ from the end of the stick, within 8s); on **Settings** – open them; in settings – next value, or open About / Sensor test |
+| **A click** | Next mode (QUICK → TOPICS → KEYBOARD → CONTROL → MOUSE → SETTINGS, skipping modes turned off in *Modes* / *MOUSE mode*). In a mode's settings, an open topic, About or Sensor test: close it |
+| **B click** | Next: Quick message / topic / key / IR code / Calibrate (MOUSE), then the mode's **Settings** item, then back to the first. In an open topic: its next message. In settings: the next setting. B itself is silent, to save battery |
+| **Hold A** | Do it: QUICK – record the selected Quick message (release to stop; if it already has one, the screen says "Hold A again to replace" – hold A again within 4s to record, B keeps it); TOPICS – open the topic, to look through its messages; CONTROL – learn the selected code (remote 30cm+ from the end of the stick, within 8s); MOUSE – pause / move the pointer, or on **Calibrate** start it; on **Settings** – open them; in settings – next value, or open About / Sensor test |
 | **Hold B** | Hear it: QUICK – the selected Quick message; an open topic – the message; CONTROL – the code's sound (without sending it); in settings – back a value |
 
 A hold is 0.6s. When the screen is off, the first press of A or B only wakes it; when it's just dim, presses work
@@ -212,6 +235,7 @@ All of these are on the setup page too, on each mode's tab and the Settings tab.
 |---|---|---|---|
 | General | Volume | 1, 2, **3**, 4 | How loud messages play |
 | General | Modes | **All**, No KEYBOARD, No CONTROL, Talking only | Turn KEYBOARD and/or CONTROL off for a switch that only talks: A skips them, the setup page hides their tabs, and their settings (and the matching Offer settings) go too. Their key and IR codes are kept |
+| General | MOUSE mode | **Off**, On | Adds the MOUSE mode (see above) and its tab on the setup page |
 | General | Press must last | **Instant**, 0.1s, 0.25s, 0.5s, 1s | Filters accidental brushes |
 | General | Ignore repeats for | Off, 0.2s, **0.4s**, 0.8s, 1.5s | Filters tremor and bounces after a press |
 | General (sensor) | Sensor mode | Line, **Move** | Only with a ToF sensor plugged in – see *Touch-free: the ToF sensor* |
@@ -243,8 +267,17 @@ All of these are on the setup page too, on each mode's tab and the Settings tab.
 | QUICK, TOPICS, CONTROL | Stop choice | **Off**, On | Offers "Stop" last, to choose none of them |
 | KEYBOARD | No USB | **Bluetooth**, QUICK, TOPICS | What to do when the switch isn't plugged into a computer or AAC device by USB. *Bluetooth*: send the key over Bluetooth instead. *QUICK* / *TOPICS*: after 10 seconds, talk instead, using that mode – Bluetooth stays off to save battery. Plugging USB back in switches it back to KEYBOARD (see the backup mode above). Only with USB Mode: USB-OTG (TinyUSB) |
 | KEYBOARD | Key action | **Momentary**, Latch | *Momentary* holds the key while the switch is held; *Latch* – one press holds the key down, the next lets it go. The screen says "Key held" and the LED glows brighter while latched |
-| KEYBOARD, CONTROL | Press sound | **Off**, Click, Beep | A sound on each press, as feedback (CONTROL: only for codes with no sound of their own) |
+| KEYBOARD, CONTROL, MOUSE | Press sound | **Off**, Click, Beep | A sound on each press, as feedback (CONTROL: only for codes with no sound of their own) |
 | CONTROL | IR codes | **Selected**, Repeat held, Scan | See the CONTROL mode above |
+| MOUSE | Speed | 1–6 (**4**) | How far the pointer goes per turn. The computer's pointer speed also applies |
+| MOUSE | Speed-up | Off, Low, **Medium**, High | Faster turns go further, so slow turns stay precise |
+| MOUSE | Steady | Off, **Low**, Medium, High | Ignores turns slower than this – steadies tremor and drift |
+| MOUSE | Smoothing | Off, **Low**, Medium, High | Smooths out shakes, with a little lag |
+| MOUSE | Dwell click | **Off**, 0.8, 1, 1.5, 2, 3 s | Time in one place to left-click |
+| MOUSE | Dwell area | Small, **Medium**, Large | How far the pointer may wander and still count as one place |
+| MOUSE | Switch | **Left click**, Right click | The button the big switch presses |
+| MOUSE | Hold to pause | Off, 1 s, **2 s**, 3 s | Holding the switch this long pauses / moves the pointer; short presses click when let go. Off: the button is held while the switch is (drag) |
+| MOUSE | Flip left/right, Flip up/down | **Off**, On | If the pointer goes the wrong way |
 
 ### The screen
 
@@ -293,12 +326,12 @@ The screen says which is in use.
 - The screen dims after 30s and switches off after 2 minutes without a press of A or B. Its brightness while
   in use is the *Brightness* setting (Low saves the most).
   The big switch keeps working with the screen off.
-- Bluetooth only runs in KEYBOARD mode (it starts after a second or so in that mode; pairing is remembered).
+- Bluetooth only runs in KEYBOARD and MOUSE modes (it starts after a second or so in that mode; pairing is remembered).
 - **Sleep:** on battery, after the *Sleep after* time with no presses, the StickS3 sleeps – screen, speaker
   and radio off. The switch LED keeps glowing. **The big switch still works:** a press wakes it and does its
   job (a fraction of a second slower than normal). A or B wakes it too.
-  It doesn't sleep in KEYBOARD mode over Bluetooth, because the connection would drop, or with the ToF sensor,
-  which can't wake it.
+  It doesn't sleep in KEYBOARD mode over Bluetooth, because the connection would drop, in MOUSE mode, or with the
+  ToF sensor, which can't wake it.
 - **Auto power off** (off by default): after the chosen time with no presses it beeps three times and shows
   a warning; 30s later it powers off. Press any button to cancel. Press the power button to turn it back on.
 - It never sleeps or powers off while plugged into USB.
@@ -321,7 +354,7 @@ Most settings are in the SETTINGS mode above. At the top of `TalkingSwitch.ino`:
 | `MIC_PGA` | 8 | Microphone analogue gain (3dB steps, 0–10). Lower it if loud voices sound distorted |
 | `SCREEN_DIM_MS` / `SCREEN_OFF_MS` | 30000 / 120000 | Screen dims, then switches off, when idle |
 | `BLE_NAME` | "ChatterSwitch" | Default Bluetooth name; each stick's own ID is added to it |
-| `FW_VERSION` / `FW_API` | "29 Sep 2026" / 2 | Version shown in About. Raise `FW_API` (and `PAGE_API` in `docs/index.html`) when the page and firmware must change together |
+| `FW_VERSION` / `FW_API` | "30 Sep 2026" / 3 | Version shown in About. Raise `FW_API` (and `PAGE_API` in `docs/index.html`) when the page and firmware must change together |
 
 ## Troubleshooting
 
@@ -377,6 +410,7 @@ after the stick has started.
 
 ## Mouse test (motion sensor as a mouse)
 
+This is now ChatterSwitch's MOUSE mode (above); the test sketch stays for trying new ideas first.
 `MouseTest/MouseTest.ino` is a separate test sketch: the StickS3's motion sensor moves the pointer, worn on the head
 (headband or cap) or held in the hand. Turn left/right to move left/right, tip down/up to move down/up. It works over
 USB, or Bluetooth as "ChatterSwitch XXXX" (the same identity as ChatterSwitch, so a paired device keeps working).

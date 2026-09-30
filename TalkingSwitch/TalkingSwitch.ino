@@ -32,6 +32,11 @@
 //              optics, bubble tube), and plays that code's own sound if it
 //              has one (e.g. "Bubbles!"). "IR codes" setting: Staff pick /
 //              Repeat while held / Student scans (the student chooses).
+//    MOUSE     (off unless "MOUSE mode" is on in SETTINGS) The stick's motion
+//              sensor moves the pointer - worn on the head or a hand - and
+//              the big switch clicks; optional dwell click. Over USB or
+//              Bluetooth like KEYBOARD. B steps to "Calibrate"; hold A
+//              pauses; holding the switch can pause too ("Hold to pause").
 //  Scanning: the switch offers the choices one at a time (LED colour, name
 //  on screen, a quiet spoken prompt) and the student picks one, which then
 //  plays. Choosing: Press twice - a press starts, the next chooses;
@@ -52,21 +57,22 @@
 //  off, the first press only wakes it - when it's just dim, presses work):
 //    A click .... next mode (in a mode's settings, an open topic, About or
 //                 Sensor test: close it)
-//    B click .... next: Quick message / topic / key / IR code, then the
+//    B click .... next: Quick message / topic / key / IR code / Calibrate, then the
 //                 mode's "Settings" item; in settings, the next setting
 //    Hold A ..... do it: QUICK record the message (one already there: hold
 //                 again to replace it), CONTROL learn the code,
 //                 TOPICS open the topic (B then steps through its messages,
-//                 A closes it), on "Settings" open them, in settings change
+//                 A closes it), MOUSE pause / move (on "Calibrate": start
+//                 it), on "Settings" open them, in settings change
 //                 the value (or open About / Sensor test)
 //    Hold B ..... hear it: QUICK the message, an open topic's message,
 //                 CONTROL the code's sound; in settings, back a value
 //                 (B itself is silent, to save battery)
 //
 //  Power saving: the screen dims, then switches off, when idle. Bluetooth
-//  only runs in KEYBOARD mode. On battery, after the "Sleep after" time
-//  with no presses, it sleeps (except in Bluetooth KEYBOARD mode or with the
-//  ToF sensor, which can't wake it); the
+//  only runs in KEYBOARD and MOUSE modes. On battery, after the "Sleep after"
+//  time with no presses, it sleeps (except in KEYBOARD or MOUSE mode or with
+//  the ToF sensor, which can't wake it); the
 //  big switch still works and wakes it. Optionally it can also power off
 //  completely after a longer time (press the power button to restart).
 //
@@ -120,6 +126,8 @@ USBHIDMouse UsbMouse;
 #endif
 #else
 #define HAS_USB_HID 0
+#define MOUSE_LEFT  0x01
+#define MOUSE_RIGHT 0x02
 #endif
 
 // ToF sensor settings that are the same for everyone
@@ -129,8 +137,8 @@ static const int SENSE_GRAPH_W = 224;      // Sensor test graph: one reading per
 
 // Firmware version. FW_API goes up whenever the setup page needs to change
 // with it (the page shows a warning if the numbers don't match).
-static const char* FW_VERSION = "29 Sep 2026";
-static const int   FW_API     = 2;
+static const char* FW_VERSION = "30 Sep 2026";
+static const int   FW_API     = 3;
 
 // ---------------------------------------------------------------------
 //  Settings you may want to change
@@ -186,21 +194,22 @@ static const int      LOW_BATTERY   = 15;     // warn below this battery %
 // ---------------------------------------------------------------------
 //  Modes and keys
 // ---------------------------------------------------------------------
-enum Mode : uint8_t { M_SPEAK, M_CHOOSE, M_KEYBOARD, M_IR, M_SETTINGS, M_COUNT };
-static const char* MODE_NAMES[M_COUNT] = {"QUICK", "TOPICS", "KEYBOARD", "CONTROL", "SETTINGS"};
+enum Mode : uint8_t { M_SPEAK, M_CHOOSE, M_KEYBOARD, M_IR, M_MOUSE, M_SETTINGS, M_COUNT };
+static const char* MODE_NAMES[M_COUNT] = {"QUICK", "TOPICS", "KEYBOARD", "CONTROL", "MOUSE", "SETTINGS"};
 // Mode colours for the switch LED (dim idle glow)
 static const uint8_t MODE_RGB[M_COUNT][3] = {
-  {0, 40, 0}, {0, 30, 40}, {30, 0, 40}, {40, 20, 0}, {0, 0, 0}
+  {0, 40, 0}, {0, 30, 40}, {30, 0, 40}, {40, 20, 0}, {40, 0, 20}, {0, 0, 0}
 };
 // QUICK, TOPICS and IR: the LED shows which message / topic / code it's on
 static const uint8_t SLOT_RGB[NUM_SLOTS][3] = {{0, 40, 0}, {0, 25, 40}, {30, 0, 40}, {40, 20, 0}};
 // Mode colours for the screen header, and whether it needs dark text
 static const uint8_t SCREEN_RGB[M_COUNT][3] = {
-  {0, 160, 70}, {0, 140, 160}, {140, 60, 220}, {240, 130, 0}, {90, 90, 90}
+  {0, 160, 70}, {0, 140, 160}, {140, 60, 220}, {240, 130, 0}, {210, 40, 110}, {90, 90, 90}
 };
-static const bool HEADER_DARK_TEXT[M_COUNT] = {false, false, false, true, false};
+static const bool HEADER_DARK_TEXT[M_COUNT] = {false, false, false, true, false, false};
 
 enum KbOut : uint8_t { OUT_NONE, OUT_BLE, OUT_USB };  // where keyboard presses go
+enum MouseCal : uint8_t { MC_NONE, MC_STILL, MC_TIP };  // MOUSE calibration step
 enum PlayStyle : uint8_t { PLAY_TAP, PLAY_HOLD, PLAY_LATCH };
 // A choice offered while scanning (declared here, before any function)
 enum ScanKind : uint8_t { SK_GROUP, SK_MSG, SK_BACK, SK_IR, SK_STOP, SK_IRMENU, SK_TALKER, SK_QMENU };
@@ -222,13 +231,14 @@ static const int NUM_KEYS = sizeof(KEYS) / sizeof(KEYS[0]);
 //  and remembered after power-off. Each has a fixed list of choices.
 // ---------------------------------------------------------------------
 enum SettingId : uint8_t {
-  S_VOLUME, S_MODES, S_SPEAK_CHOOSE, S_QUICK_HOW, S_GAP, S_PLAY, S_HOLD, S_CHOOSE_FROM, S_OFFER_QUICK, S_OFFER_CONTROL, S_OFFER_DEVICE, S_IR_CHOOSE, S_ACCESS, S_SCAN_SPEED, S_SCAN_ROUNDS, S_STOP,
+  S_VOLUME, S_MODES, S_MOUSE_ON, S_SPEAK_CHOOSE, S_QUICK_HOW, S_GAP, S_PLAY, S_HOLD, S_CHOOSE_FROM, S_OFFER_QUICK, S_OFFER_CONTROL, S_OFFER_DEVICE, S_IR_CHOOSE, S_ACCESS, S_SCAN_SPEED, S_SCAN_ROUNDS, S_STOP,
   S_KEY_ACTION, S_PRESS_SOUND, S_NO_USB,
+  S_M_SPEED, S_M_ACCEL, S_M_STEADY, S_M_SMOOTH, S_M_DWELL, S_M_AREA, S_M_SWITCH, S_M_HOLD, S_M_FLIPX, S_M_FLIPY,
   S_ACCEPT, S_LOCKOUT, S_SENSE_MODE, S_SENSE_LINE, S_SENSE_MOVE, S_SETTLE, S_FOLLOW, S_BEYOND, S_SENSE_TEST, S_BRIGHT, S_WAKE, S_SLEEP, S_AUTOOFF, S_LOUD, S_FORGET, S_ABOUT,
   S_COUNT
 };
 // Which settings screens a setting appears on (a setting can be on several)
-enum SettingGroup : uint8_t { G_GENERAL = 1, G_SPEAK = 2, G_CHOOSE = 4, G_KEYBOARD = 8, G_IR = 16 };
+enum SettingGroup : uint8_t { G_GENERAL = 1, G_SPEAK = 2, G_CHOOSE = 4, G_KEYBOARD = 8, G_IR = 16, G_MOUSE = 32 };
 struct Setting {
   const char* name;       // shown on screen
   const char* key;        // Preferences key (nullptr = an action, not a stored value)
@@ -241,6 +251,8 @@ static const Setting SETTINGS[S_COUNT] = {
   {"Volume",              "vol",       4, 2, {0, 1, 2, 3}, {"1", "2", "3", "4"}, G_GENERAL},
   // which modes this switch uses (QUICK and TOPICS always)
   {"Modes",               "s_modes",   4, 0, {0, 1, 2, 3}, {"All", "No KEYBOARD", "No CONTROL", "Talking only"}, G_GENERAL},
+  // MOUSE mode (the motion sensor moves the pointer): off unless wanted
+  {"MOUSE mode",          "s_mouse",   2, 0, {0, 1}, {"Off", "On"}, G_GENERAL},
   // QUICK "Plays": the selected Quick message, or one is chosen (scanning or counting presses)
   {"Plays",               "s_spkmode", 2, 0, {0, 1}, {"Selected", "Choose one"}, G_SPEAK},
   // QUICK, Choose one: how - scanning (Press twice / Hold & release, as TOPICS
@@ -274,10 +286,29 @@ static const Setting SETTINGS[S_COUNT] = {
   // holds the key down, the next press lets it go
   {"Key action",          "s_keyact",  2, 0, {0, 1}, {"Momentary", "Latch"}, G_KEYBOARD},
   // KEYBOARD and IR: a sound on each student press (they're silent otherwise)
-  {"Press sound",         "s_psound",  3, 0, {0, 1, 2}, {"Off", "Click", "Beep"}, G_KEYBOARD | G_IR},
+  {"Press sound",         "s_psound",  3, 0, {0, 1, 2}, {"Off", "Click", "Beep"}, G_KEYBOARD | G_IR | G_MOUSE},
   // KEYBOARD with no USB connection: keys go over Bluetooth, or the switch
   // talks instead (backup mode, Bluetooth off) until USB is back
   {"No USB",              "s_nousb",   3, 0, {0, 1, 2}, {"Bluetooth", "QUICK", "TOPICS"}, G_KEYBOARD},
+  // MOUSE: pointer counts per degree of turn (the computer's pointer speed also applies)
+  {"Speed",               "m_speed",   6, 3, {10, 15, 20, 30, 45, 70}, {"1", "2", "3", "4", "5", "6"}, G_MOUSE},
+  // faster turns go further: extra speed per 100 deg/s
+  {"Speed-up",            "m_accel",   4, 2, {0, 1, 2, 4}, {"Off", "Low", "Medium", "High"}, G_MOUSE},
+  // turns slower than this are ignored (tenths of a deg/s): steadies tremor and drift
+  {"Steady",              "m_steady",  4, 1, {0, 15, 30, 60}, {"Off", "Low", "Medium", "High"}, G_MOUSE},
+  // smooths out shakes (time constant, ms), at the cost of a little lag
+  {"Smoothing",           "m_smooth",  4, 1, {0, 30, 60, 120}, {"Off", "Low", "Medium", "High"}, G_MOUSE},
+  // keeping the pointer in one small area this long clicks (ms, 0 = off)
+  {"Dwell click",         "m_dwell",   6, 0, {0, 800, 1000, 1500, 2000, 3000}, {"Off", "0.8 s", "1 s", "1.5 s", "2 s", "3 s"}, G_MOUSE},
+  // ...how far the pointer may wander and still count (pointer counts)
+  {"Dwell area",          "m_area",    3, 1, {15, 30, 60}, {"Small", "Medium", "Large"}, G_MOUSE},
+  // the mouse button the big switch is (HID button bits)
+  {"Switch",              "m_switch",  2, 0, {1, 2}, {"Left click", "Right click"}, G_MOUSE},
+  // holding the switch this long pauses / moves the pointer; then presses click
+  // when let go. Off: the button is held while the switch is (to drag)
+  {"Hold to pause",       "m_hold",    4, 2, {0, 1000, 2000, 3000}, {"Off", "1 s", "2 s", "3 s"}, G_MOUSE},
+  {"Flip left/right",     "m_flipx",   2, 0, {0, 1}, {"Off", "On"}, G_MOUSE},
+  {"Flip up/down",        "m_flipy",   2, 0, {0, 1}, {"Off", "On"}, G_MOUSE},
   // press must be held this long to count - filters accidental brushes
   {"Press must last",     "s_accept",  5, 0, {0, 100, 250, 500, 1000}, {"Instant", "0.1 s", "0.25 s", "0.5 s", "1 s"}, G_GENERAL},
   // ignore new presses this soon after the last one - filters tremor/repeats
@@ -1041,11 +1072,12 @@ void forgetBluetooth() {
   }
 }
 
-// Start Bluetooth once KEYBOARD mode has been selected for a moment (so
-// clicking past it doesn't), and stop it when leaving. Pairing is kept.
+// Start Bluetooth once KEYBOARD or MOUSE mode has been selected for a moment
+// (so clicking past it doesn't), and stop it when leaving. Pairing is kept.
 void manageBle(uint32_t now) {
   static uint32_t keyboardSince = 0;
-  if (studentMode() != M_KEYBOARD || backupMode() != M_COUNT) {  // with a backup mode, Bluetooth stays off
+  const uint8_t m = studentMode();
+  if (!(m == M_MOUSE || (m == M_KEYBOARD && backupMode() == M_COUNT))) {  // with a backup mode, Bluetooth stays off
     keyboardSince = 0;
     if (bleRunning && !swActive) bleEnd();
     return;
@@ -1093,13 +1125,16 @@ KbOut kbOutput() {
   return bleConnected ? OUT_BLE : OUT_NONE;
 }
 
-// Whether a mode is in use ("Modes" setting). QUICK, TOPICS and SETTINGS always are.
+// Whether a mode is in use ("Modes" and "MOUSE mode" settings). QUICK, TOPICS and SETTINGS always are.
 bool modeOn(uint8_t m) {
   const uint8_t c = setting(S_MODES);
   if (m == M_KEYBOARD) return c == 0 || c == 2;
   if (m == M_IR) return c == 0 || c == 1;
+  if (m == M_MOUSE) return setting(S_MOUSE_ON);
   return true;
 }
+// Bluetooth is for KEYBOARD and MOUSE (pairing is shared: one keyboard + mouse)
+bool bluetoothUsed() { return modeOn(M_KEYBOARD) || modeOn(M_MOUSE); }
 
 // The mode KEYBOARD changes to with no USB (M_COUNT = none: use Bluetooth).
 uint8_t backupMode() {
@@ -1199,6 +1234,292 @@ void sendKey(bool down) {
 void releaseKey() {
   keyLatched = false;
   sendKey(false);
+}
+
+// ---------------------------------------------------------------------
+//  MOUSE: the stick's motion sensor moves the pointer. Worn on the head
+//  (headband or cap) or on a hand: turning left/right moves it left/right,
+//  tipping down/up moves it down/up. The big switch is the left (or right)
+//  button; Dwell click clicks when the pointer stays in one small area.
+//  Calibrate (B to "Calibrate", hold A; and the first time):
+//    1. Keep still - learns the sensor's zero point and which way is up
+//    2. Tip down   - nod down (or tip the hand down) and back: learns the
+//                    up/down direction, however the stick is worn
+//  Each time MOUSE starts, only Keep still is needed - unless it's worn at a
+//  clearly different angle, when it asks for Tip down again. While still it
+//  keeps correcting its zero point, so the pointer doesn't creep.
+//  Pause: hold A, or hold the switch ("Hold to pause"). With Hold to pause
+//  on, the switch clicks when it's let go (so a hold can pause instead);
+//  off, the button is held while the switch is, so it can drag.
+// ---------------------------------------------------------------------
+static const float    MS_STILL_DPS = 6.0f;       // Keep still: the gyro may wander this much (deg/s)...
+static const uint32_t MS_STILL_MS = 1000;        // ...for this long
+static const float    MS_TIP_DEG = 12.0f;        // Tip down: this far is enough to learn the direction
+static const uint32_t MS_TIP_TIMEOUT_MS = 10000;
+static const float    MS_MOVED_DEG = 25.0f;      // at start: tilted more than this from last time -> Tip down again
+static const uint32_t MS_SEND_MS = 10;           // send movement at most 100 times a second
+
+MouseCal mCal = MC_NONE;
+bool     mRunning = false;     // MOUSE is the switch's job now
+bool     mFullCal = false;     // this calibration includes Tip down
+bool     mHaveAxes = false;    // up and down directions known (saved)
+bool     mPaused = false;
+bool     mHoldUsed = false;    // this switch press paused / moved: letting go doesn't click
+uint8_t  mouseItem = 0;        // B steps: 0 the pointer, 1 Calibrate
+float    mBias[3] = {0, 0, 0};   // gyro zero point (deg/s)
+float    mUp[3] = {0, 0, 1};     // "up" in the stick's axes (unit)
+float    mDown[3] = {1, 0, 0};   // the axis tipping down turns about (unit, at right angles to up)
+float    mSumG[3], mSumA[3], mMin[3], mMax[3], mTip[3];
+int      mN = 0;
+uint32_t mCalStart = 0;
+float    mRateX = 0, mRateY = 0;  // smoothed turn rates (deg/s): right +, down +
+float    mAccX = 0, mAccY = 0;    // movement not sent yet (counts)
+float    mPosX = 0, mPosY = 0;    // where the pointer has gone (counts), for dwell
+float    mDwellX = 0, mDwellY = 0;
+uint32_t mDwellStart = 0, mStillSince = 0, mLastSample = 0, mLastSend = 0;
+bool     mDwellArmed = false;
+uint8_t  mButtons = 0;
+
+float v3dot(const float* a, const float* b) { return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]; }
+float v3norm(const float* a) { return sqrtf(v3dot(a, a)); }
+
+// One mouse report: the buttons now and a movement (counts, -127..127).
+void mouseSend(int8_t dx, int8_t dy) {
+  KbOut o = kbOutput();
+  if (o == OUT_BLE && mouseInput) {
+    uint8_t report[4] = {mButtons, (uint8_t)dx, (uint8_t)dy, 0};
+    mouseInput->setValue(report, sizeof(report));
+    mouseInput->notify();
+  }
+#if HAS_USB_HID
+  if (o == OUT_USB) {
+    if (dx || dy) UsbMouse.move(dx, dy);
+    else UsbMouse.buttons(mButtons);
+  }
+#endif
+}
+
+void mouseButton(uint8_t b, bool down) {
+  uint8_t was = mButtons;
+  mButtons = down ? mButtons | b : mButtons & ~b;
+  if (mButtons != was) mouseSend(0, 0);
+}
+
+void mouseClick(uint8_t b) {
+  mouseButton(b, true);
+  delay(15);
+  mouseButton(b, false);
+}
+
+void mouseSaveAxes() {
+  prefs.putBytes("m_up", mUp, sizeof(mUp));
+  prefs.putBytes("m_down", mDown, sizeof(mDown));
+}
+
+void mouseLoadAxes() {
+  mHaveAxes = prefs.getBytes("m_up", mUp, sizeof(mUp)) == sizeof(mUp)
+           && prefs.getBytes("m_down", mDown, sizeof(mDown)) == sizeof(mDown);
+}
+
+// Keep still: start (again) collecting samples.
+void mouseRestartStill() {
+  if (mCal != MC_STILL) needRedraw = true;
+  mCal = MC_STILL;
+  mN = 0;
+  mCalStart = millis();
+  for (int k = 0; k < 3; k++) { mSumG[k] = mSumA[k] = 0; mMin[k] = 1e9f; mMax[k] = -1e9f; }
+}
+
+void mouseStartCal(bool full) {
+  if (M5.Imu.getType() == m5::imu_none) { setStatus("No motion sensor", TFT_RED); return; }
+  mFullCal = full;
+  mouseButton(mButtons, false);
+  mouseRestartStill();
+  M5.Speaker.tone(1000, 60);
+}
+
+void mouseCalDone(const char* msg, uint16_t col) {
+  mCal = MC_NONE;
+  mAccX = mAccY = 0;
+  setStatus(msg, col);
+}
+
+// One gyro (deg/s) and accelerometer (g) sample while calibrating.
+void mouseCalSample(const float* g, const float* a, float dt) {
+  if (mCal == MC_STILL) {
+    for (int k = 0; k < 3; k++) {
+      mSumG[k] += g[k];
+      mSumA[k] += a[k];
+      mMin[k] = min(mMin[k], g[k]);
+      mMax[k] = max(mMax[k], g[k]);
+      if (mMax[k] - mMin[k] > MS_STILL_DPS) { mouseRestartStill(); return; }  // moved: start again
+    }
+    mN++;
+    if (millis() - mCalStart < MS_STILL_MS) return;
+    float up[3];
+    for (int k = 0; k < 3; k++) { mBias[k] = mSumG[k] / mN; up[k] = mSumA[k] / mN; }
+    float n = v3norm(up);
+    for (int k = 0; k < 3; k++) up[k] /= n;
+    // worn or held a different way from when it learnt "down": learn it again
+    const bool moved = mHaveAxes && v3dot(up, mUp) < cosf(MS_MOVED_DEG * DEG_TO_RAD);
+    for (int k = 0; k < 3; k++) mUp[k] = up[k];
+    if (mFullCal || !mHaveAxes || moved) {
+      mCal = MC_TIP;
+      mCalStart = millis();
+      for (int k = 0; k < 3; k++) mTip[k] = 0;
+      M5.Speaker.tone(1500, 60);
+      needRedraw = true;
+    } else {
+      // a little different: keep "down" at right angles to the new "up"
+      float d = v3dot(mDown, mUp);
+      for (int k = 0; k < 3; k++) mDown[k] -= d * mUp[k];
+      float dn = v3norm(mDown);
+      for (int k = 0; k < 3; k++) mDown[k] /= dn;
+      M5.Speaker.tone(2000, 60);
+      mouseCalDone("Ready", TFT_GREEN);
+    }
+    return;
+  }
+  // MC_TIP: add up the turn, leaving out any turn about "up"
+  float w[3] = {g[0] - mBias[0], g[1] - mBias[1], g[2] - mBias[2]};
+  float u = v3dot(w, mUp);
+  for (int k = 0; k < 3; k++) mTip[k] += (w[k] - u * mUp[k]) * dt;
+  float n = v3norm(mTip);
+  if (n >= MS_TIP_DEG) {
+    for (int k = 0; k < 3; k++) mDown[k] = mTip[k] / n;
+    mHaveAxes = true;
+    mouseSaveAxes();
+    M5.Speaker.tone(2000, 60);
+    mouseCalDone("Ready", TFT_GREEN);
+  } else if (millis() - mCalStart > MS_TIP_TIMEOUT_MS) {
+    M5.Speaker.tone(400, 150);
+    mouseCalDone(mHaveAxes ? "No tip seen\nKept the old one" : "No tip seen\nCalibrate to try again", TFT_ORANGE);
+  }
+}
+
+// One sample while running: turn rates -> pointer movement.
+void mouseMoveSample(const float* g, float dt) {
+  float w[3] = {g[0] - mBias[0], g[1] - mBias[1], g[2] - mBias[2]};
+  // keep correcting the zero point while really still (drift)
+  if (fabsf(w[0]) < 1.5f && fabsf(w[1]) < 1.5f && fabsf(w[2]) < 1.5f) {
+    if (!mStillSince) mStillSince = millis();
+    if (millis() - mStillSince > 1000) for (int k = 0; k < 3; k++) mBias[k] += w[k] * 0.005f;
+  } else mStillSince = 0;
+
+  // turning about "up" (anticlockwise seen from above = left) and tipping down
+  float x = -v3dot(w, mUp), y = v3dot(w, mDown);
+  if (setting(S_M_FLIPX)) x = -x;
+  if (setting(S_M_FLIPY)) y = -y;
+  const float tau = setting(S_M_SMOOTH) / 1000.0f;
+  const float k = tau > 0 ? dt / (tau + dt) : 1.0f;
+  mRateX += (x - mRateX) * k;
+  mRateY += (y - mRateY) * k;
+  if (mPaused || !mHaveAxes) return;
+
+  auto speed = [&](float r) {
+    float m = fabsf(r) - setting(S_M_STEADY) / 10.0f;
+    if (m <= 0) return 0.0f;
+    float gain = setting(S_M_SPEED) * (1 + setting(S_M_ACCEL) * m / 100.0f);
+    return (r < 0 ? -m : m) * gain;  // counts per second
+  };
+  float mx = speed(mRateX) * dt, my = speed(mRateY) * dt;
+  mAccX += mx; mAccY += my;
+  mPosX += mx; mPosY += my;
+}
+
+void mouseSendMovement() {
+  if (millis() - mLastSend < MS_SEND_MS) return;
+  int dx = (int)constrain(mAccX, -127.0f, 127.0f), dy = (int)constrain(mAccY, -127.0f, 127.0f);
+  if (!dx && !dy) return;
+  mLastSend = millis();
+  mAccX -= dx; mAccY -= dy;
+  markActivity();  // moving counts as using it (auto power-off)
+  if (kbOutput() != OUT_NONE) mouseSend(dx, dy);
+}
+
+// Dwell: in one small area for the dwell time -> one click; move away to arm it again.
+float mouseDwellProgress() {
+  if (!setting(S_M_DWELL) || !mDwellArmed || mPaused) return 0;
+  return min(1.0f, (millis() - mDwellStart) / (float)setting(S_M_DWELL));
+}
+
+void mouseDwell() {
+  if (!setting(S_M_DWELL) || mPaused || !mHaveAxes || swStable) {
+    mDwellArmed = false; mDwellX = mPosX; mDwellY = mPosY; return;
+  }
+  float dx = mPosX - mDwellX, dy = mPosY - mDwellY, area = setting(S_M_AREA);
+  if (dx * dx + dy * dy > area * area) {  // moved: a new place
+    mDwellX = mPosX; mDwellY = mPosY;
+    mDwellStart = millis();
+    mDwellArmed = true;
+    return;
+  }
+  if (mDwellArmed && millis() - mDwellStart >= setting(S_M_DWELL)) {
+    mDwellArmed = false;
+    mouseClick(MOUSE_LEFT);
+    M5.Speaker.tone(2500, 20);
+    needRedraw = true;
+  }
+}
+
+void mousePause(bool p) {
+  if (p == mPaused) return;
+  mPaused = p;
+  mAccX = mAccY = 0;
+  if (p) { beep(1200, 60); beep(800, 60); } else { beep(800, 60); beep(1200, 60); }
+  needRedraw = true;
+}
+
+// MOUSE became the switch's job: Keep still (and Tip down the first time).
+void mouseStart() {
+  mPaused = false;
+  mAccX = mAccY = mRateX = mRateY = 0;
+  mLastSample = micros();
+  mouseStartCal(!mHaveAxes);
+}
+
+void mouseStop() {
+  mCal = MC_NONE;
+  mouseButton(mButtons, false);
+  mAccX = mAccY = 0;
+  mDwellArmed = false;
+}
+
+// Big switch in MOUSE (after Press must last / Ignore repeats).
+void mouseSwitch(bool down) {
+  const uint8_t b = setting(S_M_SWITCH);
+  if (down) {
+    mHoldUsed = false;
+    if (!setting(S_M_HOLD)) mouseButton(b, true);  // held while the switch is (drag)
+    pressSound();
+  } else if (!setting(S_M_HOLD)) {
+    mouseButton(b, false);
+  } else if (!mHoldUsed) {
+    mouseClick(b);  // Hold to pause: a short press clicks when let go
+  }
+}
+
+void updateMouse(uint32_t now) {
+  const bool on = studentMode() == M_MOUSE;
+  if (on != mRunning) {
+    mRunning = on;
+    if (on) mouseStart(); else mouseStop();
+  }
+  if (!on) return;
+  if (M5.Imu.update()) {
+    uint32_t t = micros();
+    float dt = min((t - mLastSample) / 1e6f, 0.05f);
+    mLastSample = t;
+    auto d = M5.Imu.getImuData();
+    float g[3] = {d.gyro.x, d.gyro.y, d.gyro.z}, a[3] = {d.accel.x, d.accel.y, d.accel.z};
+    if (mCal != MC_NONE) mouseCalSample(g, a, dt);
+    else mouseMoveSample(g, dt);
+  }
+  if (mCal != MC_NONE) return;
+  mouseSendMovement();
+  mouseDwell();
+  static uint32_t lastBar = 0;  // the dwell bar on screen
+  if (mouseDwellProgress() > 0 && now - lastBar >= 100) { lastBar = now; needRedraw = true; }
 }
 
 // ---------------------------------------------------------------------
@@ -1493,6 +1814,36 @@ void drawMain(lgfx::LovyanGFX& c) {
                               + (slotLen[snd] ? " - hold B to hear" : ""));
       break;
     }
+    case M_MOUSE: {
+      if (mouseItem == 1 || mCal != MC_NONE) {
+        line1(c, mCal == MC_STILL ? "Keep still" : mCal == MC_TIP ? "Tip down" : "Calibrate");
+        line2(c, mCal == MC_STILL ? "Learning the zero point" : mCal == MC_TIP ? "Nod down, or tip the hand down"
+                 : "Hold A to start", C_DO);
+        line3(c, mCal == MC_TIP ? "Then back up" : "Wear it as it will be used");
+        break;
+      }
+      if (!mHaveAxes) {
+        line1(c, "Not calibrated", C_PROBLEM);
+        line2(c, "B, then hold A to calibrate", C_DO);
+        break;
+      }
+      KbOut o = kbOutput();
+      line1(c, mPaused ? "Paused" : "Moving");
+      if (o == OUT_NONE) line2(c, HAS_USB_HID ? "Not connected" : "No USB mouse: set USB Mode TinyUSB", C_PROBLEM);
+      else if (mPaused) line2(c, "Hold A to move", C_DO);
+      else line2(c, o == OUT_USB ? "Sending by USB" : "Sending by Bluetooth", C_READY);
+      float p = mouseDwellProgress();
+      if (p > 0) {  // dwell click coming
+        const int bw = W - 60;
+        c.drawRect(30, LINE3_Y - 4, bw, 8, TFT_DARKGREY);
+        c.fillRect(31, LINE3_Y - 3, (int)((bw - 2) * p), 6, TFT_GREEN);
+      } else {
+        line3(c, "Speed " + String(SETTINGS[S_M_SPEED].labels[settingChoice[S_M_SPEED]])
+                 + " - Dwell " + SETTINGS[S_M_DWELL].labels[settingChoice[S_M_DWELL]]
+                 + (setting(S_M_HOLD) ? " - hold switch: pause" : ""));
+      }
+      break;
+    }
   }
 }
 
@@ -1583,7 +1934,7 @@ void drawStatus(lgfx::LovyanGFX& c) {
 
 // The settings shown now: general SETTINGS, or the open mode's own.
 uint8_t settingsMask() {
-  static const uint8_t MASK[M_COUNT] = {G_SPEAK, G_CHOOSE, G_KEYBOARD, G_IR, G_GENERAL};
+  static const uint8_t MASK[M_COUNT] = {G_SPEAK, G_CHOOSE, G_KEYBOARD, G_IR, G_MOUSE, G_GENERAL};
   return MASK[mode];
 }
 
@@ -1604,7 +1955,8 @@ bool settingShown(int i) {
     case S_OFFER_CONTROL: return topicsByStudent() && modeOn(M_IR);
     case S_OFFER_DEVICE: return topicsByStudent() && modeOn(M_KEYBOARD);
     case S_NO_USB: return HAS_USB_HID;  // needs USB Mode: USB-OTG (TinyUSB)
-    case S_FORGET: return modeOn(M_KEYBOARD);  // Bluetooth is only for KEYBOARD
+    case S_FORGET: return bluetoothUsed();  // Bluetooth is only for KEYBOARD and MOUSE
+    case S_M_AREA: return setting(S_M_DWELL) > 0;
     case S_SENSE_MODE: return sensorOn;
     case S_SENSE_LINE: return sensorOn && !senseMove();
     case S_SENSE_MOVE: case S_SETTLE: case S_FOLLOW: return sensorOn && senseMove();
@@ -1649,6 +2001,8 @@ String buttonGuide() {
     case M_CHOOSE: return topicOpen ? "B next  hold B hear  A close" : "B next topic  hold A open  A mode";
     case M_KEYBOARD: return "B next key  A mode";
     case M_IR: return "B next code  hold A learn  A mode";
+    case M_MOUSE: return mouseItem == 1 ? "B next  hold A start  A mode"
+                       : mPaused ? "B next  hold A move  A mode" : "B next  hold A pause  A mode";
   }
   return "A mode";
 }
@@ -1753,7 +2107,7 @@ bool canSleep(uint32_t idle) {
   if (sensorOn) return false;  // the sensor can't wake it (no spare wire on the Grove port)
   uint32_t mins = setting(S_SLEEP);
   if (!mins || idle < mins * 60000UL) return false;
-  if (bleRunning || studentMode() == M_KEYBOARD) return false;
+  if (bleRunning || studentMode() == M_KEYBOARD || studentMode() == M_MOUSE) return false;
   if (swStable || swActive || M5.BtnA.isPressed() || M5.BtnB.isPressed()) return false;
   if (M5.Speaker.isPlaying() || scanning) return false;
   return true;
@@ -2084,6 +2438,10 @@ void onActivate() {
       if (slotLen[irSound(irSlot)]) playSlot(irSound(irSlot));  // the code's own sound, if any
       else pressSound();
       break;
+    case M_MOUSE:
+      if (mCal == MC_NONE) mouseSwitch(true);
+      else mHoldUsed = true;  // while calibrating: letting go doesn't click either
+      break;
   }
   needRedraw = true;
 }
@@ -2113,6 +2471,7 @@ void onDeactivate() {
   if (sensorTest) return;
   if (scanModeActive()) { scanDeactivate(); return; }
   if (studentMode() == M_KEYBOARD && !keyLatched) sendKey(false);
+  if (studentMode() == M_MOUSE && mCal == MC_NONE) mouseSwitch(false);
   // Hold to play: letting go stops the message
   if (setting(S_PLAY) == PLAY_HOLD && studentMode() == M_SPEAK && speakPick()) M5.Speaker.stop(0);
 }
@@ -2156,6 +2515,12 @@ void pollStudentSwitch() {
     lastIrRepeat = now;
     irSend(irSlot, 0);
   }
+  // MOUSE, "Hold to pause": a long hold pauses / moves the pointer (and doesn't click)
+  if (swActive && m == M_MOUSE && setting(S_M_HOLD) && !mHoldUsed && mCal == MC_NONE
+      && now - swLastActivation >= setting(S_M_HOLD)) {
+    mHoldUsed = true;
+    mousePause(!mPaused);
+  }
 }
 
 // ---------------------------------------------------------------------
@@ -2179,7 +2544,8 @@ void settingChanged(int i) {
     settingChoice[S_ACCESS] = settingChoice[S_QUICK_HOW];
     prefs.putUChar(SETTINGS[S_ACCESS].key, settingChoice[S_ACCESS]);
   }
-  if (i == S_MODES) {
+  if (i == S_M_SWITCH || i == S_M_HOLD) mouseButton(mButtons, false);
+  if (i == S_MODES || i == S_MOUSE_ON) {
     stopScan();
     scanInGroup = false;
     if (!modeOn(prevMode)) prevMode = M_SPEAK;
@@ -2237,6 +2603,7 @@ void nextItem() {
       case M_CHOOSE: scanInGroup = false; group = 0; break;
       case M_KEYBOARD: releaseKey(); keyIdx = 0; break;
       case M_IR: irSlot = 0; break;
+      case M_MOUSE: mouseItem = 0; break;
     }
   } else {
     switch (mode) {
@@ -2260,6 +2627,9 @@ void nextItem() {
         break;
       case M_IR:
         if (irSlot == NUM_SLOTS - 1) gateShown = true; else irSlot++;
+        break;
+      case M_MOUSE:  // the pointer, then Calibrate
+        if (mouseItem == 1) gateShown = true; else mouseItem++;
         break;
     }
   }
@@ -2308,6 +2678,9 @@ void pollStaffButtons() {
     } else if (mode == M_CHOOSE && !topicOpen) {  // open the topic to look through its messages
       for (int k = 0; k < PER_TOPIC; k++)
         if (slotLen[topicMsg(group, k)]) { topicOpen = true; topicItem = k; break; }
+    } else if (mode == M_MOUSE) {  // Calibrate, or pause / move the pointer
+      if (mouseItem == 1) { mouseItem = 0; mouseStartCal(true); }
+      else if (mCal == MC_NONE && mHaveAxes) mousePause(!mPaused);
     } else if (mode == M_IR) {
       learnIr(irSlot);
     } else if (mode == M_SPEAK) {
@@ -2338,6 +2711,7 @@ void pollStaffButtons() {
     topicOpen = false;
     if (!inSettings()) backupOn = false;  // staff chose a mode
     gateShown = false;
+    mouseItem = 0;
     if (inSettings()) settingIdx = nextSettingInView(S_COUNT - 1);
     scanInGroup = false;
     saveSettings();
@@ -2358,6 +2732,7 @@ void pollStaffButtons() {
 //    VOICE <id> <speed>   (the setup page's typed-speech voice for this switch)
 //    IRLEARN n (waits up to 8s for a remote) / IRSEND n / IRDEL n  (n 0-3)
 //    CKEY <mods> <usage> <label>  (custom key; usage 0 removes it)
+//    MCAL / MPAUSE 1|0    (MOUSE: calibrate / pause or move the pointer)
 //    UP n <samples>       -> @READY, then the samples in 4KB pieces, each
 //                            answered with @A; finally @OK
 //    DOWN n               -> @DATA n <samples>, the samples, then @OK
@@ -2417,6 +2792,8 @@ void sendInfo() {
   j += "],\"back\":{\"pr\":" + yes(slotLen[SND_PBACK]) + "},\"stop\":{\"pr\":" + yes(slotLen[SND_PSTOP]) + "}";
   j += ",\"irmenu\":{\"pr\":" + yes(slotLen[SND_PIRMENU]) + "},\"talker\":{\"pr\":" + yes(slotLen[SND_PTALKER]) + "}";
   j += ",\"qmenu\":{\"pr\":" + yes(slotLen[SND_PQMENU]) + "}";
+  j += ",\"mouse\":{\"cal\":" + yes(mHaveAxes) + ",\"step\":" + String((int)mCal) + ",\"paused\":" + yes(mPaused)
+       + ",\"imu\":" + yes(M5.Imu.getType() != m5::imu_none) + "}";
   j += ",\"settings\":[";
   bool first = true;
   for (int i = 0; i < S_COUNT; i++) {
@@ -2650,6 +3027,18 @@ void handleCommand(String line) {
   } else if (cmd == "FORGET") {
     forgetBluetooth();
     reply();
+  } else if (cmd == "MCAL") {
+    // MCAL: calibrate MOUSE (Keep still, then Tip down), as B to Calibrate + hold A
+    if (!mRunning) return reply("the switch isn't in MOUSE mode");
+    wakeScreen();
+    mouseItem = 0;
+    mouseStartCal(true);
+    reply();
+  } else if (cmd == "MPAUSE") {
+    // MPAUSE 1 / 0: pause / move the pointer
+    if (!mRunning) return reply("the switch isn't in MOUSE mode");
+    mousePause(n != 0);
+    reply();
   } else {
     reply("unknown command");
   }
@@ -2678,6 +3067,7 @@ void setup() {
   cfg.external_rtc = false;
   cfg.internal_mic = true;
   cfg.internal_spk = true;
+  cfg.internal_imu = true;  // MOUSE
   M5.begin(cfg);
   M5.Ex_I2C.release();  // make sure the Grove pins are free for the Unit Key
   auto mic = M5.Mic.config();
@@ -2710,6 +3100,7 @@ void setup() {
 
   prefs.begin("tswitch", false);
   loadSettings();
+  mouseLoadAxes();
   M5.Speaker.setVolume(volume());
 
   bool havePsram = psramFound();
@@ -2776,8 +3167,9 @@ void loop() {
   if (sensorTest && now - lastInteraction > 300000) { sensorTest = false; needRedraw = true; }
   if (aboutOpen && now - lastInteraction > SETTINGS_EXIT_MS) { aboutOpen = false; needRedraw = true; }
   if (inSettings() && !sensorTest && now - lastInteraction > SETTINGS_EXIT_MS) { mode = prevMode; ledIdle(); needRedraw = true; }
-  if ((modeSettingsOpen || gateShown || topicOpen) && !sensorTest && now - lastInteraction > SETTINGS_EXIT_MS) {
+  if ((modeSettingsOpen || gateShown || topicOpen || mouseItem) && !sensorTest && now - lastInteraction > SETTINGS_EXIT_MS) {
     modeSettingsOpen = gateShown = topicOpen = false;
+    mouseItem = 0;
     needRedraw = true;
   }
   updateScan(now);
@@ -2791,6 +3183,7 @@ void loop() {
     needRedraw = true;
   }
   manageBackup(now);
+  updateMouse(now);
   manageBle(now);
   managePower(now);
   if (needRedraw && scr != SCR_OFF) drawScreen();

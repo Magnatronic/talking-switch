@@ -202,6 +202,7 @@ ol { padding-left: 1.2em; margin: 8px 0 0; }
       <button role="tab" data-tab="topics">TOPICS</button>
       <button role="tab" data-tab="keyboard">KEYBOARD</button>
       <button role="tab" data-tab="control">CONTROL</button>
+      <button role="tab" data-tab="mouse">MOUSE</button>
       <button role="tab" data-tab="voice">Voice</button>
       <button role="tab" data-tab="settings">Settings</button>
     </nav>
@@ -255,6 +256,11 @@ ol { padding-left: 1.2em; margin: 8px 0 0; }
       <div id="irList" class="slots"></div>
     </section>
 
+    <section id="tab-mouse" class="card" role="tabpanel">
+      <div id="set-mouse" class="settings"></div>
+      <div id="mouseBox" class="settings"></div>
+    </section>
+
     <section id="tab-voice" class="card" role="tabpanel">
       <div id="set-voice" class="settings"></div>
     </section>
@@ -299,8 +305,9 @@ const MODE_HELP = {
   'TOPICS': 'Messages in topics, chosen by scanning.',
   'KEYBOARD': 'Each press is a key or a mouse click, over USB or Bluetooth.',
   'CONTROL': 'Each press sends a remote-control code, and says its sound if it has one.',
+  'MOUSE': 'Head or hand movement moves the pointer; the switch clicks.',
 };
-const TABS = ['quick', 'topics', 'keyboard', 'control', 'voice', 'settings'];
+const TABS = ['quick', 'topics', 'keyboard', 'control', 'mouse', 'voice', 'settings'];
 function tabOfMode(i) { return (info.modes[i] || '').toLowerCase(); }
 function tabOn(tab) {
   const m = info && info.modes.findIndex((x) => x.toLowerCase() === tab);
@@ -571,6 +578,7 @@ function render() {
   renderQuick();
   renderTopics();
   renderIr();
+  renderMouse();
   renderScanNotes();
   renderSettings();
   renderCustomKey();
@@ -592,6 +600,7 @@ function placeModeLine() {
     : [el('span', {}, `Switch is in ${cur}`),
       el('button', { class: 'primary', title: MODE_HELP[name] || '', onclick: async () => {
         await act(() => cmd(`MODE ${m}`), `The switch is in ${name} mode`);
+        if (name === 'MOUSE') watchMouseCal();  // it starts with Keep still
         makeMissingPrompts();
       } }, `Use ${name}`)];
   line.className = 'modeline' + (m === info.mode ? ' inuse' : '');
@@ -611,7 +620,7 @@ function settingChips(tab) {
     if (!st) return null;
     const v = st.choices[st.cur];
     if (/^(Off|Never)$/.test(v)) return null;
-    return [st.name, /^(On|Yes|No|Selected|Scan|\d.*)$/.test(v) ? `${st.name}: ${v}` : v];
+    return [st.name, /^(On|Yes|No|Selected|Scan|Low|Medium|High|Small|Large|\d.*)$/.test(v) ? `${st.name}: ${v}` : v];
   }).filter(Boolean);
 }
 
@@ -770,7 +779,7 @@ function renderEditor(i) {
 
 // ---------------------------------------------------------------- about
 // The firmware's FW_API this page is made for (see TalkingSwitch.ino).
-const PAGE_API = 2;
+const PAGE_API = 3;
 function storageFull() { return info.fsTotal && info.fsUsed / info.fsTotal >= 0.9; }
 
 function renderAbout() {
@@ -961,6 +970,43 @@ function renderIr() {
   }));
 }
 
+// ---------------------------------------------------------------- MOUSE tab
+const MOUSE_STEPS = ['', 'Keep still', 'Tip down'];
+
+// While the switch calibrates, check on it every second (for up to 20 s).
+async function watchMouseCal() {
+  for (let t = 0; t < 20; t++) {
+    await sleep(1000);
+    try { await refresh(); } catch { return; }
+    if (!info.mouse || !info.mouse.step) return;
+  }
+}
+
+function renderMouse() {
+  const m = info.mouse;
+  if (!m) { $('mouseBox').replaceChildren(); return; }
+  const inMouse = tabOfMode(info.mode) === 'mouse';
+  const step = MOUSE_STEPS[m.step] || '';
+  const calText = !m.imu ? 'No motion sensor found' : step ? `Now: ${step}` : m.cal ? 'Calibrated' : 'Not calibrated';
+  $('mouseBox').replaceChildren(
+    plainRow('Calibrate', el('div', { class: 'row' },
+      el('span', { class: 'status' + (m.cal && !step ? ' has' : '') }, calText),
+      el('button', { class: m.cal ? '' : 'add', disabled: !inMouse || !m.imu, onclick: async () => {
+        await act(() => cmd('MCAL'), 'Keep still, then nod down (or tip the hand down) and back');
+        watchMouseCal();
+      } }, m.cal ? 'Calibrate again' : 'Calibrate')),
+      inMouse ? 'Wear or hold it as it will be used. Keep still, then nod down (or tip the hand down) and back up.'
+        : 'Use MOUSE first (the button at the top).'),
+    plainRow('Pointer', el('div', { class: 'row' },
+      el('span', {}, !inMouse ? 'Not in use' : m.paused ? 'Paused' : 'Moving'),
+      el('button', { disabled: !inMouse || !m.cal, onclick: () => act(() => cmd(`MPAUSE ${m.paused ? 0 : 1}`)) },
+        m.paused ? 'Move' : 'Pause')),
+      'Or hold A on the stick, or hold the switch (Hold to pause).'),
+    plainRow('Connection', el('div', { class: 'small' }, `USB when plugged in, otherwise Bluetooth as `, el('b', {}, info.name),
+      ` (${info.bt ? 'connected now' : 'not connected'}).`),
+      'The same pairing as KEYBOARD. On an iPad, if no pointer shows, turn on AssistiveTouch.'));
+}
+
 // ---------------------------------------------------------------- settings
 // Each mode's settings open from its bar (⚙); the Settings tab has the rest,
 // in groups. Settings that do nothing with the current choices are hidden.
@@ -989,6 +1035,17 @@ const HELP = {
   s_follow: 'How fast the resting place follows drift. Slow catches slow presses; Fast copes with restless movement.',
   s_beyond: 'Further than this counts as nothing there – stops people walking past from pressing.',
   s_modes: 'Modes you don’t use are skipped on the stick and hidden here. Their key and IR codes are kept.',
+  s_mouse: 'Adds MOUSE: the stick, worn on the head or a hand, moves the pointer.',
+  m_speed: 'How far the pointer goes for a turn. The computer’s pointer speed also applies.',
+  m_accel: 'Faster turns go further, so small slow movements stay precise.',
+  m_steady: 'Very slow turns are ignored – steadies tremor and drift.',
+  m_smooth: 'Smooths out shakes, with a little lag.',
+  m_dwell: 'Keeping the pointer in one place this long left-clicks. Move away to click again.',
+  m_area: 'How far the pointer may wander and still count as in one place.',
+  m_switch: 'The mouse button the switch presses.',
+  m_hold: 'Holding the switch this long pauses the pointer, or starts it again. A short press clicks when let go. Off: the button is held while the switch is, to drag.',
+  m_flipx: 'Swaps left and right – if it’s worn the other way round.',
+  m_flipy: 'Swaps up and down.',
   s_bright: 'Screen brightness in use. Low saves battery.',
   s_accept: 'A press must last this long to count – filters brushes.',
   s_lockout: 'Presses this soon after the last are ignored – filters tremor and bounces.',
@@ -1022,6 +1079,8 @@ const TAB_SETTINGS = {  // [setting, shown only when]
   keyboard: [['s_keyact'], ['s_psound'], ['s_nousb', () => info.usbhid]],
   control: [['s_irmode'], ['s_access', irScanning], ['s_scanspd', irScanning],
     ['s_scanrnd', () => irScanning() && pressTwice()], ['s_stop', irScanning], ['s_psound']],
+  mouse: [['m_speed'], ['m_accel'], ['m_steady'], ['m_smooth'], ['m_dwell'], ['m_area', () => setCur('m_dwell') > 0],
+    ['m_switch'], ['m_hold'], ['s_psound'], ['m_flipx'], ['m_flipy']],
 };
 function visibleSettings(tab) {
   return (TAB_SETTINGS[tab] || []).filter(([, when]) => !when || when()).map(([k]) => k);
@@ -1098,8 +1157,9 @@ function renderSettings() {
     group('Screen and power', ['s_bright', 's_wake', 's_sleep', 's_autooff'].map(switchSetting)),
     group('Switch', [
       switchSetting('s_modes'),
+      switchSetting('s_mouse'),
       nameRow(),
-      tabOn('keyboard') && plainRow('Paired devices', el('div', { class: 'row' }, forget,
+      (tabOn('keyboard') || tabOn('mouse')) && plainRow('Paired devices', el('div', { class: 'row' }, forget,
         el('span', { class: 'small muted' }, info.bt ? 'Connected' : 'Not connected')),
         'For a new computer or tablet. Also remove the switch in its Bluetooth settings.'),
     ]),
