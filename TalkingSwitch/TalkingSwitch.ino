@@ -32,7 +32,7 @@
 //              optics, bubble tube), and plays that code's own sound if it
 //              has one (e.g. "Bubbles!"). "IR codes" setting: Staff pick /
 //              Repeat while held / Student scans (the student chooses).
-//    MOUSE     (off unless "MOUSE mode" is on in SETTINGS) The stick's motion
+//    MOUSE     (SETTINGS "MOUSE mode: Off" hides it) The stick's motion
 //              sensor moves the pointer - worn on the head or a hand - and
 //              the big switch clicks; optional dwell click. Over USB or
 //              Bluetooth like KEYBOARD. B steps to "Calibrate"; hold A
@@ -251,8 +251,8 @@ static const Setting SETTINGS[S_COUNT] = {
   {"Volume",              "vol",       4, 2, {0, 1, 2, 3}, {"1", "2", "3", "4"}, G_GENERAL},
   // which modes this switch uses (QUICK and TOPICS always)
   {"Modes",               "s_modes",   4, 0, {0, 1, 2, 3}, {"All", "No KEYBOARD", "No CONTROL", "Talking only"}, G_GENERAL},
-  // MOUSE mode (the motion sensor moves the pointer): off unless wanted
-  {"MOUSE mode",          "s_mouse",   2, 0, {0, 1}, {"Off", "On"}, G_GENERAL},
+  // MOUSE mode (the motion sensor moves the pointer); Off hides it
+  {"MOUSE mode",          "s_mouse",   2, 1, {0, 1}, {"Off", "On"}, G_GENERAL},
   // QUICK "Plays": the selected Quick message, or one is chosen (scanning or counting presses)
   {"Plays",               "s_spkmode", 2, 0, {0, 1}, {"Selected", "Choose one"}, G_SPEAK},
   // QUICK, Choose one: how - scanning (Press twice / Hold & release, as TOPICS

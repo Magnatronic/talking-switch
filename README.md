@@ -51,7 +51,7 @@ button while plugging it in – that starts it for programming), close the Ardui
 **ESP32S3_DEV – TinyUSB CDC**. The switch is set up over the USB cable – no Wi-Fi – and recordings and
 typed words stay on the computer.
 
-The page has a tab for each mode – QUICK, TOPICS, KEYBOARD, CONTROL (and MOUSE, when it's on) – then **Voice** and **Settings**, like the
+The page has a tab for each mode – QUICK, TOPICS, KEYBOARD, CONTROL, MOUSE – then **Voice** and **Settings**, like the
 modes on the switch. The tab of the mode the switch is in has a green dot. At the top of each mode's tab is one line:
 **In use** (or a **Use** button to switch to that mode), the mode's settings as short chips, and **⚙ settings**,
 which opens them (click **?** next to a setting for a one-line explanation; settings that do nothing with the
@@ -120,7 +120,7 @@ up to 5 seconds. Each IR code can have its own sound, e.g. IR code 1 "Bubbles" t
 | TOPICS | Messages are **chosen** from the Topics by scanning, see below | colour of the choice on offer |
 | KEYBOARD | Holds down the chosen key while pressed. With *No USB* set to QUICK or TOPICS it's also a **backup**: see below | purple |
 | CONTROL | Sends the selected IR code, and says its sound if it has one. *IR codes* setting: Selected / Repeat held (keeps sending while held, like a remote's volume button) / Scan (chosen by scanning) | code colour |
-| MOUSE | (Off unless *MOUSE mode* is on.) Clicks the mouse button; head or hand movement moves the pointer. See *MOUSE* below | pink |
+| MOUSE | Clicks the mouse button; head or hand movement moves the pointer. See *MOUSE* below | pink |
 | SETTINGS | Keeps doing whatever the previous mode did | as previous mode |
 
 ### Touch-free: the ToF sensor
@@ -150,7 +150,7 @@ SETTINGS, and the setup page shows only QUICK, TOPICS, Voice and Settings.
 
 ### MOUSE: head or hand movement moves the pointer
 
-Turn on SETTINGS **MOUSE mode**. The stick's motion sensor then works a mouse pointer, worn on the head (headband or
+The stick's motion sensor works a mouse pointer (SETTINGS **MOUSE mode: Off** hides it), worn on the head (headband or
 cap) or on a hand: turn left/right to move left/right, tip down/up to move down/up. It goes over USB, or Bluetooth
 with the same pairing as KEYBOARD (on an iPad, if no pointer shows, turn on AssistiveTouch).
 
@@ -235,7 +235,7 @@ All of these are on the setup page too, on each mode's tab and the Settings tab.
 |---|---|---|---|
 | General | Volume | 1, 2, **3**, 4 | How loud messages play |
 | General | Modes | **All**, No KEYBOARD, No CONTROL, Talking only | Turn KEYBOARD and/or CONTROL off for a switch that only talks: A skips them, the setup page hides their tabs, and their settings (and the matching Offer settings) go too. Their key and IR codes are kept |
-| General | MOUSE mode | **Off**, On | Adds the MOUSE mode (see above) and its tab on the setup page |
+| General | MOUSE mode | Off, **On** | The MOUSE mode (see above) and its tab on the setup page. Off: A skips it and the tab is hidden |
 | General | Press must last | **Instant**, 0.1s, 0.25s, 0.5s, 1s | Filters accidental brushes |
 | General | Ignore repeats for | Off, 0.2s, **0.4s**, 0.8s, 1.5s | Filters tremor and bounces after a press |
 | General (sensor) | Sensor mode | Line, **Move** | Only with a ToF sensor plugged in – see *Touch-free: the ToF sensor* |
