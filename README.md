@@ -325,6 +325,8 @@ Most settings are in the SETTINGS mode above. At the top of `TalkingSwitch.ino`:
 
 ## Troubleshooting
 
+- **Won't compile, with errors about `io_pin_remap.h`, `pinMode` or `tone` in M5Unified:** the board is set to
+  *Arduino Nano ESP32*. Choose **Tools → Board → esp32 → ESP32S3 Dev Module** and the settings above.
 - **Big switch does nothing:** with a jack switch, try the other Grove wire (see below). With the Unit Key, swap
   `PIN_KEY` (10) and `PIN_LED` (9) in the code – the Grove wire order can vary. With the ToF sensor, check About
   says *Input: ToF sensor* – the switch only looks for it when it starts, so plug it in, then turn it on.
