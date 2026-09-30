@@ -73,8 +73,9 @@ current choices are hidden). Below that is what the mode uses.
 - **CONTROL:** 4 remote-control codes, separate from the messages. For each: a name, **Test / Learn**, Delete (⋯),
   and an optional **sound** that the switch says as it sends the code. Settings: IR codes (and scanning settings
   with *Scan*), Press sound.
-- **MOUSE:** **Calibrate** (with what it's doing now), **Pause / Move**, and the connection; settings: Speed,
-  Speed-up, Steady, Smoothing, Dwell click, Switch, Hold to pause, Press sound, Flip.
+- **MOUSE:** **Calibrate** (with what it's doing now), a live **Movement** picture (where the stick is, and the
+  comfortable range it learnt), **Pause / Move**, and the connection; settings: Speed, Speed-up, Steady, Smoothing,
+  Dwell click, Switch, Hold to pause, Press sound.
 - **Voice:** the switch's **voice** and speed for typed messages and scanning prompts (natural: Emma, Isabella,
   George, Fable; quick: Cori, Alba, Southern English female, Northern English male). It's stored on the switch, so
   every computer uses the same one. Changing it remakes the prompts, and **Remake in this voice** remakes the typed
@@ -151,13 +152,20 @@ SETTINGS, and the setup page shows only QUICK, TOPICS, Voice and Settings.
 ### MOUSE: head or hand movement moves the pointer
 
 The stick's motion sensor works a mouse pointer (SETTINGS **MOUSE mode: Off** hides it), worn on the head (headband or
-cap) or on a hand: turn left/right to move left/right, tip down/up to move down/up. It goes over USB, or Bluetooth
+cap) or on a hand, using whatever movements the user makes (learnt by Calibrate). It goes over USB, or Bluetooth
 with the same pairing as KEYBOARD (on an iPad, if no pointer shows, turn on AssistiveTouch).
 
 - **Calibrate:** the first time MOUSE starts, and whenever you choose it (B to **Calibrate**, hold A; or the setup
-  page): *Keep still*, then *Tip down* – nod down, or tip the hand down, and back up. Wear it as it will be used;
-  it works whichever way round it's worn. Each time MOUSE starts after that it only needs *Keep still* (a second),
-  unless it's worn at a clearly different angle, when it asks for *Tip down* again.
+  page). Wear it as it will be used; it works whichever way round it's worn.
+  1. *Keep still* – sit comfortably. This position is the middle.
+  2. *Right*, 3. *Left*, 4. *Down*, 5. *Up* – each as far as is comfortable, and back. A beep starts each one;
+     the screen shows how far it has gone. It can be any movement: a head turn or nod, a wrist roll or bend.
+  Each side gets its own speed from its own range, so a stiff side still reaches the screen edge. If a movement
+  isn't seen within 10 s it moves on (Left or Up then get a small range; without Right or Down it keeps the old
+  calibration). Each time MOUSE starts after that it only needs *Keep still* (a second), unless it's worn at a
+  clearly different angle, when it asks for the whole calibration again.
+- **Screen edges:** the pointer stops at the edge while the head keeps going. That's also how to bring the pointer
+  back in line: push into the edge until the head is comfortable again, or pause, move back, and carry on.
 - **Clicks:** the big switch is the left (or right, *Switch* setting) button. **Dwell click:** keep the pointer in
   one small area for the *Dwell click* time to click; move away to click again. A green bar on the screen fills up
   before it clicks.
@@ -165,9 +173,8 @@ with the same pairing as KEYBOARD (on an iPad, if no pointer shows, turn on Assi
   rising = moving. With Hold to pause on, a short press clicks when it's let go; set it Off to drag (the button is
   then held while the switch is).
 - It doesn't sleep in MOUSE mode.
-- Coming next: training it on the user's own movements (left, right, up and down as far as is comfortable), so
-  the pointer and head stay in step at the screen edges, and a tilt (joystick) style for small movements. The
-  research and step-by-step plan are in [MOUSE-PLAN.md](MOUSE-PLAN.md).
+- Coming next: freeze on click, ignore jerks, and a tilt (joystick) style for small movements. The research and
+  step-by-step plan are in [MOUSE-PLAN.md](MOUSE-PLAN.md).
 
 ### Backup mode: a switch for the AAC device, and a talker when it isn't there
 
@@ -270,15 +277,14 @@ All of these are on the setup page too, on each mode's tab and the Settings tab.
 | KEYBOARD | Key action | **Momentary**, Latch | *Momentary* holds the key while the switch is held; *Latch* – one press holds the key down, the next lets it go. The screen says "Key held" and the LED glows brighter while latched |
 | KEYBOARD, CONTROL, MOUSE | Press sound | **Off**, Click, Beep | A sound on each press, as feedback (CONTROL: only for codes with no sound of their own) |
 | CONTROL | IR codes | **Selected**, Repeat held, Scan | See the CONTROL mode above |
-| MOUSE | Speed | 1–6 (**4**) | How far the pointer goes per turn. The computer's pointer speed also applies |
-| MOUSE | Speed-up | Off, Low, **Medium**, High | Faster turns go further, so slow turns stay precise |
+| MOUSE | Speed | 1–7 (**4**) | How far the pointer goes for a full comfortable movement to one side (4 ≈ half a 1920-pixel screen). The computer's pointer speed also applies |
+| MOUSE | Speed-up | Off, Low, **Medium**, High | Faster movements go further, so slow ones stay precise |
 | MOUSE | Steady | Off, **Low**, Medium, High | Ignores turns slower than this – steadies tremor and drift |
 | MOUSE | Smoothing | Off, **Low**, Medium, High | Smooths out shakes, with a little lag |
 | MOUSE | Dwell click | **Off**, 0.8, 1, 1.5, 2, 3 s | Time in one place to left-click |
 | MOUSE | Dwell area | Small, **Medium**, Large | How far the pointer may wander and still count as one place |
 | MOUSE | Switch | **Left click**, Right click | The button the big switch presses |
 | MOUSE | Hold to pause | Off, 1 s, **2 s**, 3 s | Holding the switch this long pauses / moves the pointer; short presses click when let go. Off: the button is held while the switch is (drag) |
-| MOUSE | Flip left/right, Flip up/down | **Off**, On | If the pointer goes the wrong way |
 
 ### The screen
 

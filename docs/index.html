@@ -358,6 +358,9 @@ function handleLine(line) {
   } else if (line.startsWith('tof,')) {
     const [, mm, ln, pr] = line.split(',').map(Number);
     senseReading(mm, ln, pr === 1);
+  } else if (line.startsWith('mou,')) {
+    const [, step, x, y] = line.split(',').map(Number);
+    mouseReading(step, x / 10, y / 10);
   } else if (line.startsWith('press,')) {
     const d = $('pressDot');
     d.classList.add('lit');
@@ -779,7 +782,7 @@ function renderEditor(i) {
 
 // ---------------------------------------------------------------- about
 // The firmware's FW_API this page is made for (see TalkingSwitch.ino).
-const PAGE_API = 3;
+const PAGE_API = 4;
 function storageFull() { return info.fsTotal && info.fsUsed / info.fsTotal >= 0.9; }
 
 function renderAbout() {
@@ -971,12 +974,12 @@ function renderIr() {
 }
 
 // ---------------------------------------------------------------- MOUSE tab
-const MOUSE_STEPS = ['', 'Keep still', 'Tip down'];
+const MOUSE_STEPS = ['', 'Keep still', 'Right', 'Left', 'Down', 'Up'];
 
-// While the switch calibrates, check on it every second (for up to 20 s).
+// While the switch calibrates, check on it every 2 seconds (for up to a minute).
 async function watchMouseCal() {
-  for (let t = 0; t < 20; t++) {
-    await sleep(1000);
+  for (let t = 0; t < 30; t++) {
+    await sleep(2000);
     try { await refresh(); } catch { return; }
     if (!info.mouse || !info.mouse.step) return;
   }
@@ -992,11 +995,14 @@ function renderMouse() {
     plainRow('Calibrate', el('div', { class: 'row' },
       el('span', { class: 'status' + (m.cal && !step ? ' has' : '') }, calText),
       el('button', { class: m.cal ? '' : 'add', disabled: !inMouse || !m.imu, onclick: async () => {
-        await act(() => cmd('MCAL'), 'Keep still, then nod down (or tip the hand down) and back');
+        await act(() => cmd('MCAL'), 'Keep still, then right, left, down, up');
         watchMouseCal();
       } }, m.cal ? 'Calibrate again' : 'Calibrate')),
-      inMouse ? 'Wear or hold it as it will be used. Keep still, then nod down (or tip the hand down) and back up.'
+      inMouse ? 'Wear it as it will be used. Keep still, then move right, left, down and up – each as far as is comfortable, and back.'
         : 'Use MOUSE first (the button at the top).'),
+    inMouse && m.imu ? plainRow('Movement', el('div', {}, mouseCanvas, el('div', { class: 'small', style: 'margin-top:6px' },
+      m.cal && m.range ? `Comfortable range: right ${m.range[0]}°, left ${m.range[1]}°, down ${m.range[2]}°, up ${m.range[3]}°` : 'Not calibrated yet')),
+      'The dot is the stick now; the box is the comfortable range it learnt.') : null,
     plainRow('Pointer', el('div', { class: 'row' },
       el('span', {}, !inMouse ? 'Not in use' : m.paused ? 'Paused' : 'Moving'),
       el('button', { disabled: !inMouse || !m.cal, onclick: () => act(() => cmd(`MPAUSE ${m.paused ? 0 : 1}`)) },
@@ -1036,16 +1042,14 @@ const HELP = {
   s_beyond: 'Further than this counts as nothing there – stops people walking past from pressing.',
   s_modes: 'Modes you don’t use are skipped on the stick and hidden here. Their key and IR codes are kept.',
   s_mouse: 'Adds MOUSE: the stick, worn on the head or a hand, moves the pointer.',
-  m_speed: 'How far the pointer goes for a turn. The computer’s pointer speed also applies.',
-  m_accel: 'Faster turns go further, so small slow movements stay precise.',
+  m_reach: 'How far the pointer goes for a full comfortable movement. Each side has its own range from Calibrate. The computer’s pointer speed also applies.',
+  m_accel: 'Faster movements go further, so small slow movements stay precise.',
   m_steady: 'Very slow turns are ignored – steadies tremor and drift.',
   m_smooth: 'Smooths out shakes, with a little lag.',
   m_dwell: 'Keeping the pointer in one place this long left-clicks. Move away to click again.',
   m_area: 'How far the pointer may wander and still count as in one place.',
   m_switch: 'The mouse button the switch presses.',
   m_hold: 'Holding the switch this long pauses the pointer, or starts it again. A short press clicks when let go. Off: the button is held while the switch is, to drag.',
-  m_flipx: 'Swaps left and right – if it’s worn the other way round.',
-  m_flipy: 'Swaps up and down.',
   s_bright: 'Screen brightness in use. Low saves battery.',
   s_accept: 'A press must last this long to count – filters brushes.',
   s_lockout: 'Presses this soon after the last are ignored – filters tremor and bounces.',
@@ -1079,8 +1083,8 @@ const TAB_SETTINGS = {  // [setting, shown only when]
   keyboard: [['s_keyact'], ['s_psound'], ['s_nousb', () => info.usbhid]],
   control: [['s_irmode'], ['s_access', irScanning], ['s_scanspd', irScanning],
     ['s_scanrnd', () => irScanning() && pressTwice()], ['s_stop', irScanning], ['s_psound']],
-  mouse: [['m_speed'], ['m_accel'], ['m_steady'], ['m_smooth'], ['m_dwell'], ['m_area', () => setCur('m_dwell') > 0],
-    ['m_switch'], ['m_hold'], ['s_psound'], ['m_flipx'], ['m_flipy']],
+  mouse: [['m_reach'], ['m_accel'], ['m_steady'], ['m_smooth'], ['m_dwell'], ['m_area', () => setCur('m_dwell') > 0],
+    ['m_switch'], ['m_hold'], ['s_psound']],
 };
 function visibleSettings(tab) {
   return (TAB_SETTINGS[tab] || []).filter(([, when]) => !when || when()).map(([k]) => k);
@@ -1619,11 +1623,62 @@ requestAnimationFrame(drawSenseGraph);
 function senseStream(on) { if (port && info && info.sensor) cmd(`SENSE ${on ? 1 : 0}`).catch(() => {}); }
 setInterval(() => { if (currentTab === 'settings' && !document.hidden) senseStream(true); }, 5000);
 
+// ---------------------------------------------------------------- MOUSE picture
+// Where the stick is (angle from the rest position) and the learnt range, live
+// while the MOUSE tab is open (MSTREAM 1, repeated). Calibrate steps show on it.
+const mouseCanvas = el('canvas', { class: 'sensegraph', 'aria-label': 'Live movement picture' });
+let mouseNow = null;  // { step, x, y, t }
+
+function mouseReading(step, x, y) {
+  const was = mouseNow ? mouseNow.step : 0;
+  mouseNow = { step, x, y, t: performance.now() };
+  if (was && !step) refresh().catch(() => {});  // calibration finished: the new ranges
+}
+
+function drawMousePicture() {
+  requestAnimationFrame(drawMousePicture);
+  if (currentTab !== 'mouse' || !mouseCanvas.isConnected) return;
+  const W = mouseCanvas.clientWidth, H = mouseCanvas.clientHeight, dpr = window.devicePixelRatio || 1;
+  if (mouseCanvas.width !== Math.round(W * dpr)) { mouseCanvas.width = Math.round(W * dpr); mouseCanvas.height = Math.round(H * dpr); }
+  const g = mouseCanvas.getContext('2d');
+  const css = getComputedStyle(document.documentElement);
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  g.fillStyle = css.getPropertyValue('--chip');
+  g.fillRect(0, 0, W, H);
+  const m = info && info.mouse, r = m && m.cal && m.range ? m.range : null;
+  const live = mouseNow && performance.now() - mouseNow.t < 1000 ? mouseNow : null;
+  // degrees -> pixels, the same scale both ways, with room for the range and the dot
+  let span = 30;
+  if (r) span = Math.max(span, ...r.map((v) => v * 1.25));
+  if (live) span = Math.max(span, Math.abs(live.x) * 1.1, Math.abs(live.y) * 1.1);
+  const sc = Math.min(W, H) / 2 / span, cx = W / 2, cy = H / 2;
+  g.strokeStyle = css.getPropertyValue('--line');
+  g.lineWidth = 1;
+  g.beginPath(); g.moveTo(cx, 0); g.lineTo(cx, H); g.moveTo(0, cy); g.lineTo(W, cy); g.stroke();
+  if (r) {
+    g.strokeStyle = css.getPropertyValue('--accent');
+    g.lineWidth = 2;
+    g.strokeRect(cx - r[1] * sc, cy - r[3] * sc, (r[0] + r[1]) * sc, (r[2] + r[3]) * sc);
+  }
+  g.fillStyle = css.getPropertyValue('--muted');
+  g.font = '12px system-ui, sans-serif';
+  if (live) {
+    g.fillStyle = css.getPropertyValue(live.step ? '--warn' : '--good');
+    g.beginPath(); g.arc(cx + live.x * sc, cy + live.y * sc, 7, 0, 2 * Math.PI); g.fill();
+    g.fillStyle = css.getPropertyValue('--text');
+    g.fillText(live.step ? `Calibrating: ${MOUSE_STEPS[live.step] || ''}` : `${Math.round(live.x)}° right, ${Math.round(live.y)}° down`, 8, 16);
+  } else g.fillText('Waiting for the stick…', 8, 16);
+}
+requestAnimationFrame(drawMousePicture);
+
+function mouseStream(on) { if (port && info && info.mouse && info.mouse.imu) cmd(`MSTREAM ${on ? 1 : 0}`).catch(() => {}); }
+setInterval(() => { if (currentTab === 'mouse' && !document.hidden) mouseStream(true); }, 5000);
+
 // ---------------------------------------------------------------- tabs
 let currentTab = 'quick';
 function showTab(name) {
   if (!TABS.includes(name)) name = 'quick';
-  if (name !== currentTab) senseStream(name === 'settings');
+  if (name !== currentTab) { senseStream(name === 'settings'); mouseStream(name === 'mouse'); }
   currentTab = name;
   for (const b of document.querySelectorAll('.tabs button')) b.setAttribute('aria-selected', String(b.dataset.tab === name));
   for (const t of TABS) $('tab-' + t).classList.toggle('hidden', t !== name);

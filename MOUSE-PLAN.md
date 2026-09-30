@@ -12,7 +12,7 @@ New ideas can be tried in `MouseTest/` first.
 | Step | What | State |
 |---|---|---|
 | 1 | MOUSE mode in ChatterSwitch (from MouseTest), hold to pause, setup page tab | **Done, tested 30 Sep 2026** (commits 369e680, a447b3f; on by default) |
-| 2 | Training on the user's own movements, turn limit, re-centring | Next |
+| 2 | Training on the user's own movements, per-side speed, live picture on the page | **Built 30 Sep 2026, to test** (no turn limit, see below) |
 | 3 | Freeze on click, ignore jerks | Planned |
 | 4 | Tilt (joystick) style for very small movements | Planned |
 | 5 | True screen position (absolute pointer) | Only if 2–4 aren't enough |
@@ -66,7 +66,11 @@ Sources: [Quha Zono X](https://www.quha.com/products/quha-zono-x/),
   a second switch on the other Grove wire (GPIO9, the Unit Key LED) is possible later if needed.
 - **Training covers all four directions** (right, left, down, up), each as far as is comfortable, so each side
   gets its own range.
-- Keep relative mouse reports (no re-pairing); solve the edge problem in the firmware (step 2).
+- Keep relative mouse reports (no re-pairing).
+- **No turn limit or automatic re-centring for now** (decided 30 Sep 2026). The edge is the re-centring, as on the
+  Quha and GlassOuse: push into the edge until the head is comfortable, or pause and move back. It also lets people
+  with a small or one-sided range "ratchet" across the screen. Add the turn limit later as an option only if testing
+  shows people losing the pointer.
 
 ## Step 1 – what exists now (TalkingSwitch.ino)
 
@@ -85,7 +89,18 @@ Sources: [Quha Zono X](https://www.quha.com/products/quha-zono-x/),
 - Setup page: MOUSE tab with a Calibrate button (it watches the stick every second while calibrating), a Pause/Move
   button, the connection, and the settings panel.
 
-## Step 2 – training and staying in step (next)
+## Step 2 – training (built; the design as planned, without the turn limit)
+
+**What was built:** the 5-step training below (`MC_REST`, `MC_RIGHT`, `MC_LEFT`, `MC_DOWN`, `MC_UP` in
+`mouseCalSample()`); the axes come from Right − Left and Down − Up (up/down made at right angles to left/right),
+ranges from each peak. Prefs `m_up`, `m_x`, `m_y`, `m_rng` (the old `m_down` is unused, so it asks to calibrate
+once). Movement is still "follow"; each side's gain = Speed / that side's range (up/down × 0.6). `Speed` is now
+`m_reach` (counts for a full comfortable movement: 300–2200). Flip settings removed (training learns the
+directions). Small wear changes at start turn the axes with "up". Setup page: live picture (`MSTREAM 1|0`,
+`mou,<step>,<x×10>,<y×10>,<paused>` lines), INFO `mouse.range`. FW_API / PAGE_API = 4.
+The picture's dot is the angle since the last Keep still, so it drifts slowly and doesn't follow edge pushes.
+
+The original design (turn limit parts not built):
 
 **Training routine** (replaces Keep still + Tip down; the stick talks you through it; also started from the page):
 1. **Rest** – sit comfortably, keep still. Learns the gyro zero point, gravity, and the **rest position = centre**

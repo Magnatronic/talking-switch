@@ -35,7 +35,8 @@
 //    MOUSE     (SETTINGS "MOUSE mode: Off" hides it) The stick's motion
 //              sensor moves the pointer - worn on the head or a hand - and
 //              the big switch clicks; optional dwell click. Over USB or
-//              Bluetooth like KEYBOARD. B steps to "Calibrate"; hold A
+//              Bluetooth like KEYBOARD. B steps to "Calibrate" (learns the
+//              user's own movements: rest, right, left, down, up); hold A
 //              pauses; holding the switch can pause too ("Hold to pause").
 //  Scanning: the switch offers the choices one at a time (LED colour, name
 //  on screen, a quiet spoken prompt) and the student picks one, which then
@@ -138,7 +139,7 @@ static const int SENSE_GRAPH_W = 224;      // Sensor test graph: one reading per
 // Firmware version. FW_API goes up whenever the setup page needs to change
 // with it (the page shows a warning if the numbers don't match).
 static const char* FW_VERSION = "30 Sep 2026";
-static const int   FW_API     = 3;
+static const int   FW_API     = 4;
 
 // ---------------------------------------------------------------------
 //  Settings you may want to change
@@ -209,7 +210,7 @@ static const uint8_t SCREEN_RGB[M_COUNT][3] = {
 static const bool HEADER_DARK_TEXT[M_COUNT] = {false, false, false, true, false, false};
 
 enum KbOut : uint8_t { OUT_NONE, OUT_BLE, OUT_USB };  // where keyboard presses go
-enum MouseCal : uint8_t { MC_NONE, MC_STILL, MC_TIP };  // MOUSE calibration step
+enum MouseCal : uint8_t { MC_NONE, MC_REST, MC_RIGHT, MC_LEFT, MC_DOWN, MC_UP };  // MOUSE calibration step
 enum PlayStyle : uint8_t { PLAY_TAP, PLAY_HOLD, PLAY_LATCH };
 // A choice offered while scanning (declared here, before any function)
 enum ScanKind : uint8_t { SK_GROUP, SK_MSG, SK_BACK, SK_IR, SK_STOP, SK_IRMENU, SK_TALKER, SK_QMENU };
@@ -233,7 +234,7 @@ static const int NUM_KEYS = sizeof(KEYS) / sizeof(KEYS[0]);
 enum SettingId : uint8_t {
   S_VOLUME, S_MODES, S_MOUSE_ON, S_SPEAK_CHOOSE, S_QUICK_HOW, S_GAP, S_PLAY, S_HOLD, S_CHOOSE_FROM, S_OFFER_QUICK, S_OFFER_CONTROL, S_OFFER_DEVICE, S_IR_CHOOSE, S_ACCESS, S_SCAN_SPEED, S_SCAN_ROUNDS, S_STOP,
   S_KEY_ACTION, S_PRESS_SOUND, S_NO_USB,
-  S_M_SPEED, S_M_ACCEL, S_M_STEADY, S_M_SMOOTH, S_M_DWELL, S_M_AREA, S_M_SWITCH, S_M_HOLD, S_M_FLIPX, S_M_FLIPY,
+  S_M_SPEED, S_M_ACCEL, S_M_STEADY, S_M_SMOOTH, S_M_DWELL, S_M_AREA, S_M_SWITCH, S_M_HOLD,
   S_ACCEPT, S_LOCKOUT, S_SENSE_MODE, S_SENSE_LINE, S_SENSE_MOVE, S_SETTLE, S_FOLLOW, S_BEYOND, S_SENSE_TEST, S_BRIGHT, S_WAKE, S_SLEEP, S_AUTOOFF, S_LOUD, S_FORGET, S_ABOUT,
   S_COUNT
 };
@@ -290,8 +291,9 @@ static const Setting SETTINGS[S_COUNT] = {
   // KEYBOARD with no USB connection: keys go over Bluetooth, or the switch
   // talks instead (backup mode, Bluetooth off) until USB is back
   {"No USB",              "s_nousb",   3, 0, {0, 1, 2}, {"Bluetooth", "QUICK", "TOPICS"}, G_KEYBOARD},
-  // MOUSE: pointer counts per degree of turn (the computer's pointer speed also applies)
-  {"Speed",               "m_speed",   6, 3, {10, 15, 20, 30, 45, 70}, {"1", "2", "3", "4", "5", "6"}, G_MOUSE},
+  // MOUSE: pointer counts for a full comfortable movement to one side, as calibrated
+  // (up/down: MS_UPDOWN of it; the computer's pointer speed also applies)
+  {"Speed",               "m_reach",   7, 3, {300, 450, 650, 900, 1200, 1600, 2200}, {"1", "2", "3", "4", "5", "6", "7"}, G_MOUSE},
   // faster turns go further: extra speed per 100 deg/s
   {"Speed-up",            "m_accel",   4, 2, {0, 1, 2, 4}, {"Off", "Low", "Medium", "High"}, G_MOUSE},
   // turns slower than this are ignored (tenths of a deg/s): steadies tremor and drift
@@ -307,8 +309,6 @@ static const Setting SETTINGS[S_COUNT] = {
   // holding the switch this long pauses / moves the pointer; then presses click
   // when let go. Off: the button is held while the switch is (to drag)
   {"Hold to pause",       "m_hold",    4, 2, {0, 1000, 2000, 3000}, {"Off", "1 s", "2 s", "3 s"}, G_MOUSE},
-  {"Flip left/right",     "m_flipx",   2, 0, {0, 1}, {"Off", "On"}, G_MOUSE},
-  {"Flip up/down",        "m_flipy",   2, 0, {0, 1}, {"Off", "On"}, G_MOUSE},
   // press must be held this long to count - filters accidental brushes
   {"Press must last",     "s_accept",  5, 0, {0, 100, 250, 500, 1000}, {"Instant", "0.1 s", "0.25 s", "0.5 s", "1 s"}, G_GENERAL},
   // ignore new presses this soon after the last one - filters tremor/repeats
@@ -1238,50 +1238,84 @@ void releaseKey() {
 
 // ---------------------------------------------------------------------
 //  MOUSE: the stick's motion sensor moves the pointer. Worn on the head
-//  (headband or cap) or on a hand: turning left/right moves it left/right,
-//  tipping down/up moves it down/up. The big switch is the left (or right)
+//  (headband or cap) or on a hand. The big switch is the left (or right)
 //  button; Dwell click clicks when the pointer stays in one small area.
-//  Calibrate (B to "Calibrate", hold A; and the first time):
-//    1. Keep still - learns the sensor's zero point and which way is up
-//    2. Tip down   - nod down (or tip the hand down) and back: learns the
-//                    up/down direction, however the stick is worn
+//  Calibrate (B to "Calibrate", hold A; and the first time) learns the
+//  user's own movements, whatever they are (head turn, wrist roll...):
+//    1. Keep still - the sensor's zero point, which way is up, and the rest
+//                    position (the middle)
+//    2. Right, 3. Left, 4. Down, 5. Up - each as far as is comfortable and
+//       back: the left/right and up/down movements and how far each side
+//       goes. Each side gets its own speed, so a full comfortable movement
+//       that way goes the same distance ("Speed"), even if one side is stiff.
 //  Each time MOUSE starts, only Keep still is needed - unless it's worn at a
-//  clearly different angle, when it asks for Tip down again. While still it
-//  keeps correcting its zero point, so the pointer doesn't creep.
+//  clearly different angle, when it asks for the whole calibration again.
+//  While still it keeps correcting its zero point, so the pointer doesn't creep.
+//  The pointer stops at the screen edge while the head keeps turning, so
+//  pushing into an edge (or pausing and moving back) brings the pointer
+//  back in line with a comfortable position.
 //  Pause: hold A, or hold the switch ("Hold to pause"). With Hold to pause
 //  on, the switch clicks when it's let go (so a hold can pause instead);
 //  off, the button is held while the switch is, so it can drag.
 // ---------------------------------------------------------------------
 static const float    MS_STILL_DPS = 6.0f;       // Keep still: the gyro may wander this much (deg/s)...
 static const uint32_t MS_STILL_MS = 1000;        // ...for this long
-static const float    MS_TIP_DEG = 12.0f;        // Tip down: this far is enough to learn the direction
-static const uint32_t MS_TIP_TIMEOUT_MS = 10000;
-static const float    MS_MOVED_DEG = 25.0f;      // at start: tilted more than this from last time -> Tip down again
+static const float    MS_GO_DEG = 4.0f;          // a movement step starts once it's gone this far
+static const float    MS_BACK_DPS = 20.0f;       // ...and ends back near rest, turning slower than this...
+static const uint32_t MS_BACK_MS = 250;          // ...for this long
+static const uint32_t MS_WAIT_MS = 10000;        // nothing within this: the step is skipped
+static const uint32_t MS_STEP_MS = 8000;         // a movement step ends after this anyway
+static const float    MS_MIN_RANGE = 3.0f;       // the smallest range (deg)
+static const float    MS_DEF_RANGE = 10.0f;      // Left or Up not seen: this range (deg)
+static const float    MS_UPDOWN = 0.6f;          // up/down goes this much of Speed (screens are wider than tall)
+static const float    MS_MOVED_DEG = 25.0f;      // at start: tilted more than this from last time -> calibrate again
 static const uint32_t MS_SEND_MS = 10;           // send movement at most 100 times a second
+static const uint32_t MS_STREAM_MS = 40;         // the setup page's live picture: 25 times a second
+static const char*    MS_STEP_NAMES[] = {"", "Keep still", "Right", "Left", "Down", "Up"};
 
 MouseCal mCal = MC_NONE;
 bool     mRunning = false;     // MOUSE is the switch's job now
-bool     mFullCal = false;     // this calibration includes Tip down
-bool     mHaveAxes = false;    // up and down directions known (saved)
+bool     mFullCal = false;     // this calibration includes the movements
+bool     mHaveAxes = false;    // movements learnt (saved)
 bool     mPaused = false;
 bool     mHoldUsed = false;    // this switch press paused / moved: letting go doesn't click
 uint8_t  mouseItem = 0;        // B steps: 0 the pointer, 1 Calibrate
 float    mBias[3] = {0, 0, 0};   // gyro zero point (deg/s)
-float    mUp[3] = {0, 0, 1};     // "up" in the stick's axes (unit)
-float    mDown[3] = {1, 0, 0};   // the axis tipping down turns about (unit, at right angles to up)
-float    mSumG[3], mSumA[3], mMin[3], mMax[3], mTip[3];
+float    mUp[3] = {0, 0, 1};     // "up" in the stick's axes at rest (unit)
+float    mAxX[3] = {0, 0, -1};   // the axis moving right turns about (unit)
+float    mAxY[3] = {1, 0, 0};    // the axis moving down turns about (unit, at right angles to mAxX)
+float    mRange[4] = {20, 20, 15, 15};  // how far is comfortable (deg): right, left, down, up
+float    mSumG[3], mSumA[3], mMin[3], mMax[3];
+float    mRot[3];              // calibrating: the turn since Keep still (deg)
+float    mPk[4][3];            // ...each movement at its furthest
+float    mPeak = 0;            // ...how far this movement has gone
+bool     mGot[4];              // ...which movements were seen
+bool     mStarted = false;
 int      mN = 0;
-uint32_t mCalStart = 0;
+uint32_t mCalStart = 0, mBackSince = 0;
 float    mRateX = 0, mRateY = 0;  // smoothed turn rates (deg/s): right +, down +
+float    mAngX = 0, mAngY = 0;    // angle from rest (deg), for the live picture
 float    mAccX = 0, mAccY = 0;    // movement not sent yet (counts)
 float    mPosX = 0, mPosY = 0;    // where the pointer has gone (counts), for dwell
 float    mDwellX = 0, mDwellY = 0;
 uint32_t mDwellStart = 0, mStillSince = 0, mLastSample = 0, mLastSend = 0;
+uint32_t mStreamUntil = 0;     // the setup page shows the live picture until then
 bool     mDwellArmed = false;
 uint8_t  mButtons = 0;
 
 float v3dot(const float* a, const float* b) { return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]; }
 float v3norm(const float* a) { return sqrtf(v3dot(a, a)); }
+void  v3cross(const float* a, const float* b, float* o) {
+  o[0] = a[1] * b[2] - a[2] * b[1]; o[1] = a[2] * b[0] - a[0] * b[2]; o[2] = a[0] * b[1] - a[1] * b[0];
+}
+// a minus its part along unit u
+void  v3perp(float* a, const float* u) { float d = v3dot(a, u); for (int k = 0; k < 3; k++) a[k] -= d * u[k]; }
+bool  v3unit(float* a) {
+  float n = v3norm(a);
+  if (n < 1e-6f) return false;
+  for (int k = 0; k < 3; k++) a[k] /= n;
+  return true;
+}
 
 // One mouse report: the buttons now and a movement (counts, -127..127).
 void mouseSend(int8_t dx, int8_t dy) {
@@ -1313,18 +1347,38 @@ void mouseClick(uint8_t b) {
 
 void mouseSaveAxes() {
   prefs.putBytes("m_up", mUp, sizeof(mUp));
-  prefs.putBytes("m_down", mDown, sizeof(mDown));
+  prefs.putBytes("m_x", mAxX, sizeof(mAxX));
+  prefs.putBytes("m_y", mAxY, sizeof(mAxY));
+  prefs.putBytes("m_rng", mRange, sizeof(mRange));
 }
 
 void mouseLoadAxes() {
   mHaveAxes = prefs.getBytes("m_up", mUp, sizeof(mUp)) == sizeof(mUp)
-           && prefs.getBytes("m_down", mDown, sizeof(mDown)) == sizeof(mDown);
+           && prefs.getBytes("m_x", mAxX, sizeof(mAxX)) == sizeof(mAxX)
+           && prefs.getBytes("m_y", mAxY, sizeof(mAxY)) == sizeof(mAxY)
+           && prefs.getBytes("m_rng", mRange, sizeof(mRange)) == sizeof(mRange);
+}
+
+// Worn a little differently: turn the learnt axes the way "up" turned.
+void mouseFollowUp(const float* up) {
+  float k[3];
+  v3cross(mUp, up, k);
+  float s = v3norm(k), c = v3dot(mUp, up);
+  if (s > 1e-4f) {
+    for (int i = 0; i < 3; i++) k[i] /= s;
+    for (float* v : {mAxX, mAxY}) {  // Rodrigues: v c + (k x v) s + k (k.v)(1 - c)
+      float kv[3], d = v3dot(k, v);
+      v3cross(k, v, kv);
+      for (int i = 0; i < 3; i++) v[i] = v[i] * c + kv[i] * s + k[i] * d * (1 - c);
+    }
+  }
+  for (int i = 0; i < 3; i++) mUp[i] = up[i];
 }
 
 // Keep still: start (again) collecting samples.
 void mouseRestartStill() {
-  if (mCal != MC_STILL) needRedraw = true;
-  mCal = MC_STILL;
+  if (mCal != MC_REST) needRedraw = true;
+  mCal = MC_REST;
   mN = 0;
   mCalStart = millis();
   for (int k = 0; k < 3; k++) { mSumG[k] = mSumA[k] = 0; mMin[k] = 1e9f; mMax[k] = -1e9f; }
@@ -1340,13 +1394,75 @@ void mouseStartCal(bool full) {
 
 void mouseCalDone(const char* msg, uint16_t col) {
   mCal = MC_NONE;
-  mAccX = mAccY = 0;
+  mAccX = mAccY = mRateX = mRateY = 0;
   setStatus(msg, col);
+  needRedraw = true;
+}
+
+// The next movement step: Right, Left, Down, Up.
+void mouseStep(MouseCal s) {
+  mCal = s;
+  mCalStart = millis();
+  mStarted = false;
+  mPeak = 0;
+  mBackSince = 0;
+  static const uint16_t TONES[] = {0, 0, 1400, 1200, 1000, 1600};
+  M5.Speaker.tone(TONES[s], 80);
+  needRedraw = true;
+}
+
+// Left/right and up/down so far (from Right and Left; Down and Up), for measuring the next steps.
+void mouseSoFarX(float* x) {
+  for (int k = 0; k < 3; k++) x[k] = mPk[0][k] - (mGot[1] ? mPk[1][k] : 0);
+  v3unit(x);
+}
+void mouseSoFarY(const float* x, float* y) {
+  for (int k = 0; k < 3; k++) y[k] = mPk[2][k] - (mGot[3] ? mPk[3][k] : 0);
+  v3perp(y, x);
+  v3unit(y);
+}
+
+// How far the movement being learnt has gone (deg), and the live picture's x, y.
+float mouseStepMeasure(float& px, float& py) {
+  float x[3], y[3], r[3] = {mRot[0], mRot[1], mRot[2]};
+  px = py = 0;
+  if (mCal == MC_RIGHT) return px = v3norm(r);
+  mouseSoFarX(x);
+  px = v3dot(r, x);
+  if (mCal == MC_LEFT) return -px;
+  v3perp(r, x);
+  if (mCal == MC_DOWN) return py = v3norm(r);
+  mouseSoFarY(x, y);
+  py = v3dot(r, y);
+  return -py;  // MC_UP
+}
+
+// All movements done (or some skipped): work out the axes and ranges.
+void mouseFinishCal() {
+  if (!mGot[0] || !mGot[2]) {
+    M5.Speaker.tone(400, 150);
+    mouseCalDone(mHaveAxes ? (mGot[0] ? "No down seen\nKept the old one" : "No right seen\nKept the old one")
+                           : "Not all seen\nCalibrate to try again", TFT_ORANGE);
+    return;
+  }
+  float x[3], y[3];
+  mouseSoFarX(x);
+  mouseSoFarY(x, y);
+  float r[4] = {v3dot(mPk[0], x), mGot[1] ? -v3dot(mPk[1], x) : MS_DEF_RANGE,
+                v3dot(mPk[2], y), mGot[3] ? -v3dot(mPk[3], y) : MS_DEF_RANGE};
+  for (int k = 0; k < 3; k++) { mAxX[k] = x[k]; mAxY[k] = y[k]; }
+  for (int k = 0; k < 4; k++) mRange[k] = max(r[k], MS_MIN_RANGE);
+  mHaveAxes = true;
+  mouseSaveAxes();
+  mAngX = mAngY = 0;
+  M5.Speaker.tone(2000, 60);
+  if (mGot[1] && mGot[3]) mouseCalDone("Ready", TFT_GREEN);
+  else mouseCalDone(mGot[1] ? "Ready\nNo up seen" : "Ready\nNo left seen", TFT_ORANGE);
 }
 
 // One gyro (deg/s) and accelerometer (g) sample while calibrating.
 void mouseCalSample(const float* g, const float* a, float dt) {
-  if (mCal == MC_STILL) {
+  if (mCal == MC_REST) {
     for (int k = 0; k < 3; k++) {
       mSumG[k] += g[k];
       mSumA[k] += a[k];
@@ -1358,43 +1474,50 @@ void mouseCalSample(const float* g, const float* a, float dt) {
     if (millis() - mCalStart < MS_STILL_MS) return;
     float up[3];
     for (int k = 0; k < 3; k++) { mBias[k] = mSumG[k] / mN; up[k] = mSumA[k] / mN; }
-    float n = v3norm(up);
-    for (int k = 0; k < 3; k++) up[k] /= n;
-    // worn or held a different way from when it learnt "down": learn it again
+    v3unit(up);
+    // worn or held a different way from when it learnt the movements: learn them again
     const bool moved = mHaveAxes && v3dot(up, mUp) < cosf(MS_MOVED_DEG * DEG_TO_RAD);
-    for (int k = 0; k < 3; k++) mUp[k] = up[k];
+    if (mHaveAxes) { mouseFollowUp(up); mouseSaveAxes(); }  // turn the axes with it
+    else for (int k = 0; k < 3; k++) mUp[k] = up[k];
+    mAngX = mAngY = 0;
     if (mFullCal || !mHaveAxes || moved) {
-      mCal = MC_TIP;
-      mCalStart = millis();
-      for (int k = 0; k < 3; k++) mTip[k] = 0;
-      M5.Speaker.tone(1500, 60);
-      needRedraw = true;
+      for (int k = 0; k < 3; k++) mRot[k] = 0;
+      for (int s = 0; s < 4; s++) mGot[s] = false;
+      mouseStep(MC_RIGHT);
     } else {
-      // a little different: keep "down" at right angles to the new "up"
-      float d = v3dot(mDown, mUp);
-      for (int k = 0; k < 3; k++) mDown[k] -= d * mUp[k];
-      float dn = v3norm(mDown);
-      for (int k = 0; k < 3; k++) mDown[k] /= dn;
       M5.Speaker.tone(2000, 60);
       mouseCalDone("Ready", TFT_GREEN);
     }
     return;
   }
-  // MC_TIP: add up the turn, leaving out any turn about "up"
+  // Right, Left, Down, Up: add up the turn since Keep still
   float w[3] = {g[0] - mBias[0], g[1] - mBias[1], g[2] - mBias[2]};
-  float u = v3dot(w, mUp);
-  for (int k = 0; k < 3; k++) mTip[k] += (w[k] - u * mUp[k]) * dt;
-  float n = v3norm(mTip);
-  if (n >= MS_TIP_DEG) {
-    for (int k = 0; k < 3; k++) mDown[k] = mTip[k] / n;
-    mHaveAxes = true;
-    mouseSaveAxes();
-    M5.Speaker.tone(2000, 60);
-    mouseCalDone("Ready", TFT_GREEN);
-  } else if (millis() - mCalStart > MS_TIP_TIMEOUT_MS) {
-    M5.Speaker.tone(400, 150);
-    mouseCalDone(mHaveAxes ? "No tip seen\nKept the old one" : "No tip seen\nCalibrate to try again", TFT_ORANGE);
+  for (int k = 0; k < 3; k++) mRot[k] += w[k] * dt;
+  const int s = mCal - MC_RIGHT;
+  float px, py, m = mouseStepMeasure(px, py);
+  mAngX = px; mAngY = py;
+  uint32_t now = millis();
+  if (!mStarted && m >= MS_GO_DEG) { mStarted = true; mCalStart = now; }
+  if (mStarted && m > mPeak) {  // further than before: remember this one
+    if ((int)m != (int)mPeak) needRedraw = true;  // the screen shows how far
+    mPeak = m;
+    for (int k = 0; k < 3; k++) mPk[s][k] = mRot[k];
   }
+  bool done = false;
+  if (mStarted) {
+    const bool back = v3norm(mRot) < max(MS_GO_DEG, 0.4f * mPeak) && v3norm(w) < MS_BACK_DPS;
+    if (!back) mBackSince = 0;
+    else if (!mBackSince) mBackSince = now;
+    done = (mBackSince && now - mBackSince >= MS_BACK_MS) || now - mCalStart > MS_STEP_MS;
+    if (done) mGot[s] = true;
+  } else if (now - mCalStart > MS_WAIT_MS) {
+    done = true;  // nothing seen: skipped
+    M5.Speaker.tone(400, 150);
+    if (mCal == MC_RIGHT || mCal == MC_DOWN) { mouseFinishCal(); return; }  // can't go on without it
+  }
+  if (!done) return;
+  if (mCal == MC_UP) { mouseFinishCal(); return; }
+  mouseStep((MouseCal)(mCal + 1));
 }
 
 // One sample while running: turn rates -> pointer movement.
@@ -1405,24 +1528,27 @@ void mouseMoveSample(const float* g, float dt) {
     if (!mStillSince) mStillSince = millis();
     if (millis() - mStillSince > 1000) for (int k = 0; k < 3; k++) mBias[k] += w[k] * 0.005f;
   } else mStillSince = 0;
+  if (!mHaveAxes) return;
 
-  // turning about "up" (anticlockwise seen from above = left) and tipping down
-  float x = -v3dot(w, mUp), y = v3dot(w, mDown);
-  if (setting(S_M_FLIPX)) x = -x;
-  if (setting(S_M_FLIPY)) y = -y;
+  // right and down, as learnt
+  float x = v3dot(w, mAxX), y = v3dot(w, mAxY);
+  mAngX += x * dt; mAngY += y * dt;
   const float tau = setting(S_M_SMOOTH) / 1000.0f;
   const float k = tau > 0 ? dt / (tau + dt) : 1.0f;
   mRateX += (x - mRateX) * k;
   mRateY += (y - mRateY) * k;
-  if (mPaused || !mHaveAxes) return;
+  if (mPaused) return;
 
-  auto speed = [&](float r) {
+  // Speed = counts for a full comfortable movement, so each side's own range sets its gain
+  auto speed = [&](float r, float full, float rangePos, float rangeNeg) {
     float m = fabsf(r) - setting(S_M_STEADY) / 10.0f;
     if (m <= 0) return 0.0f;
-    float gain = setting(S_M_SPEED) * (1 + setting(S_M_ACCEL) * m / 100.0f);
+    float gain = full / (r < 0 ? rangeNeg : rangePos) * (1 + setting(S_M_ACCEL) * m / 100.0f);
     return (r < 0 ? -m : m) * gain;  // counts per second
   };
-  float mx = speed(mRateX) * dt, my = speed(mRateY) * dt;
+  const float full = setting(S_M_SPEED);
+  float mx = speed(mRateX, full, mRange[0], mRange[1]) * dt;
+  float my = speed(mRateY, full * MS_UPDOWN, mRange[2], mRange[3]) * dt;
   mAccX += mx; mAccY += my;
   mPosX += mx; mPosY += my;
 }
@@ -1470,7 +1596,7 @@ void mousePause(bool p) {
   needRedraw = true;
 }
 
-// MOUSE became the switch's job: Keep still (and Tip down the first time).
+// MOUSE became the switch's job: Keep still (and the movements the first time).
 void mouseStart() {
   mPaused = false;
   mAccX = mAccY = mRateX = mRateY = 0;
@@ -1499,6 +1625,14 @@ void mouseSwitch(bool down) {
   }
 }
 
+// The setup page's live picture: mou,<step>,<right deg x10>,<down deg x10>,<paused>
+void mouseStream(uint32_t now) {
+  static uint32_t last = 0;
+  if (!mStreamUntil || (int32_t)(now - mStreamUntil) >= 0 || now - last < MS_STREAM_MS) return;
+  last = now;
+  Serial.printf("mou,%d,%d,%d,%d\n", (int)mCal, (int)lroundf(mAngX * 10), (int)lroundf(mAngY * 10), mPaused ? 1 : 0);
+}
+
 void updateMouse(uint32_t now) {
   const bool on = studentMode() == M_MOUSE;
   if (on != mRunning) {
@@ -1515,6 +1649,7 @@ void updateMouse(uint32_t now) {
     if (mCal != MC_NONE) mouseCalSample(g, a, dt);
     else mouseMoveSample(g, dt);
   }
+  mouseStream(now);
   if (mCal != MC_NONE) return;
   mouseSendMovement();
   mouseDwell();
@@ -1815,11 +1950,16 @@ void drawMain(lgfx::LovyanGFX& c) {
       break;
     }
     case M_MOUSE: {
-      if (mouseItem == 1 || mCal != MC_NONE) {
-        line1(c, mCal == MC_STILL ? "Keep still" : mCal == MC_TIP ? "Tip down" : "Calibrate");
-        line2(c, mCal == MC_STILL ? "Learning the zero point" : mCal == MC_TIP ? "Nod down, or tip the hand down"
-                 : "Hold A to start", C_DO);
-        line3(c, mCal == MC_TIP ? "Then back up" : "Wear it as it will be used");
+      if (mCal >= MC_RIGHT) {  // Right, Left, Down, Up: how far so far
+        line1(c, MS_STEP_NAMES[mCal]);
+        line2(c, "As far as is comfortable", C_DO);
+        line3(c, mStarted ? "Then back - " + String((int)mPeak) + " deg" : "Then back");
+        break;
+      }
+      if (mouseItem == 1 || mCal == MC_REST) {
+        line1(c, mCal == MC_REST ? "Keep still" : "Calibrate");
+        line2(c, mCal == MC_REST ? "Sit comfortably" : "Hold A to start", C_DO);
+        line3(c, mCal == MC_REST ? "Wear it as it will be used" : "Then right, left, down, up");
         break;
       }
       if (!mHaveAxes) {
@@ -2733,6 +2873,7 @@ void pollStaffButtons() {
 //    IRLEARN n (waits up to 8s for a remote) / IRSEND n / IRDEL n  (n 0-3)
 //    CKEY <mods> <usage> <label>  (custom key; usage 0 removes it)
 //    MCAL / MPAUSE 1|0    (MOUSE: calibrate / pause or move the pointer)
+//    MSTREAM 1|0          (MOUSE: the live picture, "mou,..." lines, for 10 s)
 //    UP n <samples>       -> @READY, then the samples in 4KB pieces, each
 //                            answered with @A; finally @OK
 //    DOWN n               -> @DATA n <samples>, the samples, then @OK
@@ -2793,7 +2934,9 @@ void sendInfo() {
   j += ",\"irmenu\":{\"pr\":" + yes(slotLen[SND_PIRMENU]) + "},\"talker\":{\"pr\":" + yes(slotLen[SND_PTALKER]) + "}";
   j += ",\"qmenu\":{\"pr\":" + yes(slotLen[SND_PQMENU]) + "}";
   j += ",\"mouse\":{\"cal\":" + yes(mHaveAxes) + ",\"step\":" + String((int)mCal) + ",\"paused\":" + yes(mPaused)
-       + ",\"imu\":" + yes(M5.Imu.getType() != m5::imu_none) + "}";
+       + ",\"imu\":" + yes(M5.Imu.getType() != m5::imu_none) + ",\"range\":[";
+  for (int k = 0; k < 4; k++) j += (k ? "," : "") + String((int)lroundf(mRange[k]));
+  j += "]}";
   j += ",\"settings\":[";
   bool first = true;
   for (int i = 0; i < S_COUNT; i++) {
@@ -3028,7 +3171,7 @@ void handleCommand(String line) {
     forgetBluetooth();
     reply();
   } else if (cmd == "MCAL") {
-    // MCAL: calibrate MOUSE (Keep still, then Tip down), as B to Calibrate + hold A
+    // MCAL: calibrate MOUSE (Keep still, then Right, Left, Down, Up), as B to Calibrate + hold A
     if (!mRunning) return reply("the switch isn't in MOUSE mode");
     wakeScreen();
     mouseItem = 0;
@@ -3038,6 +3181,10 @@ void handleCommand(String line) {
     // MPAUSE 1 / 0: pause / move the pointer
     if (!mRunning) return reply("the switch isn't in MOUSE mode");
     mousePause(n != 0);
+    reply();
+  } else if (cmd == "MSTREAM") {
+    // MSTREAM 1 / 0: send the live picture's readings for the next 10 s (the page repeats it)
+    mStreamUntil = n ? millis() + 10000 : 0;
     reply();
   } else {
     reply("unknown command");
