@@ -166,7 +166,8 @@ with the same pairing as KEYBOARD (on an iPad, if no pointer shows, turn on Assi
   then held while the switch is).
 - It doesn't sleep in MOUSE mode.
 - Coming next: training it on the student's own movements (left, right, up and down as far as is comfortable), so
-  the pointer and head stay in step at the screen edges, and a tilt (joystick) style for small movements.
+  the pointer and head stay in step at the screen edges, and a tilt (joystick) style for small movements. The
+  research and step-by-step plan are in [MOUSE-PLAN.md](MOUSE-PLAN.md).
 
 ### Backup mode: a switch for the AAC device, and a talker when it isn't there
 
@@ -360,6 +361,9 @@ Most settings are in the SETTINGS mode above. At the top of `TalkingSwitch.ino`:
 
 - **Won't compile, with errors about `io_pin_remap.h`, `pinMode` or `tone` in M5Unified:** the board is set to
   *Arduino Nano ESP32*. Choose **Tools → Board → esp32 → ESP32S3 Dev Module** and the settings above.
+- **Won't compile: "Set Tools > USB CDC On Boot: Enabled":** set **Tools → USB CDC On Boot → Enabled** (and check
+  the other settings above). The IDE keeps Tools settings between sketches, so they can change while you're working
+  on another one. MouseTest uses the same settings.
 - **Big switch does nothing:** with a jack switch, try the other Grove wire (see below). With the Unit Key, swap
   `PIN_KEY` (10) and `PIN_LED` (9) in the code – the Grove wire order can vary. With the ToF sensor, check About
   says *Input: ToF sensor* – the switch only looks for it when it starts, so plug it in, then turn it on.
