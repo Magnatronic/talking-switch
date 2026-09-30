@@ -98,7 +98,9 @@ once). Movement is still "follow"; each side's gain = Speed / that side's range 
 `m_reach` (counts for a full comfortable movement: 300–2200). Flip settings removed (training learns the
 directions). Small wear changes at start turn the axes with "up". Setup page: live picture (`MSTREAM 1|0`,
 `mou,<step>,<x×10>,<y×10>,<paused>` lines), INFO `mouse.range`. FW_API / PAGE_API = 4.
-The picture's dot is the angle since the last Keep still, so it drifts slowly and doesn't follow edge pushes.
+The picture's dot is the angle since the last Keep still, pause or `MZERO` (the page's Centre button), so it drifts
+slowly (about 0.07°/s measured) and doesn't follow edge pushes. FW_API / PAGE_API = 5 since MZERO.
+Stream checked on the stick 30 Sep 2026: right, left, down, up all come out the right way.
 
 The original design (turn limit parts not built):
 

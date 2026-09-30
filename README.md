@@ -73,8 +73,8 @@ current choices are hidden). Below that is what the mode uses.
 - **CONTROL:** 4 remote-control codes, separate from the messages. For each: a name, **Test / Learn**, Delete (⋯),
   and an optional **sound** that the switch says as it sends the code. Settings: IR codes (and scanning settings
   with *Scan*), Press sound.
-- **MOUSE:** **Calibrate** (with what it's doing now), a live **Movement** picture (where the stick is, and the
-  comfortable range it learnt), **Pause / Move**, and the connection; settings: Speed, Speed-up, Steady, Smoothing,
+- **MOUSE:** **Calibrate** (with what it's doing now), a live **Movement** picture (where the stick is, not the
+  pointer, and the comfortable range it learnt; **Centre** puts the dot back in the middle), **Pause / Move**, and the connection; settings: Speed, Speed-up, Steady, Smoothing,
   Dwell click, Switch, Hold to pause, Press sound.
 - **Voice:** the switch's **voice** and speed for typed messages and scanning prompts (natural: Emma, Isabella,
   George, Fable; quick: Cori, Alba, Southern English female, Northern English male). It's stored on the switch, so

@@ -782,7 +782,7 @@ function renderEditor(i) {
 
 // ---------------------------------------------------------------- about
 // The firmware's FW_API this page is made for (see TalkingSwitch.ino).
-const PAGE_API = 4;
+const PAGE_API = 5;
 function storageFull() { return info.fsTotal && info.fsUsed / info.fsTotal >= 0.9; }
 
 function renderAbout() {
@@ -1000,9 +1000,11 @@ function renderMouse() {
       } }, m.cal ? 'Calibrate again' : 'Calibrate')),
       inMouse ? 'Wear it as it will be used. Keep still, then move right, left, down and up – each as far as is comfortable, and back.'
         : 'Use MOUSE first (the button at the top).'),
-    inMouse && m.imu ? plainRow('Movement', el('div', {}, mouseCanvas, el('div', { class: 'small', style: 'margin-top:6px' },
-      m.cal && m.range ? `Comfortable range: right ${m.range[0]}°, left ${m.range[1]}°, down ${m.range[2]}°, up ${m.range[3]}°` : 'Not calibrated yet')),
-      'The dot is the stick now; the box is the comfortable range it learnt.') : null,
+    inMouse && m.imu ? plainRow('Movement', el('div', {}, mouseCanvas, el('div', { class: 'row', style: 'margin-top:6px' },
+      el('span', { class: 'small' }, m.cal && m.range
+        ? `Comfortable range: right ${m.range[0]}°, left ${m.range[1]}°, down ${m.range[2]}°, up ${m.range[3]}°` : 'Not calibrated yet'),
+      el('button', { onclick: () => act(() => cmd('MZERO')) }, 'Centre'))),
+      'The dot is the stick (not the pointer); the box is the comfortable range it learnt. Sit at rest and press Centre to check it. It drifts slowly; it centres again after Keep still and after a pause.') : null,
     plainRow('Pointer', el('div', { class: 'row' },
       el('span', {}, !inMouse ? 'Not in use' : m.paused ? 'Paused' : 'Moving'),
       el('button', { disabled: !inMouse || !m.cal, onclick: () => act(() => cmd(`MPAUSE ${m.paused ? 0 : 1}`)) },

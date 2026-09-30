@@ -139,7 +139,7 @@ static const int SENSE_GRAPH_W = 224;      // Sensor test graph: one reading per
 // Firmware version. FW_API goes up whenever the setup page needs to change
 // with it (the page shows a warning if the numbers don't match).
 static const char* FW_VERSION = "30 Sep 2026";
-static const int   FW_API     = 4;
+static const int   FW_API     = 5;
 
 // ---------------------------------------------------------------------
 //  Settings you may want to change
@@ -1293,7 +1293,8 @@ bool     mStarted = false;
 int      mN = 0;
 uint32_t mCalStart = 0, mBackSince = 0;
 float    mRateX = 0, mRateY = 0;  // smoothed turn rates (deg/s): right +, down +
-float    mAngX = 0, mAngY = 0;    // angle from rest (deg), for the live picture
+float    mAngX = 0, mAngY = 0;    // angle from rest (deg), for the live picture (0 again after Keep still,
+                                  // moving again after a pause, and MZERO)
 float    mAccX = 0, mAccY = 0;    // movement not sent yet (counts)
 float    mPosX = 0, mPosY = 0;    // where the pointer has gone (counts), for dwell
 float    mDwellX = 0, mDwellY = 0;
@@ -1592,6 +1593,7 @@ void mousePause(bool p) {
   if (p == mPaused) return;
   mPaused = p;
   mAccX = mAccY = 0;
+  if (!p) mAngX = mAngY = 0;  // the live picture: moving again starts from the middle
   if (p) { beep(1200, 60); beep(800, 60); } else { beep(800, 60); beep(1200, 60); }
   needRedraw = true;
 }
@@ -2874,6 +2876,7 @@ void pollStaffButtons() {
 //    CKEY <mods> <usage> <label>  (custom key; usage 0 removes it)
 //    MCAL / MPAUSE 1|0    (MOUSE: calibrate / pause or move the pointer)
 //    MSTREAM 1|0          (MOUSE: the live picture, "mou,..." lines, for 10 s)
+//    MZERO                (MOUSE: the live picture's dot back to the middle)
 //    UP n <samples>       -> @READY, then the samples in 4KB pieces, each
 //                            answered with @A; finally @OK
 //    DOWN n               -> @DATA n <samples>, the samples, then @OK
@@ -3185,6 +3188,10 @@ void handleCommand(String line) {
   } else if (cmd == "MSTREAM") {
     // MSTREAM 1 / 0: send the live picture's readings for the next 10 s (the page repeats it)
     mStreamUntil = n ? millis() + 10000 : 0;
+    reply();
+  } else if (cmd == "MZERO") {
+    // MZERO: here is the middle, for the live picture
+    mAngX = mAngY = 0;
     reply();
   } else {
     reply("unknown command");
