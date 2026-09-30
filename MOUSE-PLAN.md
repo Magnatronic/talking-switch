@@ -5,14 +5,14 @@ We build it **one step at a time**, testing each step on the stick before starti
 New ideas can be tried in `MouseTest/` first.
 
 **Targets:** Windows PCs and iPads (USB, or Bluetooth with the same pairing as KEYBOARD).
-**Users:** college students; the stick is worn on the head (headband or cap) or on a wrist or hand.
+**Users:** college; the stick is worn on the head (headband or cap) or on a wrist or hand.
 
 ## Status
 
 | Step | What | State |
 |---|---|---|
 | 1 | MOUSE mode in ChatterSwitch (from MouseTest), hold to pause, setup page tab | **Done, tested 30 Sep 2026** (commits 369e680, a447b3f; on by default) |
-| 2 | Training on the student's own movements, turn limit, re-centring | Next |
+| 2 | Training on the user's own movements, turn limit, re-centring | Next |
 | 3 | Freeze on click, ignore jerks | Planned |
 | 4 | Tilt (joystick) style for very small movements | Planned |
 | 5 | True screen position (absolute pointer) | Only if 2–4 aren't enough |
@@ -21,13 +21,13 @@ New ideas can be tried in `MouseTest/` first.
 
 **The edge problem.** The stick sends "move by this much", like any mouse, so it never knows where the pointer is.
 At the edge of the screen the pointer stops but the head keeps turning; turning back moves the pointer straight
-away, so "straight ahead" has shifted and the student ends up looking sideways at the screen.
+away, so "straight ahead" has shifted and the user ends up looking sideways at the screen.
 - The commercial gyro head mice (**Quha Zono**, **GlassOuse**) behave the same way. Their manuals present it as the
   way to re-centre: push the pointer into the edge on purpose and keep turning. Fine as a trick, a fault by accident.
 - Quha also has head gestures for pause, scroll and **cursor centring**, separate horizontal/vertical speed, and a tremor filter.
 
 **Comfortable movement.** Comfortable head turn is about ±30°, and the maximum is about ±55°. Nodding range is smaller.
-Students with CP often move further one way than the other. One person testing a head-worn IMU joystick had a sore
+People with CP often move further one way than the other. One person testing a head-worn IMU joystick had a sore
 neck after 10 minutes, so keep the movement needed small and make pausing easy.
 - The current default (Speed 4 = 30 counts/°) needs about ±32° to cross a 1920-pixel screen, right at the comfortable limit.
 
@@ -39,13 +39,13 @@ neck after 10 minutes, so keep the movement needed small and make pausing easy.
   A 4-direction, fixed-speed variant exists for users with poor control.
 
 **Wrist use.** The movement is different: a wrist is more likely to roll or bend than turn about the vertical.
-So calibration must learn *whatever* two movements the student can make, not assume a head turn.
+So calibration must learn *whatever* two movements the user can make, not assume a head turn.
 
 **True screen position (absolute HID).** The stick could say "pointer at x,y", so head angle maps exactly to
 screen position. It works on Windows over USB, but reports over Bluetooth are mixed and iPad support is unclear.
 It would also need a new report map, so every device would have to pair again. Last resort.
 
-**Other gaps:** pressing the switch jogs the pointer; spasms throw it; the student needs to pause without staff help
+**Other gaps:** pressing the switch jogs the pointer; spasms throw it; the user needs to pause without help
 (talking, resting, looking away).
 
 Sources: [Quha Zono X](https://www.quha.com/products/quha-zono-x/),
@@ -60,7 +60,7 @@ Sources: [Quha Zono X](https://www.quha.com/products/quha-zono-x/),
 ## Decisions made
 
 - Build into ChatterSwitch as MOUSE mode; **on by default** (SETTINGS *MOUSE mode: Off* hides it). Keep MouseTest for experiments.
-- Staff buttons follow the usual rule: A = next mode, **hold A = pause/move**, B steps to **Calibrate**, then Settings.
+- Stick buttons follow the usual rule: A = next mode, **hold A = pause/move**, B steps to **Calibrate**, then Settings.
 - **Pause with the switch:** *Hold to pause* setting (Off, 1, **2**, 3 s). With it on, a short press
   clicks on release; Off = the button is held while the switch is (drag). One switch input only (Grove GPIO10);
   a second switch on the other Grove wire (GPIO9, the Unit Key LED) is possible later if needed.
@@ -87,7 +87,7 @@ Sources: [Quha Zono X](https://www.quha.com/products/quha-zono-x/),
 
 ## Step 2 – training and staying in step (next)
 
-**Training routine** (replaces Keep still + Tip down; the stick talks staff through it; also started from the page):
+**Training routine** (replaces Keep still + Tip down; the stick talks you through it; also started from the page):
 1. **Rest** – sit comfortably, keep still. Learns the gyro zero point, gravity, and the **rest position = centre**
    (which need not be straight ahead).
 2. **Right** as far as is comfortable, and back → the left/right axis (whatever movement it is: head turn, wrist
@@ -102,7 +102,7 @@ uses a small default range, or keeps the old one. Beeps and the screen show each
 Save the axes, the ranges and the rest position in prefs.
 
 **Turn limit (fixes the edge problem):** keep an angle from centre on each axis. The pointer only moves while that
-angle is inside the trained range. Past the range, the pointer waits until the student comes back inside.
+angle is inside the trained range. Past the range, the pointer waits until the user comes back inside.
 - Map each side's range to slightly **more** than half the screen (about 1.2×). Then reaching the limit always
   pins the pointer to that screen edge, and **every visit to an edge puts head and pointer back in step**. This
   works even with Windows/iPad pointer acceleration.
@@ -117,7 +117,7 @@ angle is inside the trained range. Past the range, the pointer waits until the s
 (the stick streams angles, like the ToF sensor's `SENSE` stream).
 
 **To test:** on the head and on a wrist; Windows and iPad; asymmetric range (pretend one side is stiff);
-turning past the edge and back should no longer leave the student looking sideways.
+turning past the edge and back should no longer leave the user looking sideways.
 
 ## Step 3 – filters
 

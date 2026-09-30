@@ -165,7 +165,7 @@ with the same pairing as KEYBOARD (on an iPad, if no pointer shows, turn on Assi
   rising = moving. With Hold to pause on, a short press clicks when it's let go; set it Off to drag (the button is
   then held while the switch is).
 - It doesn't sleep in MOUSE mode.
-- Coming next: training it on the student's own movements (left, right, up and down as far as is comfortable), so
+- Coming next: training it on the user's own movements (left, right, up and down as far as is comfortable), so
   the pointer and head stay in step at the screen edges, and a tilt (joystick) style for small movements. The
   research and step-by-step plan are in [MOUSE-PLAN.md](MOUSE-PLAN.md).
 
