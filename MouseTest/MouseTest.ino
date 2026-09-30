@@ -16,7 +16,8 @@
 //    2. Tip down    - nod down (head) or tip the front down (hand), then
 //                     back; this learns the up/down direction, whatever
 //                     way round the stick is worn or held
-//  Each start after that only needs the "Keep still" part. While still
+//  Each start after that only needs the "Keep still" part - unless it's
+//  worn or held at a clearly different angle, when it asks for Tip down. While still
 //  it also keeps correcting its zero point, so the pointer doesn't creep.
 //
 //    A click .... pause / move (a paused pointer stays put; the switch
@@ -71,6 +72,7 @@ static const float STILL_DPS = 6.0f;         // Keep still: gyro may wander this
 static const uint32_t STILL_MS = 1000;       // ...for this long
 static const float TIP_DEG = 12.0f;          // Tip down: this far is enough to learn the direction
 static const uint32_t TIP_TIMEOUT_MS = 10000;
+static const float MOVED_DEG = 25.0f;        // at start: tilted more than this from last time -> Tip down again
 static const uint32_t SEND_MS = 10;          // send movement at most 100 times a second
 
 // ---------------------------------------------------------------------
@@ -288,15 +290,24 @@ void calibrateSample(const float* g, const float* a, float dt) {
     }
     calN++;
     if (millis() - calStart < STILL_MS) return;
-    for (int k = 0; k < 3; k++) { bias[k] = calSumG[k] / calN; up[k] = calSumA[k] / calN; }
-    float n = norm(up);
-    for (int k = 0; k < 3; k++) up[k] /= n;
-    if (fullCal || !haveAxes) {
+    float newUp[3];
+    for (int k = 0; k < 3; k++) { bias[k] = calSumG[k] / calN; newUp[k] = calSumA[k] / calN; }
+    float n = norm(newUp);
+    for (int k = 0; k < 3; k++) newUp[k] /= n;
+    // worn or held a different way from when it learnt "down": learn it again
+    const bool moved = haveAxes && dot(newUp, up) < cosf(MOVED_DEG * DEG_TO_RAD);
+    for (int k = 0; k < 3; k++) up[k] = newUp[k];
+    if (fullCal || !haveAxes || moved) {
       cal = CAL_TIP;
       calStart = millis();
       for (int k = 0; k < 3; k++) tipAngle[k] = 0;
       M5.Speaker.tone(1500, 60);
     } else {
+      // a little different: keep "down" at right angles to the new "up"
+      float d = dot(down, up);
+      for (int k = 0; k < 3; k++) down[k] -= d * up[k];
+      float dn = norm(down);
+      for (int k = 0; k < 3; k++) down[k] /= dn;
       cal = CAL_NONE;
       M5.Speaker.tone(2000, 60);
       setStatus("Ready");

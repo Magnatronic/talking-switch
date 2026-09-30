@@ -385,7 +385,8 @@ USB, or Bluetooth as "ChatterSwitch XXXX" (the same identity as ChatterSwitch, s
   (*Switch* setting). **Dwell click:** keep the pointer in one small area for the *Dwell* time to click; move away to
   click again.
 - **Calibrate** (hold A; also at the first start): *Keep still*, then *Tip down* – nod down or tip the front down,
-  then back. This works whichever way round the stick is worn. Later starts only need *Keep still*.
+  then back. This works whichever way round the stick is worn – calibrate it the way it's worn. Later starts
+  only need *Keep still*, unless it's worn at a clearly different angle, when it asks for *Tip down* again.
 - **Buttons:** A = pause / move, hold A = calibrate, B = next speed, hold B = settings (B next, hold A change,
   A close).
 - The screen shows the turn as a dot in a box (the grey ring is *Steady*). The rates also go to the Serial Plotter.
