@@ -182,7 +182,7 @@ with the same pairing as KEYBOARD (on an iPad, if no pointer shows, turn on Assi
 - **Double-click help** (off at first): after a click the pointer keeps still for a while (0.5–1.5 s), so a second
   click lands in the same place. It doesn't double-click by itself.
 - It doesn't sleep in MOUSE mode.
-- Coming next: ignore jerks, and a tilt (joystick) style for small movements. The research and
+- Coming next: a tilt (joystick) style for small movements. The research and
   step-by-step plan are in [MOUSE-PLAN.md](MOUSE-PLAN.md).
 
 ### Backup mode: a switch for the AAC device, and a talker when it isn't there

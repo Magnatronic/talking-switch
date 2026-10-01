@@ -13,7 +13,7 @@ New ideas can be tried in `MouseTest/` first.
 |---|---|---|
 | 1 | MOUSE mode in ChatterSwitch (from MouseTest), hold to pause, setup page tab | **Done, tested 30 Sep 2026** (commits 369e680, a447b3f; on by default) |
 | 2 | Training on the user's own movements, speeds set by Calibrate, live picture on the page | **Built 30 Sep–1 Oct 2026, to test** (no turn limit, see below) |
-| 3 | Freeze on click, double-click help, clutch, ignore jerks, Centre | Freeze on click, double-click help, clutch **built 1 Oct 2026, to test**; the rest planned |
+| 3 | Freeze on click, double-click help, clutch | **Built 1 Oct 2026, to test** (ignore jerks and Centre dropped) |
 | 4 | Tilt (joystick) style for very small movements | Planned |
 | 5 | True screen position (absolute pointer) | Only if 2–4 aren't enough |
 | 6 | GAME mode: movement as a thumbstick, for PC and Xbox | Planned, after step 4 |
@@ -164,11 +164,8 @@ turning past the edge and back should no longer leave the user looking sideways.
   gestures). `mouseSwitchEdge()` on the debounced change; letting go clears the smoothing so the move doesn't leak.
   **To test:** whether people who move while pressing lose clicks (then a bigger setting, or size it from the
   Keep still wobble).
-- **Ignore jerks:** a sudden movement faster than a limit (a spasm) is ignored.
-- **Centre:** put the pointer in the middle of the screen. The stick doesn't know where the pointer is, so: push it
-  hard into the top-left corner, then move it half of `MS_SPAN_X` / `MS_SPAN_Y` (the computer's pointer speed
-  makes this only roughly the middle, like Quha's "central area"). Started by a switch action (e.g. a choice in
-  *Hold to pause*: Pause / Centre) or from the page.
+- **Dropped (1 Oct 2026, decided not needed):** *ignore jerks* (a movement faster than a limit is ignored) and
+  *Centre* (push the pointer into a corner, then half the span to the middle). The clutch covers re-lining.
 - Up/down and left/right speed are separate already (step 2).
 
 ## Step 4 – tilt (joystick) style
