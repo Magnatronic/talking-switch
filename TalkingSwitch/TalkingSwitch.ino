@@ -139,7 +139,7 @@ static const int SENSE_GRAPH_W = 224;      // Sensor test graph: one reading per
 // Firmware version. FW_API goes up whenever the setup page needs to change
 // with it (the page shows a warning if the numbers don't match).
 static const char* FW_VERSION = "1 Oct 2026";
-static const int   FW_API     = 7;
+static const int   FW_API     = 8;
 
 // ---------------------------------------------------------------------
 //  Settings you may want to change
@@ -234,7 +234,7 @@ static const int NUM_KEYS = sizeof(KEYS) / sizeof(KEYS[0]);
 enum SettingId : uint8_t {
   S_VOLUME, S_MODES, S_MOUSE_ON, S_SPEAK_CHOOSE, S_QUICK_HOW, S_GAP, S_PLAY, S_HOLD, S_CHOOSE_FROM, S_OFFER_QUICK, S_OFFER_CONTROL, S_OFFER_DEVICE, S_IR_CHOOSE, S_ACCESS, S_SCAN_SPEED, S_SCAN_ROUNDS, S_STOP,
   S_KEY_ACTION, S_PRESS_SOUND, S_NO_USB,
-  S_M_SPEED, S_M_SPEEDY, S_M_ACCEL, S_M_STEADY, S_M_SMOOTH, S_M_DWELL, S_M_AREA, S_M_SWITCH, S_M_HOLD, S_M_CLUTCH, S_M_FREEZE, S_M_DOUBLE,
+  S_M_STYLE, S_M_SPEED, S_M_SPEEDY, S_M_ACCEL, S_M_TSPEED, S_M_DEAD, S_M_DIRS, S_M_STEADY, S_M_SMOOTH, S_M_DWELL, S_M_AREA, S_M_SWITCH, S_M_HOLD, S_M_CLUTCH, S_M_FREEZE, S_M_DOUBLE,
   S_ACCEPT, S_LOCKOUT, S_SENSE_MODE, S_SENSE_LINE, S_SENSE_MOVE, S_SETTLE, S_FOLLOW, S_BEYOND, S_SENSE_TEST, S_BRIGHT, S_WAKE, S_SLEEP, S_AUTOOFF, S_LOUD, S_FORGET, S_ABOUT,
   S_COUNT
 };
@@ -291,12 +291,21 @@ static const Setting SETTINGS[S_COUNT] = {
   // KEYBOARD with no USB connection: keys go over Bluetooth, or the switch
   // talks instead (backup mode, Bluetooth off) until USB is back
   {"No USB",              "s_nousb",   3, 0, {0, 1, 2}, {"Bluetooth", "QUICK", "TOPICS"}, G_KEYBOARD},
+  // MOUSE: Follow = the pointer moves as the stick turns; Tilt = holding it tipped away
+  // from rest keeps the pointer going (a joystick), back at rest it stops
+  {"Pointer style",       "m_style",   2, 0, {0, 1}, {"Follow", "Tilt"}, G_MOUSE},
   // MOUSE: pointer counts per degree, left/right and up/down. Calibrate sets them from the
   // comfortable range (MS_SPAN_X/Y); they can be changed after. The computer's pointer speed also applies.
   {"Speed left/right",    "m_spdx",    8, 3, {8, 12, 18, 25, 35, 50, 70, 100}, {"1", "2", "3", "4", "5", "6", "7", "8"}, G_MOUSE},
   {"Speed up/down",       "m_spdy",    8, 2, {8, 12, 18, 25, 35, 50, 70, 100}, {"1", "2", "3", "4", "5", "6", "7", "8"}, G_MOUSE},
   // faster turns go further: extra speed per 100 deg/s
   {"Speed-up",            "m_accel",   4, 2, {0, 1, 2, 4}, {"Off", "Low", "Medium", "High"}, G_MOUSE},
+  // Tilt: the top speed (counts/s), reached at MS_TILT_FULL of the comfortable range
+  {"Tilt speed",          "m_tspeed",  5, 2, {300, 500, 800, 1200, 1800}, {"1", "2", "3", "4", "5"}, G_MOUSE},
+  // Tilt: this close to rest (deg) the pointer doesn't move
+  {"Dead zone",           "m_dead",    4, 1, {2, 4, 6, 9}, {"2 deg", "4 deg", "6 deg", "9 deg"}, G_MOUSE},
+  // Tilt: 4 only = straight left, right, up or down (whichever is tipped most), for less control
+  {"Directions",          "m_dirs",    2, 0, {0, 1}, {"Any", "4 only"}, G_MOUSE},
   // turns slower than this are ignored (tenths of a deg/s): steadies tremor and drift
   {"Steady",              "m_steady",  4, 1, {0, 15, 30, 60}, {"Off", "Low", "Medium", "High"}, G_MOUSE},
   // smooths out shakes (time constant, ms), at the cost of a little lag
@@ -1279,6 +1288,9 @@ static const uint32_t MS_STEP_MS = 8000;         // a movement step ends after t
 static const float    MS_MIN_RANGE = 3.0f;       // the smallest range (deg)
 static const float    MS_SPAN_X = 1920;          // Calibrate: the full left/right range sends about this many counts...
 static const float    MS_SPAN_Y = 1080;          // ...and up/down this many (a typical screen)
+static const float    MS_TILT_FULL = 0.7f;       // Tilt: top speed at this much of the comfortable range
+static const float    MS_GRAV_TAU = 2.0f;        // angles slowly follow gravity (s), where it can see them
+static const float    MS_LEAK_TAU = 5.0f;        // Tilt: at rest, angles gravity can't see drift back to 0 (s)
 static const float    MS_MOVED_DEG = 25.0f;      // at start: tilted more than this from last time -> calibrate again
 static const uint32_t MS_SEND_MS = 10;           // send movement at most 100 times a second
 static const uint32_t MS_STREAM_MS = 40;         // the setup page's live picture: 25 times a second
@@ -1312,6 +1324,8 @@ float    mPosX = 0, mPosY = 0;    // where the pointer has gone (counts), for dw
 float    mDwellX = 0, mDwellY = 0;
 uint32_t mDwellStart = 0, mStillSince = 0, mLastSample = 0, mLastSend = 0;
 uint32_t mStreamUntil = 0;     // the setup page shows the live picture until then
+float    mGrav[3] = {0, 0, 1};    // gravity now (smoothed, g)
+float    mRestG[3] = {0, 0, 1};   // ...where the angles are 0 (unit)
 uint32_t mFreezeUntil = 0;     // Freeze on click / Double-click help: the pointer keeps still until then
 uint32_t mLastClick = 0;       // Double-click help: when the last click was
 float    mHoldAngX = 0, mHoldAngY = 0;  // Clutch: where the head was when the switch went down
@@ -1373,6 +1387,13 @@ void mouseLoadAxes() {
            && prefs.getBytes("m_x", mAxX, sizeof(mAxX)) == sizeof(mAxX)
            && prefs.getBytes("m_y", mAxY, sizeof(mAxY)) == sizeof(mAxY)
            && prefs.getBytes("m_rng", mRange, sizeof(mRange)) == sizeof(mRange);
+}
+
+// Here is rest: the angles (live picture, Tilt) start from 0.
+void mouseRezero() {
+  mAngX = mAngY = 0;
+  for (int k = 0; k < 3; k++) mRestG[k] = mGrav[k];
+  v3unit(mRestG);
 }
 
 // Worn a little differently: turn the learnt axes the way "up" turned.
@@ -1471,7 +1492,7 @@ void mouseFinishCal() {
   for (int k = 0; k < 4; k++) mRange[k] = max(r[k], MS_MIN_RANGE);
   mHaveAxes = true;
   mouseSaveAxes();
-  mAngX = mAngY = 0;
+  mAngX = mAngY = 0;  // back at rest (up/down then follows gravity from Keep still's rest)
   // the speeds that make the whole range cross about the screen (nearest choice)
   auto fit = [](int id, float want) {
     const Setting& st = SETTINGS[id];
@@ -1509,7 +1530,8 @@ void mouseCalSample(const float* g, const float* a, float dt) {
     const bool moved = mHaveAxes && v3dot(up, mUp) < cosf(MS_MOVED_DEG * DEG_TO_RAD);
     if (mHaveAxes) { mouseFollowUp(up); mouseSaveAxes(); }  // turn the axes with it
     else for (int k = 0; k < 3; k++) mUp[k] = up[k];
-    mAngX = mAngY = 0;
+    for (int k = 0; k < 3; k++) mGrav[k] = up[k];
+    mouseRezero();
     if (mFullCal || !mHaveAxes || moved) {
       for (int k = 0; k < 3; k++) mRot[k] = 0;
       for (int s = 0; s < 4; s++) mGot[s] = false;
@@ -1591,7 +1613,25 @@ bool mouseFrozen() {
 }
 
 // One sample while running: turn rates -> pointer movement.
-void mouseMoveSample(const float* g, float dt) {
+// The angle about unit axis ax from rest, as gravity sees it (deg); weight 0..1 is how
+// well it can (0 for a turn about "up", like shaking the head).
+float mouseGravAngle(const float* ax, float& weight) {
+  float u[3] = {mGrav[0], mGrav[1], mGrav[2]}, r[3] = {mRestG[0], mRestG[1], mRestG[2]}, c[3];
+  v3perp(u, ax); v3perp(r, ax);
+  weight = min(v3norm(u) / max(v3norm(mGrav), 0.1f), v3norm(r));
+  v3cross(u, r, c);
+  return atan2f(v3dot(ax, c), v3dot(u, r)) * RAD_TO_DEG;
+}
+
+// Tilt: angle from rest -> pointer speed (counts/s), using that side's comfortable range.
+float mouseTiltSpeed(float ang, float rangePos, float rangeNeg) {
+  const float dead = setting(S_M_DEAD), full = max((ang > 0 ? rangePos : rangeNeg) * MS_TILT_FULL, dead + 2);
+  float f = constrain((fabsf(ang) - dead) / (full - dead), 0.0f, 1.0f);
+  f = f * f * setting(S_M_TSPEED);  // gentle near rest, for small targets
+  return ang < 0 ? -f : f;
+}
+
+void mouseMoveSample(const float* g, const float* a, float dt) {
   float w[3] = {g[0] - mBias[0], g[1] - mBias[1], g[2] - mBias[2]};
   // keep correcting the zero point while really still (drift)
   if (fabsf(w[0]) < 1.5f && fabsf(w[1]) < 1.5f && fabsf(w[2]) < 1.5f) {
@@ -1603,6 +1643,22 @@ void mouseMoveSample(const float* g, float dt) {
   // right and down, as learnt
   float x = v3dot(w, mAxX), y = v3dot(w, mAxY);
   mAngX += x * dt; mAngY += y * dt;
+  // gravity keeps the angles it can see from drifting (a nod, a wrist roll; not a head turn).
+  // Only when it isn't being shaken about (about 1 g).
+  const float an = v3norm(a), kg = dt / (0.2f + dt);
+  for (int i = 0; i < 3; i++) mGrav[i] += (a[i] - mGrav[i]) * kg;
+  float wx = 0, wy = 0;
+  if (an > 0.85f && an < 1.15f) {
+    const float gx = mouseGravAngle(mAxX, wx), gy = mouseGravAngle(mAxY, wy), kc = min(1.0f, dt / MS_GRAV_TAU);
+    if (wx > 0.3f) mAngX += (gx - mAngX) * kc * wx * wx;
+    if (wy > 0.3f) mAngY += (gy - mAngY) * kc * wy * wy;
+  }
+  const bool tilt = setting(S_M_STYLE) == 1;
+  if (tilt && mStillSince) {  // Tilt, still near rest: what gravity can't see drifts back to rest
+    const float dead = setting(S_M_DEAD), kl = min(1.0f, dt / MS_LEAK_TAU);
+    if (wx <= 0.3f && fabsf(mAngX) < dead) mAngX -= mAngX * kl;
+    if (wy <= 0.3f && fabsf(mAngY) < dead) mAngY -= mAngY * kl;
+  }
   const float tau = setting(S_M_SMOOTH) / 1000.0f;
   const float k = tau > 0 ? dt / (tau + dt) : 1.0f;
   mRateX += (x - mRateX) * k;
@@ -1612,6 +1668,14 @@ void mouseMoveSample(const float* g, float dt) {
     if (cx * cx + cy * cy > lim * lim) { mClutch = true; M5.Speaker.tone(600, 40); needRedraw = true; }
   }
   if (mPaused || mouseFrozen()) return;
+
+  if (tilt) {
+    float tx = mouseTiltSpeed(mAngX, mRange[0], mRange[1]), ty = mouseTiltSpeed(mAngY, mRange[2], mRange[3]);
+    if (setting(S_M_DIRS) == 1) { if (fabsf(tx) >= fabsf(ty)) ty = 0; else tx = 0; }  // 4 only
+    mAccX += tx * dt; mAccY += ty * dt;
+    mPosX += tx * dt; mPosY += ty * dt;
+    return;
+  }
 
   auto speed = [&](float r, float perDeg) {
     float m = fabsf(r) - setting(S_M_STEADY) / 10.0f;
@@ -1665,7 +1729,7 @@ void mousePause(bool p) {
   if (p == mPaused) return;
   mPaused = p;
   mAccX = mAccY = 0;
-  if (!p) mAngX = mAngY = 0;  // the live picture: moving again starts from the middle
+  if (!p) mouseRezero();  // moving again: here is rest (the live picture's middle; Tilt's rest)
   if (p) { beep(1200, 60); beep(800, 60); } else { beep(800, 60); beep(1200, 60); }
   needRedraw = true;
 }
@@ -1723,7 +1787,7 @@ void updateMouse(uint32_t now) {
     auto d = M5.Imu.getImuData();
     float g[3] = {d.gyro.x, d.gyro.y, d.gyro.z}, a[3] = {d.accel.x, d.accel.y, d.accel.z};
     if (mCal != MC_NONE) mouseCalSample(g, a, dt);
-    else mouseMoveSample(g, dt);
+    else mouseMoveSample(g, a, dt);
   }
   mouseStream(now);
   if (mCal != MC_NONE) return;
@@ -2054,8 +2118,9 @@ void drawMain(lgfx::LovyanGFX& c) {
         c.drawRect(30, LINE3_Y - 4, bw, 8, TFT_DARKGREY);
         c.fillRect(31, LINE3_Y - 3, (int)((bw - 2) * p), 6, TFT_GREEN);
       } else {
-        line3(c, "Speed " + String(SETTINGS[S_M_SPEED].labels[settingChoice[S_M_SPEED]])
-                 + "/" + SETTINGS[S_M_SPEEDY].labels[settingChoice[S_M_SPEEDY]]
+        line3(c, (setting(S_M_STYLE) == 1 ? "Tilt " + String(SETTINGS[S_M_TSPEED].labels[settingChoice[S_M_TSPEED]])
+                   : "Speed " + String(SETTINGS[S_M_SPEED].labels[settingChoice[S_M_SPEED]])
+                     + "/" + SETTINGS[S_M_SPEEDY].labels[settingChoice[S_M_SPEEDY]])
                  + " - Dwell " + SETTINGS[S_M_DWELL].labels[settingChoice[S_M_DWELL]]
                  + (setting(S_M_HOLD) ? (swStable && mClutch ? " - clutch" : " - hold switch: pause") : ""));
       }
@@ -2174,6 +2239,9 @@ bool settingShown(int i) {
     case S_NO_USB: return HAS_USB_HID;  // needs USB Mode: USB-OTG (TinyUSB)
     case S_FORGET: return bluetoothUsed();  // Bluetooth is only for KEYBOARD and MOUSE
     case S_M_AREA: return setting(S_M_DWELL) > 0;
+    case S_M_SPEED: case S_M_SPEEDY: case S_M_ACCEL: case S_M_STEADY: case S_M_SMOOTH: return setting(S_M_STYLE) == 0;
+    case S_M_TSPEED: case S_M_DEAD: case S_M_DIRS: return setting(S_M_STYLE) == 1;
+    case S_M_CLUTCH: return setting(S_M_HOLD) > 0;
     case S_SENSE_MODE: return sensorOn;
     case S_SENSE_LINE: return sensorOn && !senseMove();
     case S_SENSE_MOVE: case S_SETTLE: case S_FOLLOW: return sensorOn && senseMove();
@@ -3266,8 +3334,8 @@ void handleCommand(String line) {
     mStreamUntil = n ? millis() + 10000 : 0;
     reply();
   } else if (cmd == "MZERO") {
-    // MZERO: here is the middle, for the live picture
-    mAngX = mAngY = 0;
+    // MZERO: here is rest, for the live picture (and Tilt)
+    mouseRezero();
     reply();
   } else {
     reply("unknown command");

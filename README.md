@@ -74,8 +74,8 @@ current choices are hidden). Below that is what the mode uses.
   and an optional **sound** that the switch says as it sends the code. Settings: IR codes (and scanning settings
   with *Scan*), Press sound.
 - **MOUSE:** **Calibrate** (with what it's doing now), a live **Movement** picture (where the stick is, not the
-  pointer, and the comfortable range it learnt; **Centre** puts the dot back in the middle), **Pause / Move**, and the connection; settings: Speed left/right, Speed up/down,
-  Speed-up, Steady, Smoothing, Dwell click, Switch, Hold to pause, Clutch, Freeze on click, Double-click help, Press sound.
+  pointer, and the comfortable range it learnt; **Centre** puts the dot back in the middle), **Pause / Move**, and the connection; settings: Pointer style, Speed left/right, Speed up/down (Follow),
+  Speed-up, Steady, Smoothing (Follow), Tilt speed, Dead zone, Directions (Tilt), Dwell click, Switch, Hold to pause, Clutch, Freeze on click, Double-click help, Press sound.
 - **Voice:** the switch's **voice** and speed for typed messages and scanning prompts (natural: Emma, Isabella,
   George, Fable; quick: Cori, Alba, Southern English female, Northern English male). It's stored on the switch, so
   every computer uses the same one. Changing it remakes the prompts, and **Remake in this voice** remakes the typed
@@ -165,7 +165,14 @@ with the same pairing as KEYBOARD (on an iPad, if no pointer shows, turn on Assi
   change them after if needed, e.g. lower for small targets. If a movement isn't seen within 10 s it moves on (Left
   or Up then get the same range as the other side; without Right or Down it keeps the old calibration and speeds). Each time MOUSE starts after that it only needs *Keep still* (a second), unless it's worn at a
   clearly different angle, when it asks for the whole calibration again.
-- **Screen edges:** the pointer stops at the edge while the head keeps going. That's also how to bring the pointer
+- **Pointer style:** *Follow* (at first): the pointer moves as you move. *Tilt*: like a joystick – hold a little
+  away from rest and the pointer keeps going, faster the further you go (full speed at about 70% of the comfortable
+  range, so no need to reach the limit); back to rest and it stops. Tilt needs only small movements and has no
+  screen-edge problem. Its settings: *Tilt speed*, *Dead zone* (how close to rest keeps still) and *Directions*
+  (*4 only*: straight left, right, up or down, never at an angle). Rest is where you are after *Keep still*, after
+  a pause, or after **Centre** on the setup page. Nods and wrist rolls are checked against gravity, so they don't
+  drift; a head turn can drift a little, and while you rest it slowly settles back.
+- **Screen edges** (Follow): the pointer stops at the edge while the head keeps going. That's also how to bring the pointer
   back in line: push into the edge until the head is comfortable again, or use the clutch (below).
 - **Clicks:** the big switch is the left (or right, *Switch* setting) button. **Dwell click:** keep the pointer in
   one small area for the *Dwell click* time to click; move away to click again. A green bar on the screen fills up
@@ -182,8 +189,7 @@ with the same pairing as KEYBOARD (on an iPad, if no pointer shows, turn on Assi
 - **Double-click help** (off at first): after a click the pointer keeps still for a while (0.5–1.5 s), so a second
   click lands in the same place. It doesn't double-click by itself.
 - It doesn't sleep in MOUSE mode.
-- Coming next: a tilt (joystick) style for small movements. The research and
-  step-by-step plan are in [MOUSE-PLAN.md](MOUSE-PLAN.md).
+- The research and step-by-step plan are in [MOUSE-PLAN.md](MOUSE-PLAN.md).
 
 ### Backup mode: a switch for the AAC device, and a talker when it isn't there
 
@@ -286,6 +292,10 @@ All of these are on the setup page too, on each mode's tab and the Settings tab.
 | KEYBOARD | Key action | **Momentary**, Latch | *Momentary* holds the key while the switch is held; *Latch* – one press holds the key down, the next lets it go. The screen says "Key held" and the LED glows brighter while latched |
 | KEYBOARD, CONTROL, MOUSE | Press sound | **Off**, Click, Beep | A sound on each press, as feedback (CONTROL: only for codes with no sound of their own) |
 | CONTROL | IR codes | **Selected**, Repeat held, Scan | See the CONTROL mode above |
+| MOUSE | Pointer style | **Follow**, Tilt | Follow: the pointer moves as you move. Tilt: hold away from rest and it keeps going; back to rest and it stops |
+| MOUSE | Tilt speed | 1–5 (**3**) | Tilt: the fastest the pointer goes |
+| MOUSE | Dead zone | 2°, **4°**, 6°, 9° | Tilt: this close to rest the pointer keeps still |
+| MOUSE | Directions | **Any**, 4 only | Tilt: 4 only moves straight left, right, up or down |
 | MOUSE | Speed left/right, Speed up/down | 1–8 (**4**, **3**) | How fast the pointer moves each way. Calibrate sets them so a full comfortable movement crosses the screen; change them after if needed. The computer's pointer speed also applies |
 | MOUSE | Speed-up | Off, Low, **Medium**, High | Faster movements go further, so slow ones stay precise |
 | MOUSE | Steady | Off, **Low**, Medium, High | Ignores turns slower than this – steadies tremor and drift |

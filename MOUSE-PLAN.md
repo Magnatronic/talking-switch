@@ -14,7 +14,7 @@ New ideas can be tried in `MouseTest/` first.
 | 1 | MOUSE mode in ChatterSwitch (from MouseTest), hold to pause, setup page tab | **Done, tested 30 Sep 2026** (commits 369e680, a447b3f; on by default) |
 | 2 | Training on the user's own movements, speeds set by Calibrate, live picture on the page | **Built 30 Sep–1 Oct 2026, to test** (no turn limit, see below) |
 | 3 | Freeze on click, double-click help, clutch | **Built 1 Oct 2026, to test** (ignore jerks and Centre dropped) |
-| 4 | Tilt (joystick) style for very small movements | Planned |
+| 4 | Tilt (joystick) style for very small movements | **Built 1 Oct 2026, to test** |
 | 5 | True screen position (absolute pointer) | Only if 2–4 aren't enough |
 | 6 | GAME mode: movement as a thumbstick, for PC and Xbox | Planned, after step 4 |
 | – | Head gestures (Quha style) | Idea, see the end |
@@ -170,11 +170,23 @@ turning past the edge and back should no longer leave the user looking sideways.
 
 ## Step 4 – tilt (joystick) style
 
-A *Pointer style* setting: **Follow** (steps 1–2) or **Tilt**.
-- Tilt: angle from the trained rest position → pointer speed, with a dead zone around rest (sized from the Rest
-  step's wobble) and a top speed. It uses the accelerometer, so it doesn't drift.
-- Option: 4 directions only, at a fixed speed, for poor control.
-- It needs a steady rest position, so there is "set rest position" (the Rest step).
+**Built 1 Oct 2026, to test.** FW_API / PAGE_API = 8.
+- *Pointer style* (`m_style`): **Follow** (steps 1–3) or **Tilt**. Tilt settings (shown only in Tilt, on the stick
+  and the page): *Tilt speed* (`m_tspeed`, 300–1800 counts/s, **800**), *Dead zone* (`m_dead`, 2/**4**/6/9°),
+  *Directions* (`m_dirs`, **Any** / 4 only: the most-tipped axis only). Follow's speeds, Speed-up, Steady and
+  Smoothing are hidden in Tilt.
+- Speed = top × f², f = 0 at the dead zone edge to 1 at `MS_TILT_FULL` (70%) of that side's trained range, so the
+  per-side ranges from Calibrate are used (a stiff side still reaches full speed). f² keeps it gentle near rest.
+- **Angles:** `mAngX`/`mAngY` (gyro along the learnt axes) are now pulled towards what gravity sees
+  (`mouseGravAngle()`, complementary, 2 s, weighted by how far the axis is from "up"; only at about 1 g). So a nod or
+  wrist roll doesn't drift; a head turn (about "up") gravity can't see. In Tilt, while still and inside the dead
+  zone, those angles leak back to 0 (5 s), so drift settles while resting. This also steadies the live picture in Follow.
+- **Rest** (`mouseRezero()`: angles 0, rest gravity = now): after Keep still, moving again after a pause, and MZERO
+  (the page's Centre). So "pause, sit comfortably, move again" sets a new rest.
+- The dead zone is a setting, not sized from the Keep still wobble (simpler; change if testing shows a need).
+- 4 only keeps the curve, not a fixed speed. The page's picture shows the dead zone as a grey square.
+- **To test:** head and wrist; the dead zone and speeds; whether a head turn drifts out of rest during use;
+  4 only with someone with less control.
 
 ## Step 5 – true screen position (only if needed)
 

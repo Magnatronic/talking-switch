@@ -782,7 +782,7 @@ function renderEditor(i) {
 
 // ---------------------------------------------------------------- about
 // The firmware's FW_API this page is made for (see TalkingSwitch.ino).
-const PAGE_API = 7;
+const PAGE_API = 8;
 function storageFull() { return info.fsTotal && info.fsUsed / info.fsTotal >= 0.9; }
 
 function renderAbout() {
@@ -1004,7 +1004,7 @@ function renderMouse() {
       el('span', { class: 'small' }, m.cal && m.range
         ? `Comfortable range: right ${m.range[0]}°, left ${m.range[1]}°, down ${m.range[2]}°, up ${m.range[3]}°` : 'Not calibrated yet'),
       el('button', { onclick: () => act(() => cmd('MZERO')) }, 'Centre'))),
-      'The dot is the stick (not the pointer); the box is the comfortable range it learnt. Sit at rest and press Centre to check it. It drifts slowly; it centres again after Keep still and after a pause.') : null,
+      'The dot is the stick (not the pointer); the box is the comfortable range it learnt, and in Tilt the grey square is the dead zone. Sit at rest and press Centre to make that rest. Turns drift slowly; it centres again after Keep still and after a pause.') : null,
     plainRow('Pointer', el('div', { class: 'row' },
       el('span', {}, !inMouse ? 'Not in use' : m.paused ? 'Paused' : 'Moving'),
       el('button', { disabled: !inMouse || !m.cal, onclick: () => act(() => cmd(`MPAUSE ${m.paused ? 0 : 1}`)) },
@@ -1044,6 +1044,10 @@ const HELP = {
   s_beyond: 'Further than this counts as nothing there – stops people walking past from pressing.',
   s_modes: 'Modes you don’t use are skipped on the stick and hidden here. Their key and IR codes are kept.',
   s_mouse: 'Adds MOUSE: the stick, worn on the head or a hand, moves the pointer.',
+  m_style: 'Follow: the pointer moves as you move. Tilt: hold a little away from rest and the pointer keeps going, faster the further you go; back to rest and it stops. Tilt needs only small movements.',
+  m_tspeed: 'Tilt: the fastest the pointer goes, at most of the comfortable range.',
+  m_dead: 'Tilt: this close to rest the pointer keeps still. Bigger for shaky movement.',
+  m_dirs: 'Tilt: 4 only moves straight left, right, up or down (whichever is most), never at an angle.',
   m_spdx: 'How fast the pointer moves left and right. Calibrate sets it so a full comfortable movement crosses the screen; turn it down if small targets are hard to hit. The computer’s pointer speed also applies.',
   m_spdy: 'How fast the pointer moves up and down. Calibrate sets it so a full comfortable movement crosses the screen.',
   m_accel: 'Faster movements go further, so small slow movements stay precise.',
@@ -1079,6 +1083,8 @@ async function setPlays(i) {
 
 const pressTwice = () => setCur('s_access') === 0;
 const allTopics = () => setCur('s_topics') === 1;
+const tilt = () => setCur('m_style') === 1, follow = () => !tilt();
+const TILT_DEAD = [2, 4, 6, 9];  // m_dead choices (deg)
 const TAB_SETTINGS = {  // [setting, shown only when]
   quick: [['plays'], ['s_gap', countingPresses],
     ['s_play', () => setCur('s_spkmode') === 0], ['s_hold', () => setCur('s_spkmode') === 0 && setCur('s_play') === 0],
@@ -1089,7 +1095,8 @@ const TAB_SETTINGS = {  // [setting, shown only when]
   keyboard: [['s_keyact'], ['s_psound'], ['s_nousb', () => info.usbhid]],
   control: [['s_irmode'], ['s_access', irScanning], ['s_scanspd', irScanning],
     ['s_scanrnd', () => irScanning() && pressTwice()], ['s_stop', irScanning], ['s_psound']],
-  mouse: [['m_spdx'], ['m_spdy'], ['m_accel'], ['m_steady'], ['m_smooth'], ['m_dwell'], ['m_area', () => setCur('m_dwell') > 0],
+  mouse: [['m_style'], ['m_spdx', follow], ['m_spdy', follow], ['m_accel', follow], ['m_steady', follow], ['m_smooth', follow],
+    ['m_tspeed', tilt], ['m_dead', tilt], ['m_dirs', tilt], ['m_dwell'], ['m_area', () => setCur('m_dwell') > 0],
     ['m_switch'], ['m_hold'], ['m_clutch', () => setCur('m_hold') > 0], ['m_freeze'], ['m_double'], ['s_psound']],
 };
 function visibleSettings(tab) {
@@ -1665,6 +1672,11 @@ function drawMousePicture() {
     g.strokeStyle = css.getPropertyValue('--accent');
     g.lineWidth = 2;
     g.strokeRect(cx - r[1] * sc, cy - r[3] * sc, (r[0] + r[1]) * sc, (r[2] + r[3]) * sc);
+  }
+  if (r && tilt()) {  // Tilt: inside the dead zone the pointer keeps still
+    const d = TILT_DEAD[setCur('m_dead')] * sc;
+    g.fillStyle = css.getPropertyValue('--line');
+    g.fillRect(cx - d, cy - d, 2 * d, 2 * d);
   }
   g.fillStyle = css.getPropertyValue('--muted');
   g.font = '12px system-ui, sans-serif';
