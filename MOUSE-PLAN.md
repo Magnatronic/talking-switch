@@ -16,6 +16,7 @@ New ideas can be tried in `MouseTest/` first.
 | 3 | Freeze on click, double-click help, ignore jerks, Centre | Planned |
 | 4 | Tilt (joystick) style for very small movements | Planned |
 | 5 | True screen position (absolute pointer) | Only if 2–4 aren't enough |
+| 6 | GAME mode: movement as a thumbstick, for PC and Xbox | Planned, after step 4 |
 | – | Head gestures (Quha style) | Idea, see the end |
 
 ## What we found (research, 30 Sep 2026)
@@ -167,6 +168,45 @@ A *Pointer style* setting: **Follow** (steps 1–2) or **Tilt**.
 
 An absolute pointer report, USB first. It needs a changed report map, so paired devices would have to pair again,
 and iPad support must be checked. Try it in MouseTest first.
+
+## Step 6 – GAME mode (thumbstick, PC and Xbox)
+
+A new mode (like MOUSE, hidden unless turned on): head or hand movement is a **thumbstick**, the switch is a button.
+Goal: games on a **Windows PC** and on an **Xbox** (through the Xbox Adaptive Controller).
+
+**Why movement suits a thumbstick:** a thumbstick reports a *position* (centre to fully pushed), like a head
+angle; a mouse reports movement. So angle from rest → stick position, and back at rest = centred. No edge problem.
+- **Calibrate is the same as MOUSE:** Keep still = centre; Right, Left, Down, Up = full push each way. Here the
+  per-side ranges *are* used (dropped for MOUSE), so a stiff side still reaches full push.
+- **Dead zone** around rest (sized from the Keep still wobble) and a **response curve** (fine near the middle,
+  full at the comfortable limit). Settings: dead zone, curve, which stick (left / right), the switch's button.
+- **Drift:** nod and wrist tilt are corrected from gravity (accelerometer). A head turn is gyro only (about
+  0.07°/s measured), so: slowly re-centre while still inside the dead zone, plus Centre on a pause / switch hold.
+- Mostly the same code as step 4 (tilt style), so do step 4 first.
+
+**PC:** a USB HID joystick/gamepad works in Windows with no driver (DirectInput). Games that only take Xbox
+controllers (XInput) need Steam Input or similar to map it. Bluetooth gamepad possible later, but it changes the
+Bluetooth report map, so paired devices would pair again.
+
+**Xbox:** an Xbox only accepts controllers with Microsoft's security chip, so not directly. The **Xbox Adaptive
+Controller (XAC)** accepts USB HID joysticks on its USB ports: X,Y axes → left stick, Z,RZ → right stick, hat →
+d-pad, buttons → XAC buttons. Copilot lets it share one player with another controller.
+Known from open-source ESP32-S3 XAC joysticks (one is for M5Stack):
+- the HID report must be laid out the way XAC expects (signed vs unsigned axes: unsigned has centre at 127,127);
+- XAC firmware June 2024 or newer;
+- XAC's USB ports give at most 100 mA unless the XAC has its 5 V 2 A supply (the stick charges from USB, so
+  check the current, or run it on battery);
+- **to check:** whether XAC accepts our composite USB device (keyboard + mouse + serial + gamepad) or needs a
+  joystick-only USB device. If joystick-only, GAME mode restarts the stick's USB as a joystick (no setup page
+  over USB while in GAME mode).
+
+**Plan:** a `GameTest/` sketch first (USB joystick from the stick's movement; test on PC, then XAC), then GAME
+mode in ChatterSwitch.
+
+Sources: [ESP32 gamepad for XAC (esp32beans)](https://github.com/esp32beans/ESP32_gamepad),
+[M5Stack USB joystick (esp32beans)](https://github.com/esp32beans/M5Stack_Touch_USB_Joystick),
+[dinput_tinyusb for XAC](https://github.com/controllercustom/dinput_tinyusb),
+[Arduino forum: joystick for XAC](https://forum.arduino.cc/t/joystick-for-xbox-adaptive-controller/1325039).
 
 ## Idea for later – head gestures (Quha Zono 2)
 
