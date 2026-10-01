@@ -12,10 +12,11 @@ New ideas can be tried in `MouseTest/` first.
 | Step | What | State |
 |---|---|---|
 | 1 | MOUSE mode in ChatterSwitch (from MouseTest), hold to pause, setup page tab | **Done, tested 30 Sep 2026** (commits 369e680, a447b3f; on by default) |
-| 2 | Training on the user's own movements, per-side speed, live picture on the page | **Built 30 Sep 2026, to test** (no turn limit, see below) |
-| 3 | Freeze on click, ignore jerks | Planned |
+| 2 | Training on the user's own movements, speeds set by Calibrate, live picture on the page | **Built 30 Sep–1 Oct 2026, to test** (no turn limit, see below) |
+| 3 | Freeze on click, double-click help, ignore jerks, Centre | Planned |
 | 4 | Tilt (joystick) style for very small movements | Planned |
 | 5 | True screen position (absolute pointer) | Only if 2–4 aren't enough |
+| – | Head gestures (Quha style) | Idea, see the end |
 
 ## What we found (research, 30 Sep 2026)
 
@@ -144,8 +145,15 @@ turning past the edge and back should no longer leave the user looking sideways.
 ## Step 3 – filters
 
 - **Freeze on click:** ignore movement for a moment (about 0.3 s) when the switch is pressed, so the press doesn't jog the pointer.
+- **Double-click help** (Quha's "double-click assistant"): after a click the pointer stays still for a short time
+  (setting, e.g. Off / 0.5 / 1 s), so a second click lands in the same place. It doesn't double-click by itself.
+  Could share a setting with freeze on click.
 - **Ignore jerks:** a sudden movement faster than a limit (a spasm) is ignored.
-- Up/down and left/right speed are separate already from step 2's per-side ranges. If not, add a setting.
+- **Centre:** put the pointer in the middle of the screen. The stick doesn't know where the pointer is, so: push it
+  hard into the top-left corner, then move it half of `MS_SPAN_X` / `MS_SPAN_Y` (the computer's pointer speed
+  makes this only roughly the middle, like Quha's "central area"). Started by a switch action (e.g. a choice in
+  *Hold to pause*: Pause / Centre) or from the page.
+- Up/down and left/right speed are separate already (step 2).
 
 ## Step 4 – tilt (joystick) style
 
@@ -159,6 +167,18 @@ A *Pointer style* setting: **Follow** (steps 1–2) or **Tilt**.
 
 An absolute pointer report, USB first. It needs a changed report map, so paired devices would have to pair again,
 and iPad support must be checked. Try it in MouseTest first.
+
+## Idea for later – head gestures (Quha Zono 2)
+
+From the [Quha Zono 2 manual](https://www.zyteq.com.au/uploads/PDF/Access/Quha-Zono-2-User-Manual-v1.0-English.pdf):
+every gesture starts with holding still for about a second, then a quick back-and-forth, e.g. **pause** = right,
+left, right, left; **exit pause** = right, left. Gestures for scroll and centring too.
+- The pointer does move during a gesture; back-and-forth ends where it started. We could also undo the wiggle:
+  the stick knows the movement it sent since the still second, so once a gesture is recognised it sends the
+  opposite and the pointer is back exactly.
+- **Doubts:** quick back-and-forth needs good control (hard for many people with CP), and jerky movement could
+  trigger it by accident. Hold to pause already covers pausing. So: optional and off by default, and only if
+  users who can't use the switch to pause need it.
 
 ## Hardware and build notes
 
