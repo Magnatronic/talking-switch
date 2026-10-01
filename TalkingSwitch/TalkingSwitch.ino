@@ -139,7 +139,7 @@ static const int SENSE_GRAPH_W = 224;      // Sensor test graph: one reading per
 // Firmware version. FW_API goes up whenever the setup page needs to change
 // with it (the page shows a warning if the numbers don't match).
 static const char* FW_VERSION = "30 Sep 2026";
-static const int   FW_API     = 5;
+static const int   FW_API     = 6;
 
 // ---------------------------------------------------------------------
 //  Settings you may want to change
@@ -234,7 +234,7 @@ static const int NUM_KEYS = sizeof(KEYS) / sizeof(KEYS[0]);
 enum SettingId : uint8_t {
   S_VOLUME, S_MODES, S_MOUSE_ON, S_SPEAK_CHOOSE, S_QUICK_HOW, S_GAP, S_PLAY, S_HOLD, S_CHOOSE_FROM, S_OFFER_QUICK, S_OFFER_CONTROL, S_OFFER_DEVICE, S_IR_CHOOSE, S_ACCESS, S_SCAN_SPEED, S_SCAN_ROUNDS, S_STOP,
   S_KEY_ACTION, S_PRESS_SOUND, S_NO_USB,
-  S_M_SPEED, S_M_ACCEL, S_M_STEADY, S_M_SMOOTH, S_M_DWELL, S_M_AREA, S_M_SWITCH, S_M_HOLD,
+  S_M_SPEED, S_M_SPEEDY, S_M_ACCEL, S_M_STEADY, S_M_SMOOTH, S_M_DWELL, S_M_AREA, S_M_SWITCH, S_M_HOLD,
   S_ACCEPT, S_LOCKOUT, S_SENSE_MODE, S_SENSE_LINE, S_SENSE_MOVE, S_SETTLE, S_FOLLOW, S_BEYOND, S_SENSE_TEST, S_BRIGHT, S_WAKE, S_SLEEP, S_AUTOOFF, S_LOUD, S_FORGET, S_ABOUT,
   S_COUNT
 };
@@ -291,9 +291,10 @@ static const Setting SETTINGS[S_COUNT] = {
   // KEYBOARD with no USB connection: keys go over Bluetooth, or the switch
   // talks instead (backup mode, Bluetooth off) until USB is back
   {"No USB",              "s_nousb",   3, 0, {0, 1, 2}, {"Bluetooth", "QUICK", "TOPICS"}, G_KEYBOARD},
-  // MOUSE: pointer counts for a full comfortable movement to one side, as calibrated
-  // (up/down: MS_UPDOWN of it; the computer's pointer speed also applies)
-  {"Speed",               "m_reach",   7, 3, {300, 450, 650, 900, 1200, 1600, 2200}, {"1", "2", "3", "4", "5", "6", "7"}, G_MOUSE},
+  // MOUSE: pointer counts per degree, left/right and up/down. Calibrate sets them from the
+  // comfortable range (MS_SPAN_X/Y); they can be changed after. The computer's pointer speed also applies.
+  {"Speed left/right",    "m_spdx",    8, 3, {8, 12, 18, 25, 35, 50, 70, 100}, {"1", "2", "3", "4", "5", "6", "7", "8"}, G_MOUSE},
+  {"Speed up/down",       "m_spdy",    8, 2, {8, 12, 18, 25, 35, 50, 70, 100}, {"1", "2", "3", "4", "5", "6", "7", "8"}, G_MOUSE},
   // faster turns go further: extra speed per 100 deg/s
   {"Speed-up",            "m_accel",   4, 2, {0, 1, 2, 4}, {"Off", "Low", "Medium", "High"}, G_MOUSE},
   // turns slower than this are ignored (tenths of a deg/s): steadies tremor and drift
@@ -1246,8 +1247,9 @@ void releaseKey() {
 //                    position (the middle)
 //    2. Right, 3. Left, 4. Down, 5. Up - each as far as is comfortable and
 //       back: the left/right and up/down movements and how far each side
-//       goes. Each side gets its own speed, so a full comfortable movement
-//       that way goes the same distance ("Speed"), even if one side is stiff.
+//       goes. From the whole left-to-right and down-to-up range it sets
+//       "Speed left/right" and "Speed up/down", so a full movement crosses
+//       about the screen. They're ordinary settings: change them after if needed.
 //  Each time MOUSE starts, only Keep still is needed - unless it's worn at a
 //  clearly different angle, when it asks for the whole calibration again.
 //  While still it keeps correcting its zero point, so the pointer doesn't creep.
@@ -1266,7 +1268,8 @@ static const uint32_t MS_BACK_MS = 250;          // ...for this long
 static const uint32_t MS_WAIT_MS = 10000;        // nothing within this: the step is skipped
 static const uint32_t MS_STEP_MS = 8000;         // a movement step ends after this anyway
 static const float    MS_MIN_RANGE = 3.0f;       // the smallest range (deg)
-static const float    MS_UPDOWN = 0.6f;          // up/down goes this much of Speed (screens are wider than tall)
+static const float    MS_SPAN_X = 1920;          // Calibrate: the full left/right range sends about this many counts...
+static const float    MS_SPAN_Y = 1080;          // ...and up/down this many (a typical screen)
 static const float    MS_MOVED_DEG = 25.0f;      // at start: tilted more than this from last time -> calibrate again
 static const uint32_t MS_SEND_MS = 10;           // send movement at most 100 times a second
 static const uint32_t MS_STREAM_MS = 40;         // the setup page's live picture: 25 times a second
@@ -1392,7 +1395,7 @@ void mouseStartCal(bool full) {
   M5.Speaker.tone(1000, 60);
 }
 
-void mouseCalDone(const char* msg, uint16_t col) {
+void mouseCalDone(const String& msg, uint16_t col) {
   mCal = MC_NONE;
   mAccX = mAccY = mRateX = mRateY = 0;
   setStatus(msg, col);
@@ -1456,9 +1459,22 @@ void mouseFinishCal() {
   mHaveAxes = true;
   mouseSaveAxes();
   mAngX = mAngY = 0;
+  // the speeds that make the whole range cross about the screen (nearest choice)
+  auto fit = [](int id, float want) {
+    const Setting& st = SETTINGS[id];
+    int best = 0;
+    for (int i = 1; i < st.count; i++)
+      if (fabsf(logf(st.values[i] / want)) < fabsf(logf(st.values[best] / want))) best = i;
+    settingChoice[id] = best;
+    prefs.putUChar(st.key, best);
+  };
+  fit(S_M_SPEED, MS_SPAN_X / (mRange[0] + mRange[1]));
+  fit(S_M_SPEEDY, MS_SPAN_Y / (mRange[2] + mRange[3]));
+  String speeds = "Speed " + String(SETTINGS[S_M_SPEED].labels[settingChoice[S_M_SPEED]])
+                  + " / " + SETTINGS[S_M_SPEEDY].labels[settingChoice[S_M_SPEEDY]];
   M5.Speaker.tone(2000, 60);
-  if (mGot[1] && mGot[3]) mouseCalDone("Ready", TFT_GREEN);
-  else mouseCalDone(mGot[1] ? "Ready\nNo up seen" : "Ready\nNo left seen", TFT_ORANGE);
+  if (mGot[1] && mGot[3]) mouseCalDone("Ready\n" + speeds, TFT_GREEN);
+  else mouseCalDone((mGot[1] ? "No up seen\n" : "No left seen\n") + speeds, TFT_ORANGE);
 }
 
 // One gyro (deg/s) and accelerometer (g) sample while calibrating.
@@ -1540,16 +1556,14 @@ void mouseMoveSample(const float* g, float dt) {
   mRateY += (y - mRateY) * k;
   if (mPaused) return;
 
-  // Speed = counts for a full comfortable movement, so each side's own range sets its gain
-  auto speed = [&](float r, float full, float rangePos, float rangeNeg) {
+  auto speed = [&](float r, float perDeg) {
     float m = fabsf(r) - setting(S_M_STEADY) / 10.0f;
     if (m <= 0) return 0.0f;
-    float gain = full / (r < 0 ? rangeNeg : rangePos) * (1 + setting(S_M_ACCEL) * m / 100.0f);
+    float gain = perDeg * (1 + setting(S_M_ACCEL) * m / 100.0f);
     return (r < 0 ? -m : m) * gain;  // counts per second
   };
-  const float full = setting(S_M_SPEED);
-  float mx = speed(mRateX, full, mRange[0], mRange[1]) * dt;
-  float my = speed(mRateY, full * MS_UPDOWN, mRange[2], mRange[3]) * dt;
+  float mx = speed(mRateX, setting(S_M_SPEED)) * dt;
+  float my = speed(mRateY, setting(S_M_SPEEDY)) * dt;
   mAccX += mx; mAccY += my;
   mPosX += mx; mPosY += my;
 }
@@ -1981,6 +1995,7 @@ void drawMain(lgfx::LovyanGFX& c) {
         c.fillRect(31, LINE3_Y - 3, (int)((bw - 2) * p), 6, TFT_GREEN);
       } else {
         line3(c, "Speed " + String(SETTINGS[S_M_SPEED].labels[settingChoice[S_M_SPEED]])
+                 + "/" + SETTINGS[S_M_SPEEDY].labels[settingChoice[S_M_SPEEDY]]
                  + " - Dwell " + SETTINGS[S_M_DWELL].labels[settingChoice[S_M_DWELL]]
                  + (setting(S_M_HOLD) ? " - hold switch: pause" : ""));
       }

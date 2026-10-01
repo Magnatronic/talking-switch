@@ -74,8 +74,8 @@ current choices are hidden). Below that is what the mode uses.
   and an optional **sound** that the switch says as it sends the code. Settings: IR codes (and scanning settings
   with *Scan*), Press sound.
 - **MOUSE:** **Calibrate** (with what it's doing now), a live **Movement** picture (where the stick is, not the
-  pointer, and the comfortable range it learnt; **Centre** puts the dot back in the middle), **Pause / Move**, and the connection; settings: Speed, Speed-up, Steady, Smoothing,
-  Dwell click, Switch, Hold to pause, Press sound.
+  pointer, and the comfortable range it learnt; **Centre** puts the dot back in the middle), **Pause / Move**, and the connection; settings: Speed left/right, Speed up/down,
+  Speed-up, Steady, Smoothing, Dwell click, Switch, Hold to pause, Press sound.
 - **Voice:** the switch's **voice** and speed for typed messages and scanning prompts (natural: Emma, Isabella,
   George, Fable; quick: Cori, Alba, Southern English female, Northern English male). It's stored on the switch, so
   every computer uses the same one. Changing it remakes the prompts, and **Remake in this voice** remakes the typed
@@ -160,9 +160,10 @@ with the same pairing as KEYBOARD (on an iPad, if no pointer shows, turn on Assi
   1. *Keep still* – sit comfortably. This position is the middle.
   2. *Right*, 3. *Left*, 4. *Down*, 5. *Up* – each as far as is comfortable, and back. A beep starts each one;
      the screen shows how far it has gone. It can be any movement: a head turn or nod, a wrist roll or bend.
-  Each side gets its own speed from its own range, so a stiff side still reaches the screen edge. If a movement
-  isn't seen within 10 s it moves on (Left or Up then get the same range as the other side; without Right or Down it keeps the old
-  calibration). Each time MOUSE starts after that it only needs *Keep still* (a second), unless it's worn at a
+  From the whole left-to-right and down-to-up range it sets **Speed left/right** and **Speed up/down**, so a full
+  comfortable movement crosses about the screen (the screen shows the speeds it chose). They're ordinary settings:
+  change them after if needed, e.g. lower for small targets. If a movement isn't seen within 10 s it moves on (Left
+  or Up then get the same range as the other side; without Right or Down it keeps the old calibration and speeds). Each time MOUSE starts after that it only needs *Keep still* (a second), unless it's worn at a
   clearly different angle, when it asks for the whole calibration again.
 - **Screen edges:** the pointer stops at the edge while the head keeps going. That's also how to bring the pointer
   back in line: push into the edge until the head is comfortable again, or pause, move back, and carry on.
@@ -277,7 +278,7 @@ All of these are on the setup page too, on each mode's tab and the Settings tab.
 | KEYBOARD | Key action | **Momentary**, Latch | *Momentary* holds the key while the switch is held; *Latch* – one press holds the key down, the next lets it go. The screen says "Key held" and the LED glows brighter while latched |
 | KEYBOARD, CONTROL, MOUSE | Press sound | **Off**, Click, Beep | A sound on each press, as feedback (CONTROL: only for codes with no sound of their own) |
 | CONTROL | IR codes | **Selected**, Repeat held, Scan | See the CONTROL mode above |
-| MOUSE | Speed | 1–7 (**4**) | How far the pointer goes for a full comfortable movement to one side (4 ≈ half a 1920-pixel screen). The computer's pointer speed also applies |
+| MOUSE | Speed left/right, Speed up/down | 1–8 (**4**, **3**) | How fast the pointer moves each way. Calibrate sets them so a full comfortable movement crosses the screen; change them after if needed. The computer's pointer speed also applies |
 | MOUSE | Speed-up | Off, Low, **Medium**, High | Faster movements go further, so slow ones stay precise |
 | MOUSE | Steady | Off, **Low**, Medium, High | Ignores turns slower than this – steadies tremor and drift |
 | MOUSE | Smoothing | Off, **Low**, Medium, High | Smooths out shakes, with a little lag |

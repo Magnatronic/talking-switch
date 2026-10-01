@@ -94,12 +94,17 @@ Sources: [Quha Zono X](https://www.quha.com/products/quha-zono-x/),
 **What was built:** the 5-step training below (`MC_REST`, `MC_RIGHT`, `MC_LEFT`, `MC_DOWN`, `MC_UP` in
 `mouseCalSample()`); the axes come from Right − Left and Down − Up (up/down made at right angles to left/right),
 ranges from each peak (a missed Left or Up copies the other side). Prefs `m_up`, `m_x`, `m_y`, `m_rng` (the old `m_down` is unused, so it asks to calibrate
-once). Movement is still "follow"; each side's gain = Speed / that side's range (up/down × 0.6). `Speed` is now
-`m_reach` (counts for a full comfortable movement: 300–2200). Flip settings removed (training learns the
+once). Movement is still "follow". **Speed (changed 1 Oct 2026, after research):** two ordinary settings,
+*Speed left/right* (`m_spdx`) and *Speed up/down* (`m_spdy`), in counts per degree (8–100). Calibrate sets them
+from the whole span (right+left, down+up) so it crosses about 1920 × 1080 counts, picks the nearest choice, and
+shows them ("Speed 6 / 4"); they can be changed after. This is how Enable Viacam does it (Quha also has separate
+H/V speeds). No product found sets left and right separately, and head-pointer research puts the best gain well
+below a hand mouse's, so the speed must stay adjustable. Per-side speeds were tried and dropped; an optional
+*Even out sides* can come later if a strongly one-sided user needs it. Flip settings removed (training learns the
 directions). Small wear changes at start turn the axes with "up". Setup page: live picture (`MSTREAM 1|0`,
 `mou,<step>,<x×10>,<y×10>,<paused>` lines), INFO `mouse.range`. FW_API / PAGE_API = 4.
 The picture's dot is the angle since the last Keep still, pause or `MZERO` (the page's Centre button), so it drifts
-slowly (about 0.07°/s measured) and doesn't follow edge pushes. FW_API / PAGE_API = 5 since MZERO.
+slowly (about 0.07°/s measured) and doesn't follow edge pushes. FW_API / PAGE_API = 6 since the two speed settings.
 Stream checked on the stick 30 Sep 2026: right, left, down, up all come out the right way.
 
 The original design (turn limit parts not built):

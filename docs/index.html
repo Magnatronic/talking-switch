@@ -782,7 +782,7 @@ function renderEditor(i) {
 
 // ---------------------------------------------------------------- about
 // The firmware's FW_API this page is made for (see TalkingSwitch.ino).
-const PAGE_API = 5;
+const PAGE_API = 6;
 function storageFull() { return info.fsTotal && info.fsUsed / info.fsTotal >= 0.9; }
 
 function renderAbout() {
@@ -995,10 +995,10 @@ function renderMouse() {
     plainRow('Calibrate', el('div', { class: 'row' },
       el('span', { class: 'status' + (m.cal && !step ? ' has' : '') }, calText),
       el('button', { class: m.cal ? '' : 'add', disabled: !inMouse || !m.imu, onclick: async () => {
-        await act(() => cmd('MCAL'), 'Keep still, then right, left, down, up');
+        await act(() => cmd('MCAL'), 'Keep still, then right, left, down, up. It sets the speeds.');
         watchMouseCal();
       } }, m.cal ? 'Calibrate again' : 'Calibrate')),
-      inMouse ? 'Wear it as it will be used. Keep still, then move right, left, down and up – each as far as is comfortable, and back.'
+      inMouse ? 'Wear it as it will be used. Keep still, then move right, left, down and up – each as far as is comfortable, and back. This sets both speeds; change them after in the settings if needed.'
         : 'Use MOUSE first (the button at the top).'),
     inMouse && m.imu ? plainRow('Movement', el('div', {}, mouseCanvas, el('div', { class: 'row', style: 'margin-top:6px' },
       el('span', { class: 'small' }, m.cal && m.range
@@ -1044,7 +1044,8 @@ const HELP = {
   s_beyond: 'Further than this counts as nothing there – stops people walking past from pressing.',
   s_modes: 'Modes you don’t use are skipped on the stick and hidden here. Their key and IR codes are kept.',
   s_mouse: 'Adds MOUSE: the stick, worn on the head or a hand, moves the pointer.',
-  m_reach: 'How far the pointer goes for a full comfortable movement. Each side has its own range from Calibrate. The computer’s pointer speed also applies.',
+  m_spdx: 'How fast the pointer moves left and right. Calibrate sets it so a full comfortable movement crosses the screen; turn it down if small targets are hard to hit. The computer’s pointer speed also applies.',
+  m_spdy: 'How fast the pointer moves up and down. Calibrate sets it so a full comfortable movement crosses the screen.',
   m_accel: 'Faster movements go further, so small slow movements stay precise.',
   m_steady: 'Very slow turns are ignored – steadies tremor and drift.',
   m_smooth: 'Smooths out shakes, with a little lag.',
@@ -1085,7 +1086,7 @@ const TAB_SETTINGS = {  // [setting, shown only when]
   keyboard: [['s_keyact'], ['s_psound'], ['s_nousb', () => info.usbhid]],
   control: [['s_irmode'], ['s_access', irScanning], ['s_scanspd', irScanning],
     ['s_scanrnd', () => irScanning() && pressTwice()], ['s_stop', irScanning], ['s_psound']],
-  mouse: [['m_reach'], ['m_accel'], ['m_steady'], ['m_smooth'], ['m_dwell'], ['m_area', () => setCur('m_dwell') > 0],
+  mouse: [['m_spdx'], ['m_spdy'], ['m_accel'], ['m_steady'], ['m_smooth'], ['m_dwell'], ['m_area', () => setCur('m_dwell') > 0],
     ['m_switch'], ['m_hold'], ['s_psound']],
 };
 function visibleSettings(tab) {
