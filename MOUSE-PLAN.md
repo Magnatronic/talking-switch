@@ -16,7 +16,7 @@ New ideas can be tried in `MouseTest/` first.
 | 3 | Freeze on click, double-click help, clutch | **Built 1 Oct 2026, to test** (ignore jerks and Centre dropped) |
 | 4 | Tilt (joystick) style for very small movements | **Built 1 Oct 2026, to test** |
 | 5 | True screen position (absolute pointer) | Only if 2–4 aren't enough |
-| 6 | GAME mode: movement as a thumbstick, for PC and Xbox | Planned, after step 4 |
+| 6 | GAME mode: movement as a thumbstick, for PC and Xbox | **Built 1 Oct 2026, to test** (straight into ChatterSwitch, no GameTest) |
 | – | Head gestures (Quha style) | Idea, see the end |
 
 ## What we found (research, 30 Sep 2026)
@@ -224,8 +224,22 @@ Known from open-source ESP32-S3 XAC joysticks (one is for M5Stack):
   joystick-only USB device. If joystick-only, GAME mode restarts the stick's USB as a joystick (no setup page
   over USB while in GAME mode).
 
-**Plan:** a `GameTest/` sketch first (USB joystick from the stick's movement; test on PC, then XAC), then GAME
-mode in ChatterSwitch.
+**Built 1 Oct 2026, to test** – straight into ChatterSwitch (no GameTest sketch). FW_API / PAGE_API = 9.
+- Mode `M_GAME` (after MOUSE, blue), group `G_GAME`, `s_game` **Off** by default. `motionMode()` = MOUSE or GAME:
+  they share the motion engine (`updateMouse`, calibration, `mAngX/Y`, pause, MZERO, the page's picture).
+- USB: the core's `USBHIDGamepad` (X, Y, Z, Rz, Rx, Ry signed −127..127, hat, 32 buttons), added to the composite
+  device (keyboard + mouse + serial) **only when `s_game` is on at start**; changing `s_game` restarts the stick
+  (`gameRestartAt`). So nobody else gets an idle gamepad. No Bluetooth gamepad.
+- `gameAxis()`: dead zone (`m_dead`, shared with Tilt) → 0..1 at `MS_TILT_FULL` (70%) of that side's range, then
+  `powf(f, g_curve/10)` (*Response*: Straight 1.0, **Gentle** 1.5, Very gentle 2.2). `m_dirs` 4 only shared.
+  *Stick* (`g_stick`) left = X/Y, right = Z/Rz. *Switch button* (`g_button`: A, B, X, Y, LB, RB = core buttons
+  0, 1, 3, 4, 6, 7) held while the switch is. Pause centres the stick. The yaw leak to rest (inside the dead zone,
+  still) always runs in GAME.
+- Sent on change (button at once, stick at most every 10 ms). No hold to pause, clutch or freeze in GAME.
+- **To test:** joy.cpl on Windows (axes, button, dead zone, curve); a game via Steam Input; then the XAC:
+  whether it accepts the composite device and our report (signed axes), the 100 mA limit without its PSU,
+  XAC firmware. If the XAC wants a joystick-only device, GAME would start USB as a gamepad only (no setup page
+  over USB in GAME).
 
 Sources: [ESP32 gamepad for XAC (esp32beans)](https://github.com/esp32beans/ESP32_gamepad),
 [M5Stack USB joystick (esp32beans)](https://github.com/esp32beans/M5Stack_Touch_USB_Joystick),

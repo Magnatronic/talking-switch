@@ -51,7 +51,7 @@ button while plugging it in – that starts it for programming), close the Ardui
 **ESP32S3_DEV – TinyUSB CDC**. The switch is set up over the USB cable – no Wi-Fi – and recordings and
 typed words stay on the computer.
 
-The page has a tab for each mode – QUICK, TOPICS, KEYBOARD, CONTROL, MOUSE – then **Voice** and **Settings**, like the
+The page has a tab for each mode – QUICK, TOPICS, KEYBOARD, CONTROL, MOUSE, GAME – then **Voice** and **Settings**, like the
 modes on the switch. The tab of the mode the switch is in has a green dot. At the top of each mode's tab is one line:
 **In use** (or a **Use** button to switch to that mode), the mode's settings as short chips, and **⚙ settings**,
 which opens them (click **?** next to a setting for a one-line explanation; settings that do nothing with the
@@ -122,6 +122,7 @@ up to 5 seconds. Each IR code can have its own sound, e.g. IR code 1 "Bubbles" t
 | KEYBOARD | Holds down the chosen key while pressed. With *No USB* set to QUICK or TOPICS it's also a **backup**: see below | purple |
 | CONTROL | Sends the selected IR code, and says its sound if it has one. *IR codes* setting: Selected / Repeat held (keeps sending while held, like a remote's volume button) / Scan (chosen by scanning) | code colour |
 | MOUSE | Clicks the mouse button; head or hand movement moves the pointer. See *MOUSE* below | pink |
+| GAME | A gamepad button; head or hand movement is a thumbstick (USB). Off at first. See *GAME* below | blue |
 | SETTINGS | Keeps doing whatever the previous mode did | as previous mode |
 
 ### Touch-free: the ToF sensor
@@ -191,6 +192,27 @@ with the same pairing as KEYBOARD (on an iPad, if no pointer shows, turn on Assi
 - It doesn't sleep in MOUSE mode.
 - The research and step-by-step plan are in [MOUSE-PLAN.md](MOUSE-PLAN.md).
 
+### GAME: head or hand movement is a gamepad thumbstick
+
+Off at first: SETTINGS **GAME mode: On** adds it (the switch restarts, as USB has to start again with the gamepad).
+Over **USB only**, the stick is then also a gamepad:
+- **On a PC:** it shows in *Set up USB game controllers* (joy.cpl) with no driver. Games that only take Xbox
+  controllers need Steam Input (or similar) to use it.
+- **On an Xbox:** plug it into a USB port on the **Xbox Adaptive Controller**. Its left stick is the XAC's left
+  stick, its right stick the right one. The XAC's USB ports only give a little power unless the XAC has its own
+  power supply; the stick can run on its battery.
+
+How it works:
+- **Calibrate** is the same as MOUSE (shared, so calibrating in either does both). Rest is the thumbstick in the
+  middle; full push comes at about 70% of each side's comfortable range, so a stiff side still gets there.
+- Near rest (*Dead zone*) the thumbstick stays in the middle; *Response* makes it finer near the middle.
+  *Directions: 4 only* pushes straight left, right, up or down. Nods and wrist rolls don't drift (gravity); a head
+  turn settles back to the middle while resting near it.
+- **The switch** is a gamepad button (*Switch button*: A, B, X, Y, LB, RB), held while the switch is.
+- **Pause:** hold A, or **Pause** on the setup page: the thumbstick goes to the middle. Moving again makes where you
+  are the new rest.
+- Not over Bluetooth, and it doesn't sleep in GAME mode.
+
 ### Backup mode: a switch for the AAC device, and a talker when it isn't there
 
 With KEYBOARD's **No USB** set to QUICK or TOPICS, the switch works an AAC device over USB, and when
@@ -208,9 +230,9 @@ The bottom line of the screen always shows what the buttons do right now.
 
 | Button | Does |
 |---|---|
-| **A click** | Next mode (QUICK → TOPICS → KEYBOARD → CONTROL → MOUSE → SETTINGS, skipping modes turned off in *Modes* / *MOUSE mode*). In a mode's settings, an open topic, About or Sensor test: close it |
-| **B click** | Next: Quick message / topic / key / IR code / Calibrate (MOUSE), then the mode's **Settings** item, then back to the first. In an open topic: its next message. In settings: the next setting. B itself is silent, to save battery |
-| **Hold A** | Do it: QUICK – record the selected Quick message (release to stop; if it already has one, the screen says "Hold A again to replace" – hold A again within 4s to record, B keeps it); TOPICS – open the topic, to look through its messages; CONTROL – learn the selected code (remote 30cm+ from the end of the stick, within 8s); MOUSE – pause / move the pointer, or on **Calibrate** start it; on **Settings** – open them; in settings – next value, or open About / Sensor test |
+| **A click** | Next mode (QUICK → TOPICS → KEYBOARD → CONTROL → MOUSE → GAME → SETTINGS, skipping modes turned off in *Modes* / *MOUSE mode* / *GAME mode*). In a mode's settings, an open topic, About or Sensor test: close it |
+| **B click** | Next: Quick message / topic / key / IR code / Calibrate (MOUSE, GAME), then the mode's **Settings** item, then back to the first. In an open topic: its next message. In settings: the next setting. B itself is silent, to save battery |
+| **Hold A** | Do it: QUICK – record the selected Quick message (release to stop; if it already has one, the screen says "Hold A again to replace" – hold A again within 4s to record, B keeps it); TOPICS – open the topic, to look through its messages; CONTROL – learn the selected code (remote 30cm+ from the end of the stick, within 8s); MOUSE, GAME – pause / move the pointer (thumbstick), or on **Calibrate** start it; on **Settings** – open them; in settings – next value, or open About / Sensor test |
 | **Hold B** | Hear it: QUICK – the selected Quick message; an open topic – the message; CONTROL – the code's sound (without sending it); in settings – back a value |
 
 A hold is 0.6s. When the screen is off, the first press of A or B only wakes it; when it's just dim, presses work
@@ -259,6 +281,7 @@ All of these are on the setup page too, on each mode's tab and the Settings tab.
 | General | Volume | 1, 2, **3**, 4 | How loud messages play |
 | General | Modes | **All**, No KEYBOARD, No CONTROL, Talking only | Turn KEYBOARD and/or CONTROL off for a switch that only talks: A skips them, the setup page hides their tabs, and their settings (and the matching Offer settings) go too. Their key and IR codes are kept |
 | General | MOUSE mode | Off, **On** | The MOUSE mode (see above) and its tab on the setup page. Off: A skips it and the tab is hidden |
+| General | GAME mode | **Off**, On | The GAME mode (see above) and its tab. The switch restarts when it changes. Needs USB Mode: USB-OTG (TinyUSB) |
 | General | Press must last | **Instant**, 0.1s, 0.25s, 0.5s, 1s | Filters accidental brushes |
 | General | Ignore repeats for | Off, 0.2s, **0.4s**, 0.8s, 1.5s | Filters tremor and bounces after a press |
 | General (sensor) | Sensor mode | Line, **Move** | Only with a ToF sensor plugged in – see *Touch-free: the ToF sensor* |
@@ -290,12 +313,12 @@ All of these are on the setup page too, on each mode's tab and the Settings tab.
 | QUICK, TOPICS, CONTROL | Stop choice | **Off**, On | Offers "Stop" last, to choose none of them |
 | KEYBOARD | No USB | **Bluetooth**, QUICK, TOPICS | What to do when the switch isn't plugged into a computer or AAC device by USB. *Bluetooth*: send the key over Bluetooth instead. *QUICK* / *TOPICS*: after 10 seconds, talk instead, using that mode – Bluetooth stays off to save battery. Plugging USB back in switches it back to KEYBOARD (see the backup mode above). Only with USB Mode: USB-OTG (TinyUSB) |
 | KEYBOARD | Key action | **Momentary**, Latch | *Momentary* holds the key while the switch is held; *Latch* – one press holds the key down, the next lets it go. The screen says "Key held" and the LED glows brighter while latched |
-| KEYBOARD, CONTROL, MOUSE | Press sound | **Off**, Click, Beep | A sound on each press, as feedback (CONTROL: only for codes with no sound of their own) |
+| KEYBOARD, CONTROL, MOUSE, GAME | Press sound | **Off**, Click, Beep | A sound on each press, as feedback (CONTROL: only for codes with no sound of their own) |
 | CONTROL | IR codes | **Selected**, Repeat held, Scan | See the CONTROL mode above |
 | MOUSE | Pointer style | **Follow**, Tilt | Follow: the pointer moves as you move. Tilt: hold away from rest and it keeps going; back to rest and it stops |
 | MOUSE | Tilt speed | 1–5 (**3**) | Tilt: the fastest the pointer goes |
-| MOUSE | Dead zone | 2°, **4°**, 6°, 9° | Tilt: this close to rest the pointer keeps still |
-| MOUSE | Directions | **Any**, 4 only | Tilt: 4 only moves straight left, right, up or down |
+| MOUSE (Tilt), GAME | Dead zone | 2°, **4°**, 6°, 9° | This close to rest nothing moves (shared) |
+| MOUSE (Tilt), GAME | Directions | **Any**, 4 only | 4 only moves straight left, right, up or down (shared) |
 | MOUSE | Speed left/right, Speed up/down | 1–8 (**4**, **3**) | How fast the pointer moves each way. Calibrate sets them so a full comfortable movement crosses the screen; change them after if needed. The computer's pointer speed also applies |
 | MOUSE | Speed-up | Off, Low, **Medium**, High | Faster movements go further, so slow ones stay precise |
 | MOUSE | Steady | Off, **Low**, Medium, High | Ignores turns slower than this – steadies tremor and drift |
@@ -306,6 +329,9 @@ All of these are on the setup page too, on each mode's tab and the Settings tab.
 | MOUSE | Hold to pause | Off, 1 s, **2 s**, 3 s | Holding the switch this long pauses / moves the pointer; short presses click when let go. Off: the button is held while the switch is (drag) |
 | MOUSE | Clutch | Off, 5°, **10°**, 15° | With Hold to pause on: the pointer keeps still while the switch is held; moving more than this while holding re-lines the head, with no click |
 | MOUSE | Freeze on click | Off, 0.2 s, **0.3 s**, 0.5 s | The pointer keeps still this long when the switch is pressed and let go (and while held, with Hold to pause on) |
+| GAME | Stick | **Left**, Right | Which thumbstick the movement is |
+| GAME | Switch button | **A**, B, X, Y, LB, RB | The gamepad button the switch is, held while the switch is |
+| GAME | Response | Straight, **Gentle**, Very gentle | Gentle: finer near the middle, full at the comfortable limit |
 | MOUSE | Double-click help | **Off**, 0.5 s, 1 s, 1.5 s | After a click the pointer keeps still this long, so a second click lands in the same place |
 
 ### The screen
@@ -359,7 +385,7 @@ The screen says which is in use.
 - **Sleep:** on battery, after the *Sleep after* time with no presses, the StickS3 sleeps – screen, speaker
   and radio off. The switch LED keeps glowing. **The big switch still works:** a press wakes it and does its
   job (a fraction of a second slower than normal). A or B wakes it too.
-  It doesn't sleep in KEYBOARD mode over Bluetooth, because the connection would drop, in MOUSE mode, or with the
+  It doesn't sleep in KEYBOARD mode over Bluetooth, because the connection would drop, in MOUSE or GAME mode, or with the
   ToF sensor, which can't wake it.
 - **Auto power off** (off by default): after the chosen time with no presses it beeps three times and shows
   a warning; 30s later it powers off. Press any button to cancel. Press the power button to turn it back on.

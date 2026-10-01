@@ -119,9 +119,11 @@
 #include "USB.h"
 #include "USBHIDKeyboard.h"
 #include "USBHIDMouse.h"
+#include "USBHIDGamepad.h"
 #define HAS_USB_HID 1
 USBHIDKeyboard UsbKeyboard;
 USBHIDMouse UsbMouse;
+USBHIDGamepad UsbGamepad;  // only started with GAME mode on (see setup)
 #if !ARDUINO_USB_CDC_ON_BOOT
 #error "Set Tools > USB CDC On Boot: Enabled - the setup page talks to the switch over it"
 #endif
@@ -139,7 +141,7 @@ static const int SENSE_GRAPH_W = 224;      // Sensor test graph: one reading per
 // Firmware version. FW_API goes up whenever the setup page needs to change
 // with it (the page shows a warning if the numbers don't match).
 static const char* FW_VERSION = "1 Oct 2026";
-static const int   FW_API     = 8;
+static const int   FW_API     = 9;
 
 // ---------------------------------------------------------------------
 //  Settings you may want to change
@@ -195,19 +197,19 @@ static const int      LOW_BATTERY   = 15;     // warn below this battery %
 // ---------------------------------------------------------------------
 //  Modes and keys
 // ---------------------------------------------------------------------
-enum Mode : uint8_t { M_SPEAK, M_CHOOSE, M_KEYBOARD, M_IR, M_MOUSE, M_SETTINGS, M_COUNT };
-static const char* MODE_NAMES[M_COUNT] = {"QUICK", "TOPICS", "KEYBOARD", "CONTROL", "MOUSE", "SETTINGS"};
+enum Mode : uint8_t { M_SPEAK, M_CHOOSE, M_KEYBOARD, M_IR, M_MOUSE, M_GAME, M_SETTINGS, M_COUNT };
+static const char* MODE_NAMES[M_COUNT] = {"QUICK", "TOPICS", "KEYBOARD", "CONTROL", "MOUSE", "GAME", "SETTINGS"};
 // Mode colours for the switch LED (dim idle glow)
 static const uint8_t MODE_RGB[M_COUNT][3] = {
-  {0, 40, 0}, {0, 30, 40}, {30, 0, 40}, {40, 20, 0}, {40, 0, 20}, {0, 0, 0}
+  {0, 40, 0}, {0, 30, 40}, {30, 0, 40}, {40, 20, 0}, {40, 0, 20}, {0, 10, 40}, {0, 0, 0}
 };
 // QUICK, TOPICS and IR: the LED shows which message / topic / code it's on
 static const uint8_t SLOT_RGB[NUM_SLOTS][3] = {{0, 40, 0}, {0, 25, 40}, {30, 0, 40}, {40, 20, 0}};
 // Mode colours for the screen header, and whether it needs dark text
 static const uint8_t SCREEN_RGB[M_COUNT][3] = {
-  {0, 160, 70}, {0, 140, 160}, {140, 60, 220}, {240, 130, 0}, {210, 40, 110}, {90, 90, 90}
+  {0, 160, 70}, {0, 140, 160}, {140, 60, 220}, {240, 130, 0}, {210, 40, 110}, {30, 90, 220}, {90, 90, 90}
 };
-static const bool HEADER_DARK_TEXT[M_COUNT] = {false, false, false, true, false, false};
+static const bool HEADER_DARK_TEXT[M_COUNT] = {false, false, false, true, false, false, false};
 
 enum KbOut : uint8_t { OUT_NONE, OUT_BLE, OUT_USB };  // where keyboard presses go
 enum MouseCal : uint8_t { MC_NONE, MC_REST, MC_RIGHT, MC_LEFT, MC_DOWN, MC_UP };  // MOUSE calibration step
@@ -232,14 +234,15 @@ static const int NUM_KEYS = sizeof(KEYS) / sizeof(KEYS[0]);
 //  and remembered after power-off. Each has a fixed list of choices.
 // ---------------------------------------------------------------------
 enum SettingId : uint8_t {
-  S_VOLUME, S_MODES, S_MOUSE_ON, S_SPEAK_CHOOSE, S_QUICK_HOW, S_GAP, S_PLAY, S_HOLD, S_CHOOSE_FROM, S_OFFER_QUICK, S_OFFER_CONTROL, S_OFFER_DEVICE, S_IR_CHOOSE, S_ACCESS, S_SCAN_SPEED, S_SCAN_ROUNDS, S_STOP,
+  S_VOLUME, S_MODES, S_MOUSE_ON, S_GAME_ON, S_SPEAK_CHOOSE, S_QUICK_HOW, S_GAP, S_PLAY, S_HOLD, S_CHOOSE_FROM, S_OFFER_QUICK, S_OFFER_CONTROL, S_OFFER_DEVICE, S_IR_CHOOSE, S_ACCESS, S_SCAN_SPEED, S_SCAN_ROUNDS, S_STOP,
   S_KEY_ACTION, S_PRESS_SOUND, S_NO_USB,
   S_M_STYLE, S_M_SPEED, S_M_SPEEDY, S_M_ACCEL, S_M_TSPEED, S_M_DEAD, S_M_DIRS, S_M_STEADY, S_M_SMOOTH, S_M_DWELL, S_M_AREA, S_M_SWITCH, S_M_HOLD, S_M_CLUTCH, S_M_FREEZE, S_M_DOUBLE,
+  S_G_STICK, S_G_BUTTON, S_G_CURVE,
   S_ACCEPT, S_LOCKOUT, S_SENSE_MODE, S_SENSE_LINE, S_SENSE_MOVE, S_SETTLE, S_FOLLOW, S_BEYOND, S_SENSE_TEST, S_BRIGHT, S_WAKE, S_SLEEP, S_AUTOOFF, S_LOUD, S_FORGET, S_ABOUT,
   S_COUNT
 };
 // Which settings screens a setting appears on (a setting can be on several)
-enum SettingGroup : uint8_t { G_GENERAL = 1, G_SPEAK = 2, G_CHOOSE = 4, G_KEYBOARD = 8, G_IR = 16, G_MOUSE = 32 };
+enum SettingGroup : uint8_t { G_GENERAL = 1, G_SPEAK = 2, G_CHOOSE = 4, G_KEYBOARD = 8, G_IR = 16, G_MOUSE = 32, G_GAME = 64 };
 struct Setting {
   const char* name;       // shown on screen
   const char* key;        // Preferences key (nullptr = an action, not a stored value)
@@ -254,6 +257,9 @@ static const Setting SETTINGS[S_COUNT] = {
   {"Modes",               "s_modes",   4, 0, {0, 1, 2, 3}, {"All", "No KEYBOARD", "No CONTROL", "Talking only"}, G_GENERAL},
   // MOUSE mode (the motion sensor moves the pointer); Off hides it
   {"MOUSE mode",          "s_mouse",   2, 1, {0, 1}, {"Off", "On"}, G_GENERAL},
+  // GAME: movement is a USB gamepad's thumbstick (PC, or Xbox through the Adaptive
+  // Controller). Changing it restarts the switch, as USB has to start again.
+  {"GAME mode",           "s_game",    2, 0, {0, 1}, {"Off", "On"}, G_GENERAL},
   // QUICK "Plays": the selected Quick message, or one is chosen (scanning or counting presses)
   {"Plays",               "s_spkmode", 2, 0, {0, 1}, {"Selected", "Choose one"}, G_SPEAK},
   // QUICK, Choose one: how - scanning (Press twice / Hold & release, as TOPICS
@@ -287,7 +293,7 @@ static const Setting SETTINGS[S_COUNT] = {
   // holds the key down, the next press lets it go
   {"Key action",          "s_keyact",  2, 0, {0, 1}, {"Momentary", "Latch"}, G_KEYBOARD},
   // KEYBOARD and IR: a sound on each student press (they're silent otherwise)
-  {"Press sound",         "s_psound",  3, 0, {0, 1, 2}, {"Off", "Click", "Beep"}, G_KEYBOARD | G_IR | G_MOUSE},
+  {"Press sound",         "s_psound",  3, 0, {0, 1, 2}, {"Off", "Click", "Beep"}, G_KEYBOARD | G_IR | G_MOUSE | G_GAME},
   // KEYBOARD with no USB connection: keys go over Bluetooth, or the switch
   // talks instead (backup mode, Bluetooth off) until USB is back
   {"No USB",              "s_nousb",   3, 0, {0, 1, 2}, {"Bluetooth", "QUICK", "TOPICS"}, G_KEYBOARD},
@@ -303,9 +309,9 @@ static const Setting SETTINGS[S_COUNT] = {
   // Tilt: the top speed (counts/s), reached at MS_TILT_FULL of the comfortable range
   {"Tilt speed",          "m_tspeed",  5, 2, {300, 500, 800, 1200, 1800}, {"1", "2", "3", "4", "5"}, G_MOUSE},
   // Tilt: this close to rest (deg) the pointer doesn't move
-  {"Dead zone",           "m_dead",    4, 1, {2, 4, 6, 9}, {"2 deg", "4 deg", "6 deg", "9 deg"}, G_MOUSE},
+  {"Dead zone",           "m_dead",    4, 1, {2, 4, 6, 9}, {"2 deg", "4 deg", "6 deg", "9 deg"}, G_MOUSE | G_GAME},
   // Tilt: 4 only = straight left, right, up or down (whichever is tipped most), for less control
-  {"Directions",          "m_dirs",    2, 0, {0, 1}, {"Any", "4 only"}, G_MOUSE},
+  {"Directions",          "m_dirs",    2, 0, {0, 1}, {"Any", "4 only"}, G_MOUSE | G_GAME},
   // turns slower than this are ignored (tenths of a deg/s): steadies tremor and drift
   {"Steady",              "m_steady",  4, 1, {0, 15, 30, 60}, {"Off", "Low", "Medium", "High"}, G_MOUSE},
   // smooths out shakes (time constant, ms), at the cost of a little lag
@@ -328,6 +334,12 @@ static const Setting SETTINGS[S_COUNT] = {
   // after a click the pointer keeps still this long, so a second click lands in the
   // same place (ms). Not after the second one
   {"Double-click help",   "m_double",  4, 0, {0, 500, 1000, 1500}, {"Off", "0.5 s", "1 s", "1.5 s"}, G_MOUSE},
+  // GAME: which thumbstick the movement is (XAC: left = X/Y, right = Z/Rz)
+  {"Stick",               "g_stick",   2, 0, {0, 1}, {"Left", "Right"}, G_GAME},
+  // GAME: the gamepad button the big switch is, held while the switch is (core button numbers)
+  {"Switch button",       "g_button",  6, 0, {0, 1, 3, 4, 6, 7}, {"A", "B", "X", "Y", "LB", "RB"}, G_GAME},
+  // GAME: how the stick follows movement (power x10): Straight, or gentler near the middle
+  {"Response",            "g_curve",   3, 1, {10, 15, 22}, {"Straight", "Gentle", "Very gentle"}, G_GAME},
   // press must be held this long to count - filters accidental brushes
   {"Press must last",     "s_accept",  5, 0, {0, 100, 250, 500, 1000}, {"Instant", "0.1 s", "0.25 s", "0.5 s", "1 s"}, G_GENERAL},
   // ignore new presses this soon after the last one - filters tremor/repeats
@@ -474,6 +486,8 @@ void drawScreen();  // defined in the Display section
 bool inSettings() { return mode == M_SETTINGS; }         // the general SETTINGS mode
 bool settingsView() { return inSettings() || modeSettingsOpen; }
 uint8_t studentMode() { return inSettings() ? prevMode : mode; }
+// MOUSE and GAME share the motion sensor: calibration, angles, pause
+bool motionMode(uint8_t m) { return m == M_MOUSE || m == M_GAME; }
 
 // LED colour for a choice being offered
 const uint8_t* scanColour(const ScanItem& it) {
@@ -567,6 +581,7 @@ void loadSettings() {
     settingChoice[i] = prefs.getUChar(SETTINGS[i].key, SETTINGS[i].def);
     if (settingChoice[i] >= SETTINGS[i].count) settingChoice[i] = SETTINGS[i].def;
   }
+  if (!modeOn(mode)) mode = M_SPEAK;
   // older firmware's "Choose from": Quick msgs / A topic / Topics. Scanning the
   // Quick messages is now QUICK's "Messages: Student scans".
   if (prefs.isKey("s_choose")) {
@@ -1150,6 +1165,7 @@ bool modeOn(uint8_t m) {
   if (m == M_KEYBOARD) return c == 0 || c == 2;
   if (m == M_IR) return c == 0 || c == 1;
   if (m == M_MOUSE) return setting(S_MOUSE_ON);
+  if (m == M_GAME) return HAS_USB_HID && setting(S_GAME_ON);
   return true;
 }
 // Bluetooth is for KEYBOARD and MOUSE (pairing is shared: one keyboard + mouse)
@@ -1328,6 +1344,10 @@ float    mGrav[3] = {0, 0, 1};    // gravity now (smoothed, g)
 float    mRestG[3] = {0, 0, 1};   // ...where the angles are 0 (unit)
 uint32_t mFreezeUntil = 0;     // Freeze on click / Double-click help: the pointer keeps still until then
 uint32_t mLastClick = 0;       // Double-click help: when the last click was
+bool     gamepadOn = false;    // GAME mode was on at start, so the stick is also a USB gamepad
+uint32_t gameRestartAt = 0;    // GAME mode turned on/off: restart then
+int8_t   gX = 0, gY = 0;       // GAME: the thumbstick (-127..127, right and down +)
+bool     gPressed = false;     // ...the switch's button
 float    mHoldAngX = 0, mHoldAngY = 0;  // Clutch: where the head was when the switch went down
 bool     mClutch = false;      // ...this press moved: letting go doesn't click (or pause)
 bool     mDwellArmed = false;
@@ -1631,6 +1651,55 @@ float mouseTiltSpeed(float ang, float rangePos, float rangeNeg) {
   return ang < 0 ? -f : f;
 }
 
+// GAME: angle from rest -> thumbstick (-1..1): 0 in the dead zone, full at MS_TILT_FULL
+// of that side's comfortable range, with the Response curve between.
+float gameAxis(float ang, float rangePos, float rangeNeg) {
+  const float dead = setting(S_M_DEAD), full = max((ang > 0 ? rangePos : rangeNeg) * MS_TILT_FULL, dead + 2);
+  float f = constrain((fabsf(ang) - dead) / (full - dead), 0.0f, 1.0f);
+  f = powf(f, setting(S_G_CURVE) / 10.0f);
+  return ang < 0 ? -f : f;
+}
+
+void gameStick() {
+  float x = gameAxis(mAngX, mRange[0], mRange[1]), y = gameAxis(mAngY, mRange[2], mRange[3]);
+  if (setting(S_M_DIRS) == 1) { if (fabsf(x) >= fabsf(y)) y = 0; else x = 0; }  // 4 only
+  if (mPaused) x = y = 0;
+  gX = (int8_t)lroundf(x * 127); gY = (int8_t)lroundf(y * 127);
+}
+
+// The gamepad report, when something changed (the button at once, the stick at most every MS_SEND_MS).
+void gameSend() {
+#if HAS_USB_HID
+  static int8_t sx = 0, sy = 0;
+  static bool sb = false;
+  static uint32_t last = 0;
+  if (!gamepadOn || !usbHostActive()) return;
+  if (gX == sx && gY == sy && gPressed == sb) return;
+  if (gPressed == sb && millis() - last < MS_SEND_MS) return;
+  last = millis();
+  if (gX != sx || gY != sy) markActivity();  // moving counts as using it (auto power-off)
+  sx = gX; sy = gY; sb = gPressed;
+  const bool right = setting(S_G_STICK) == 1;
+  UsbGamepad.send(right ? 0 : gX, right ? 0 : gY, right ? gX : 0, right ? gY : 0, 0, 0, HAT_CENTER,
+                  gPressed ? 1UL << setting(S_G_BUTTON) : 0);
+#endif
+}
+
+// GAME: centre the stick and let go of the button (pause, leaving GAME).
+void gameRelease() {
+  if (!gX && !gY && !gPressed) return;
+  gX = gY = 0;
+  gPressed = false;
+  gameSend();
+}
+
+// Big switch in GAME: the button is held while the switch is.
+void gameSwitch(bool down) {
+  gPressed = down;
+  if (down) pressSound();
+  gameSend();
+}
+
 void mouseMoveSample(const float* g, const float* a, float dt) {
   float w[3] = {g[0] - mBias[0], g[1] - mBias[1], g[2] - mBias[2]};
   // keep correcting the zero point while really still (drift)
@@ -1653,8 +1722,8 @@ void mouseMoveSample(const float* g, const float* a, float dt) {
     if (wx > 0.3f) mAngX += (gx - mAngX) * kc * wx * wx;
     if (wy > 0.3f) mAngY += (gy - mAngY) * kc * wy * wy;
   }
-  const bool tilt = setting(S_M_STYLE) == 1;
-  if (tilt && mStillSince) {  // Tilt, still near rest: what gravity can't see drifts back to rest
+  const bool game = studentMode() == M_GAME, tilt = !game && setting(S_M_STYLE) == 1;
+  if ((tilt || game) && mStillSince) {  // Tilt, still near rest: what gravity can't see drifts back to rest
     const float dead = setting(S_M_DEAD), kl = min(1.0f, dt / MS_LEAK_TAU);
     if (wx <= 0.3f && fabsf(mAngX) < dead) mAngX -= mAngX * kl;
     if (wy <= 0.3f && fabsf(mAngY) < dead) mAngY -= mAngY * kl;
@@ -1663,6 +1732,7 @@ void mouseMoveSample(const float* g, const float* a, float dt) {
   const float k = tau > 0 ? dt / (tau + dt) : 1.0f;
   mRateX += (x - mRateX) * k;
   mRateY += (y - mRateY) * k;
+  if (game) { gameStick(); return; }
   if (swStable && !mClutch && !mPaused && mouseClutchOn()) {  // moved far enough while holding: a clutch
     const float cx = mAngX - mHoldAngX, cy = mAngY - mHoldAngY, lim = setting(S_M_CLUTCH);
     if (cx * cx + cy * cy > lim * lim) { mClutch = true; M5.Speaker.tone(600, 40); needRedraw = true; }
@@ -1743,6 +1813,7 @@ void mouseStart() {
 }
 
 void mouseStop() {
+  gameRelease();
   mCal = MC_NONE;
   mouseButton(mButtons, false);
   mAccX = mAccY = 0;
@@ -1774,7 +1845,9 @@ void mouseStream(uint32_t now) {
 }
 
 void updateMouse(uint32_t now) {
-  const bool on = studentMode() == M_MOUSE;
+  const bool on = motionMode(studentMode());
+  if (studentMode() != M_GAME) gameRelease();  // MOUSE <-> GAME without stopping
+  if (gameRestartAt && (int32_t)(now - gameRestartAt) >= 0) ESP.restart();
   if (on != mRunning) {
     mRunning = on;
     if (on) mouseStart(); else mouseStop();
@@ -1791,6 +1864,7 @@ void updateMouse(uint32_t now) {
   }
   mouseStream(now);
   if (mCal != MC_NONE) return;
+  if (studentMode() == M_GAME) { gameSend(); return; }
   mouseSendMovement();
   mouseDwell();
   static uint32_t lastBar = 0;  // the dwell bar on screen
@@ -2089,7 +2163,7 @@ void drawMain(lgfx::LovyanGFX& c) {
                               + (slotLen[snd] ? " - hold B to hear" : ""));
       break;
     }
-    case M_MOUSE: {
+    case M_MOUSE: case M_GAME: {
       if (mCal >= MC_RIGHT) {  // Right, Left, Down, Up: how far so far
         line1(c, MS_STEP_NAMES[mCal]);
         line2(c, "As far as is comfortable", C_DO);
@@ -2105,6 +2179,16 @@ void drawMain(lgfx::LovyanGFX& c) {
       if (!mHaveAxes) {
         line1(c, "Not calibrated", C_PROBLEM);
         line2(c, "B, then hold A to calibrate", C_DO);
+        break;
+      }
+      if (mode == M_GAME) {
+        line1(c, mPaused ? "Paused" : "Playing");
+        if (!gamepadOn) line2(c, "Restart to use", C_PROBLEM);
+        else if (!usbHostActive()) line2(c, "Plug into USB", C_PROBLEM);
+        else if (mPaused) line2(c, "Hold A to move", C_DO);
+        else line2(c, "Gamepad by USB", C_READY);
+        line3(c, String(SETTINGS[S_G_STICK].labels[settingChoice[S_G_STICK]]) + " stick - switch "
+                 + SETTINGS[S_G_BUTTON].labels[settingChoice[S_G_BUTTON]]);
         break;
       }
       KbOut o = kbOutput();
@@ -2216,7 +2300,7 @@ void drawStatus(lgfx::LovyanGFX& c) {
 
 // The settings shown now: general SETTINGS, or the open mode's own.
 uint8_t settingsMask() {
-  static const uint8_t MASK[M_COUNT] = {G_SPEAK, G_CHOOSE, G_KEYBOARD, G_IR, G_MOUSE, G_GENERAL};
+  static const uint8_t MASK[M_COUNT] = {G_SPEAK, G_CHOOSE, G_KEYBOARD, G_IR, G_MOUSE, G_GAME, G_GENERAL};
   return MASK[mode];
 }
 
@@ -2240,7 +2324,9 @@ bool settingShown(int i) {
     case S_FORGET: return bluetoothUsed();  // Bluetooth is only for KEYBOARD and MOUSE
     case S_M_AREA: return setting(S_M_DWELL) > 0;
     case S_M_SPEED: case S_M_SPEEDY: case S_M_ACCEL: case S_M_STEADY: case S_M_SMOOTH: return setting(S_M_STYLE) == 0;
-    case S_M_TSPEED: case S_M_DEAD: case S_M_DIRS: return setting(S_M_STYLE) == 1;
+    case S_M_TSPEED: return setting(S_M_STYLE) == 1;
+    case S_M_DEAD: case S_M_DIRS: return mode == M_GAME || setting(S_M_STYLE) == 1;
+    case S_GAME_ON: return HAS_USB_HID;  // a USB gamepad needs USB Mode: USB-OTG (TinyUSB)
     case S_M_CLUTCH: return setting(S_M_HOLD) > 0;
     case S_SENSE_MODE: return sensorOn;
     case S_SENSE_LINE: return sensorOn && !senseMove();
@@ -2286,7 +2372,7 @@ String buttonGuide() {
     case M_CHOOSE: return topicOpen ? "B next  hold B hear  A close" : "B next topic  hold A open  A mode";
     case M_KEYBOARD: return "B next key  A mode";
     case M_IR: return "B next code  hold A learn  A mode";
-    case M_MOUSE: return mouseItem == 1 ? "B next  hold A start  A mode"
+    case M_MOUSE: case M_GAME: return mouseItem == 1 ? "B next  hold A start  A mode"
                        : mPaused ? "B next  hold A move  A mode" : "B next  hold A pause  A mode";
   }
   return "A mode";
@@ -2392,7 +2478,7 @@ bool canSleep(uint32_t idle) {
   if (sensorOn) return false;  // the sensor can't wake it (no spare wire on the Grove port)
   uint32_t mins = setting(S_SLEEP);
   if (!mins || idle < mins * 60000UL) return false;
-  if (bleRunning || studentMode() == M_KEYBOARD || studentMode() == M_MOUSE) return false;
+  if (bleRunning || studentMode() == M_KEYBOARD || motionMode(studentMode())) return false;
   if (swStable || swActive || M5.BtnA.isPressed() || M5.BtnB.isPressed()) return false;
   if (M5.Speaker.isPlaying() || scanning) return false;
   return true;
@@ -2727,6 +2813,9 @@ void onActivate() {
       if (mCal == MC_NONE) mouseSwitch(true);
       else mHoldUsed = true;  // while calibrating: letting go doesn't click either
       break;
+    case M_GAME:
+      if (mCal == MC_NONE) gameSwitch(true);
+      break;
   }
   needRedraw = true;
 }
@@ -2757,6 +2846,7 @@ void onDeactivate() {
   if (scanModeActive()) { scanDeactivate(); return; }
   if (studentMode() == M_KEYBOARD && !keyLatched) sendKey(false);
   if (studentMode() == M_MOUSE && mCal == MC_NONE) mouseSwitch(false);
+  if (studentMode() == M_GAME) gameSwitch(false);
   // Hold to play: letting go stops the message
   if (setting(S_PLAY) == PLAY_HOLD && studentMode() == M_SPEAK && speakPick()) M5.Speaker.stop(0);
 }
@@ -2768,7 +2858,7 @@ void pollStudentSwitch() {
   if (now - swRawChange >= DEBOUNCE_MS && swRaw != swStable) {
     swStable = swRaw;
     needRedraw = true;
-    if (mRunning && mCal == MC_NONE) mouseSwitchEdge(swStable);
+    if (mRunning && mCal == MC_NONE && studentMode() == M_MOUSE) mouseSwitchEdge(swStable);
     if (swStable) {
       swPressStart = now;
       swPending = true;
@@ -2831,7 +2921,11 @@ void settingChanged(int i) {
     prefs.putUChar(SETTINGS[S_ACCESS].key, settingChoice[S_ACCESS]);
   }
   if (i == S_M_SWITCH || i == S_M_HOLD) mouseButton(mButtons, false);
-  if (i == S_MODES || i == S_MOUSE_ON) {
+  if (i == S_GAME_ON) {  // the gamepad is only in the USB device from the start
+    setStatus("Restarting\nfor GAME mode", TFT_ORANGE);
+    gameRestartAt = millis() + 1500;
+  }
+  if (i == S_MODES || i == S_MOUSE_ON || i == S_GAME_ON) {
     stopScan();
     scanInGroup = false;
     if (!modeOn(prevMode)) prevMode = M_SPEAK;
@@ -2889,7 +2983,7 @@ void nextItem() {
       case M_CHOOSE: scanInGroup = false; group = 0; break;
       case M_KEYBOARD: releaseKey(); keyIdx = 0; break;
       case M_IR: irSlot = 0; break;
-      case M_MOUSE: mouseItem = 0; break;
+      case M_MOUSE: case M_GAME: mouseItem = 0; break;
     }
   } else {
     switch (mode) {
@@ -2914,7 +3008,7 @@ void nextItem() {
       case M_IR:
         if (irSlot == NUM_SLOTS - 1) gateShown = true; else irSlot++;
         break;
-      case M_MOUSE:  // the pointer, then Calibrate
+      case M_MOUSE: case M_GAME:  // the pointer (stick), then Calibrate
         if (mouseItem == 1) gateShown = true; else mouseItem++;
         break;
     }
@@ -2964,7 +3058,7 @@ void pollStaffButtons() {
     } else if (mode == M_CHOOSE && !topicOpen) {  // open the topic to look through its messages
       for (int k = 0; k < PER_TOPIC; k++)
         if (slotLen[topicMsg(group, k)]) { topicOpen = true; topicItem = k; break; }
-    } else if (mode == M_MOUSE) {  // Calibrate, or pause / move the pointer
+    } else if (motionMode(mode)) {  // Calibrate, or pause / move the pointer
       if (mouseItem == 1) { mouseItem = 0; mouseStartCal(true); }
       else if (mCal == MC_NONE && mHaveAxes) mousePause(!mPaused);
     } else if (mode == M_IR) {
@@ -3049,7 +3143,7 @@ void sendInfo() {
        + ",\"irSlot\":" + String(irSlot);
   j += ",\"key\":" + String(keyIdx) + ",\"vol\":" + String(settingChoice[S_VOLUME]) + ",\"vols\":" + String(sizeof(VOLUMES));
   j += ",\"bat\":" + String(batLevel) + ",\"chg\":" + yes(batCharging) + ",\"bt\":" + yes(bleConnected);
-  j += ",\"usbhid\":" + yes(HAS_USB_HID) + ",\"sensor\":" + yes(sensorOn);
+  j += ",\"usbhid\":" + yes(HAS_USB_HID) + ",\"gamepad\":" + yes(gamepadOn) + ",\"sensor\":" + yes(sensorOn);
   j += ",\"ver\":" + jsonStr(FW_VERSION) + ",\"api\":" + String(FW_API) + ",\"presses\":" + String(pressCount);
   j += ",\"fsUsed\":" + String((unsigned long)fsUsed()) + ",\"fsTotal\":" + String((unsigned long)LittleFS.totalBytes());
   j += ",\"voice\":" + jsonStr(voiceId) + ",\"vspeed\":" + jsonStr(voiceSpeed);
@@ -3319,14 +3413,14 @@ void handleCommand(String line) {
     reply();
   } else if (cmd == "MCAL") {
     // MCAL: calibrate MOUSE (Keep still, then Right, Left, Down, Up), as B to Calibrate + hold A
-    if (!mRunning) return reply("the switch isn't in MOUSE mode");
+    if (!mRunning) return reply("the switch isn't in MOUSE or GAME mode");
     wakeScreen();
     mouseItem = 0;
     mouseStartCal(true);
     reply();
   } else if (cmd == "MPAUSE") {
     // MPAUSE 1 / 0: pause / move the pointer
-    if (!mRunning) return reply("the switch isn't in MOUSE mode");
+    if (!mRunning) return reply("the switch isn't in MOUSE or GAME mode");
     mousePause(n != 0);
     reply();
   } else if (cmd == "MSTREAM") {
@@ -3433,6 +3527,8 @@ void setup() {
   USB.onEvent(onUsbEvent);
   UsbKeyboard.begin();
   UsbMouse.begin();
+  gamepadOn = setting(S_GAME_ON);  // the gamepad only when GAME is on (games see no idle gamepad otherwise)
+  if (gamepadOn) UsbGamepad.begin();
   USB.begin();
 #endif
 
