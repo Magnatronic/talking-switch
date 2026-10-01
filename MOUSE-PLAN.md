@@ -13,7 +13,7 @@ New ideas can be tried in `MouseTest/` first.
 |---|---|---|
 | 1 | MOUSE mode in ChatterSwitch (from MouseTest), hold to pause, setup page tab | **Done, tested 30 Sep 2026** (commits 369e680, a447b3f; on by default) |
 | 2 | Training on the user's own movements, speeds set by Calibrate, live picture on the page | **Built 30 Sep–1 Oct 2026, to test** (no turn limit, see below) |
-| 3 | Freeze on click, double-click help, ignore jerks, Centre | Planned |
+| 3 | Freeze on click, double-click help, clutch, ignore jerks, Centre | Freeze on click, double-click help, clutch **built 1 Oct 2026, to test**; the rest planned |
 | 4 | Tilt (joystick) style for very small movements | Planned |
 | 5 | True screen position (absolute pointer) | Only if 2–4 aren't enough |
 | 6 | GAME mode: movement as a thumbstick, for PC and Xbox | Planned, after step 4 |
@@ -145,10 +145,25 @@ turning past the edge and back should no longer leave the user looking sideways.
 
 ## Step 3 – filters
 
-- **Freeze on click:** ignore movement for a moment (about 0.3 s) when the switch is pressed, so the press doesn't jog the pointer.
-- **Double-click help** (Quha's "double-click assistant"): after a click the pointer stays still for a short time
-  (setting, e.g. Off / 0.5 / 1 s), so a second click lands in the same place. It doesn't double-click by itself.
-  Could share a setting with freeze on click.
+- **Freeze on click (built 1 Oct 2026):** setting *Freeze on click* (`m_freeze`: Off, 0.2, **0.3**, 0.5 s).
+  The pointer keeps still that long after the switch goes down and after it comes up (`mouseFreeze()`, called on
+  the debounced change, before *Press must last*, since the jog comes with the press). With *Hold to pause* on, it
+  also keeps still the whole time the switch is held (the click comes on letting go, so it lands where pressed).
+  Movement not sent yet is dropped; the smoothing and the live picture keep running. FW_API / PAGE_API = 7.
+- **Double-click help (built 1 Oct 2026)** (Quha's "double-click assistant"): setting *Double-click help*
+  (`m_double`: **Off**, 0.5, 1, 1.5 s). After a click (switch or dwell, `mouseClicked()`) the pointer keeps still
+  that long, so a second click lands in the same place. It doesn't double-click by itself. A click within the time
+  (+0.3 s) is the second one and doesn't hold the pointer again. Kept separate from freeze on click: that one is
+  short and for every press, this one longer and only wanted by some.
+- **Clutch (built 1 Oct 2026):** the switch works like lifting a mouse off the desk. Setting *Clutch* (`m_clutch`:
+  Off, 5°, **10°**, 15°), only with *Hold to pause* on (Off holds the button to drag). While the switch is held the
+  pointer keeps still. If the head moves further than the setting from where it was when the switch went down
+  (straight-line angle, so tremor doesn't add up), it is a clutch: a low note (600 Hz), no click on letting go, and
+  no Hold to pause. Re-centring is then one natural move: hold, look back at the pointer, let go. It also lets a
+  small or one-sided range step across the screen. Found in no head mouse (Quha and GlassOuse use edge pushes or
+  gestures). `mouseSwitchEdge()` on the debounced change; letting go clears the smoothing so the move doesn't leak.
+  **To test:** whether people who move while pressing lose clicks (then a bigger setting, or size it from the
+  Keep still wobble).
 - **Ignore jerks:** a sudden movement faster than a limit (a spasm) is ignored.
 - **Centre:** put the pointer in the middle of the screen. The stick doesn't know where the pointer is, so: push it
   hard into the top-left corner, then move it half of `MS_SPAN_X` / `MS_SPAN_Y` (the computer's pointer speed

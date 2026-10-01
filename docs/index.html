@@ -782,7 +782,7 @@ function renderEditor(i) {
 
 // ---------------------------------------------------------------- about
 // The firmware's FW_API this page is made for (see TalkingSwitch.ino).
-const PAGE_API = 6;
+const PAGE_API = 7;
 function storageFull() { return info.fsTotal && info.fsUsed / info.fsTotal >= 0.9; }
 
 function renderAbout() {
@@ -1053,6 +1053,9 @@ const HELP = {
   m_area: 'How far the pointer may wander and still count as in one place.',
   m_switch: 'The mouse button the switch presses.',
   m_hold: 'Holding the switch this long pauses the pointer, or starts it again. A short press clicks when let go. Off: the button is held while the switch is, to drag.',
+  m_clutch: 'Holding the switch keeps the pointer still. Turn back to look at it while holding, then let go: head and pointer are in line again, with no click. Moving less than this is still a click.',
+  m_freeze: 'The pointer keeps still this long when the switch is pressed and let go, so pressing doesn’t move it. With Hold to pause on, it also keeps still while the switch is held.',
+  m_double: 'After a click the pointer keeps still this long, so a second click lands in the same place for a double-click.',
   s_bright: 'Screen brightness in use. Low saves battery.',
   s_accept: 'A press must last this long to count – filters brushes.',
   s_lockout: 'Presses this soon after the last are ignored – filters tremor and bounces.',
@@ -1087,7 +1090,7 @@ const TAB_SETTINGS = {  // [setting, shown only when]
   control: [['s_irmode'], ['s_access', irScanning], ['s_scanspd', irScanning],
     ['s_scanrnd', () => irScanning() && pressTwice()], ['s_stop', irScanning], ['s_psound']],
   mouse: [['m_spdx'], ['m_spdy'], ['m_accel'], ['m_steady'], ['m_smooth'], ['m_dwell'], ['m_area', () => setCur('m_dwell') > 0],
-    ['m_switch'], ['m_hold'], ['s_psound']],
+    ['m_switch'], ['m_hold'], ['m_clutch', () => setCur('m_hold') > 0], ['m_freeze'], ['m_double'], ['s_psound']],
 };
 function visibleSettings(tab) {
   return (TAB_SETTINGS[tab] || []).filter(([, when]) => !when || when()).map(([k]) => k);

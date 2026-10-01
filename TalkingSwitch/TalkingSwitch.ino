@@ -138,8 +138,8 @@ static const int SENSE_GRAPH_W = 224;      // Sensor test graph: one reading per
 
 // Firmware version. FW_API goes up whenever the setup page needs to change
 // with it (the page shows a warning if the numbers don't match).
-static const char* FW_VERSION = "30 Sep 2026";
-static const int   FW_API     = 6;
+static const char* FW_VERSION = "1 Oct 2026";
+static const int   FW_API     = 7;
 
 // ---------------------------------------------------------------------
 //  Settings you may want to change
@@ -234,7 +234,7 @@ static const int NUM_KEYS = sizeof(KEYS) / sizeof(KEYS[0]);
 enum SettingId : uint8_t {
   S_VOLUME, S_MODES, S_MOUSE_ON, S_SPEAK_CHOOSE, S_QUICK_HOW, S_GAP, S_PLAY, S_HOLD, S_CHOOSE_FROM, S_OFFER_QUICK, S_OFFER_CONTROL, S_OFFER_DEVICE, S_IR_CHOOSE, S_ACCESS, S_SCAN_SPEED, S_SCAN_ROUNDS, S_STOP,
   S_KEY_ACTION, S_PRESS_SOUND, S_NO_USB,
-  S_M_SPEED, S_M_SPEEDY, S_M_ACCEL, S_M_STEADY, S_M_SMOOTH, S_M_DWELL, S_M_AREA, S_M_SWITCH, S_M_HOLD,
+  S_M_SPEED, S_M_SPEEDY, S_M_ACCEL, S_M_STEADY, S_M_SMOOTH, S_M_DWELL, S_M_AREA, S_M_SWITCH, S_M_HOLD, S_M_CLUTCH, S_M_FREEZE, S_M_DOUBLE,
   S_ACCEPT, S_LOCKOUT, S_SENSE_MODE, S_SENSE_LINE, S_SENSE_MOVE, S_SETTLE, S_FOLLOW, S_BEYOND, S_SENSE_TEST, S_BRIGHT, S_WAKE, S_SLEEP, S_AUTOOFF, S_LOUD, S_FORGET, S_ABOUT,
   S_COUNT
 };
@@ -310,6 +310,15 @@ static const Setting SETTINGS[S_COUNT] = {
   // holding the switch this long pauses / moves the pointer; then presses click
   // when let go. Off: the button is held while the switch is (to drag)
   {"Hold to pause",       "m_hold",    4, 2, {0, 1000, 2000, 3000}, {"Off", "1 s", "2 s", "3 s"}, G_MOUSE},
+  // with Hold to pause on: the pointer keeps still while the switch is held; moving
+  // further than this (deg) while holding lines the head up again, with no click
+  {"Clutch",              "m_clutch",  4, 2, {0, 5, 10, 15}, {"Off", "5 deg", "10 deg", "15 deg"}, G_MOUSE},
+  // the pointer keeps still this long after the switch goes down or up (ms), so a
+  // press doesn't jog it. With Hold to pause on, also all the time the switch is held
+  {"Freeze on click",     "m_freeze",  4, 2, {0, 200, 300, 500}, {"Off", "0.2 s", "0.3 s", "0.5 s"}, G_MOUSE},
+  // after a click the pointer keeps still this long, so a second click lands in the
+  // same place (ms). Not after the second one
+  {"Double-click help",   "m_double",  4, 0, {0, 500, 1000, 1500}, {"Off", "0.5 s", "1 s", "1.5 s"}, G_MOUSE},
   // press must be held this long to count - filters accidental brushes
   {"Press must last",     "s_accept",  5, 0, {0, 100, 250, 500, 1000}, {"Instant", "0.1 s", "0.25 s", "0.5 s", "1 s"}, G_GENERAL},
   // ignore new presses this soon after the last one - filters tremor/repeats
@@ -1303,6 +1312,10 @@ float    mPosX = 0, mPosY = 0;    // where the pointer has gone (counts), for dw
 float    mDwellX = 0, mDwellY = 0;
 uint32_t mDwellStart = 0, mStillSince = 0, mLastSample = 0, mLastSend = 0;
 uint32_t mStreamUntil = 0;     // the setup page shows the live picture until then
+uint32_t mFreezeUntil = 0;     // Freeze on click / Double-click help: the pointer keeps still until then
+uint32_t mLastClick = 0;       // Double-click help: when the last click was
+float    mHoldAngX = 0, mHoldAngY = 0;  // Clutch: where the head was when the switch went down
+bool     mClutch = false;      // ...this press moved: letting go doesn't click (or pause)
 bool     mDwellArmed = false;
 uint8_t  mButtons = 0;
 
@@ -1537,6 +1550,46 @@ void mouseCalSample(const float* g, const float* a, float dt) {
   mouseStep((MouseCal)(mCal + 1));
 }
 
+// Freeze on click: the switch just went down or up (before Press must last, as the
+// jog comes with the press itself). Drops movement not sent yet.
+void mouseFreeze() {
+  if (!setting(S_M_FREEZE)) return;
+  const uint32_t until = millis() + setting(S_M_FREEZE);
+  if ((int32_t)(until - mFreezeUntil) > 0) mFreezeUntil = until;
+  mAccX = mAccY = 0;
+}
+
+// Double-click help: a click just happened (switch or dwell). A second click soon
+// after is the double-click, so it doesn't hold the pointer again.
+void mouseClicked() {
+  const uint32_t now = millis(), help = setting(S_M_DOUBLE);
+  const bool second = mLastClick && now - mLastClick < help + 300;
+  mLastClick = second ? 0 : now;
+  if (!help || second) return;
+  if ((int32_t)(now + help - mFreezeUntil) > 0) mFreezeUntil = now + help;
+  mAccX = mAccY = 0;
+}
+
+// The switch went down or up (debounced, before Press must last).
+void mouseSwitchEdge(bool down) {
+  mouseFreeze();
+  if (down) {
+    mHoldAngX = mAngX; mHoldAngY = mAngY;
+    mClutch = false;
+  } else if (mClutch) {
+    mRateX = mRateY = 0;  // the smoothing mustn't carry the clutch move on after letting go
+    mAccX = mAccY = 0;
+  }
+}
+
+// Clutch on: holding the switch keeps the pointer still (Hold to pause on only; Off drags).
+bool mouseClutchOn() { return setting(S_M_CLUTCH) && setting(S_M_HOLD); }
+
+bool mouseFrozen() {
+  if (swStable && setting(S_M_HOLD) && (setting(S_M_FREEZE) || setting(S_M_CLUTCH))) return true;  // the click comes on letting go: keep it where it was pressed
+  return (int32_t)(millis() - mFreezeUntil) < 0;
+}
+
 // One sample while running: turn rates -> pointer movement.
 void mouseMoveSample(const float* g, float dt) {
   float w[3] = {g[0] - mBias[0], g[1] - mBias[1], g[2] - mBias[2]};
@@ -1554,7 +1607,11 @@ void mouseMoveSample(const float* g, float dt) {
   const float k = tau > 0 ? dt / (tau + dt) : 1.0f;
   mRateX += (x - mRateX) * k;
   mRateY += (y - mRateY) * k;
-  if (mPaused) return;
+  if (swStable && !mClutch && !mPaused && mouseClutchOn()) {  // moved far enough while holding: a clutch
+    const float cx = mAngX - mHoldAngX, cy = mAngY - mHoldAngY, lim = setting(S_M_CLUTCH);
+    if (cx * cx + cy * cy > lim * lim) { mClutch = true; M5.Speaker.tone(600, 40); needRedraw = true; }
+  }
+  if (mPaused || mouseFrozen()) return;
 
   auto speed = [&](float r, float perDeg) {
     float m = fabsf(r) - setting(S_M_STEADY) / 10.0f;
@@ -1598,6 +1655,7 @@ void mouseDwell() {
   if (mDwellArmed && millis() - mDwellStart >= setting(S_M_DWELL)) {
     mDwellArmed = false;
     mouseClick(MOUSE_LEFT);
+    mouseClicked();
     M5.Speaker.tone(2500, 20);
     needRedraw = true;
   }
@@ -1636,8 +1694,10 @@ void mouseSwitch(bool down) {
     pressSound();
   } else if (!setting(S_M_HOLD)) {
     mouseButton(b, false);
-  } else if (!mHoldUsed) {
+    mouseClicked();
+  } else if (!mHoldUsed && !mClutch) {
     mouseClick(b);  // Hold to pause: a short press clicks when let go
+    mouseClicked();
   }
 }
 
@@ -1997,7 +2057,7 @@ void drawMain(lgfx::LovyanGFX& c) {
         line3(c, "Speed " + String(SETTINGS[S_M_SPEED].labels[settingChoice[S_M_SPEED]])
                  + "/" + SETTINGS[S_M_SPEEDY].labels[settingChoice[S_M_SPEEDY]]
                  + " - Dwell " + SETTINGS[S_M_DWELL].labels[settingChoice[S_M_DWELL]]
-                 + (setting(S_M_HOLD) ? " - hold switch: pause" : ""));
+                 + (setting(S_M_HOLD) ? (swStable && mClutch ? " - clutch" : " - hold switch: pause") : ""));
       }
       break;
     }
@@ -2640,6 +2700,7 @@ void pollStudentSwitch() {
   if (now - swRawChange >= DEBOUNCE_MS && swRaw != swStable) {
     swStable = swRaw;
     needRedraw = true;
+    if (mRunning && mCal == MC_NONE) mouseSwitchEdge(swStable);
     if (swStable) {
       swPressStart = now;
       swPending = true;
@@ -2673,7 +2734,7 @@ void pollStudentSwitch() {
     irSend(irSlot, 0);
   }
   // MOUSE, "Hold to pause": a long hold pauses / moves the pointer (and doesn't click)
-  if (swActive && m == M_MOUSE && setting(S_M_HOLD) && !mHoldUsed && mCal == MC_NONE
+  if (swActive && m == M_MOUSE && setting(S_M_HOLD) && !mHoldUsed && !mClutch && mCal == MC_NONE
       && now - swLastActivation >= setting(S_M_HOLD)) {
     mHoldUsed = true;
     mousePause(!mPaused);

@@ -75,7 +75,7 @@ current choices are hidden). Below that is what the mode uses.
   with *Scan*), Press sound.
 - **MOUSE:** **Calibrate** (with what it's doing now), a live **Movement** picture (where the stick is, not the
   pointer, and the comfortable range it learnt; **Centre** puts the dot back in the middle), **Pause / Move**, and the connection; settings: Speed left/right, Speed up/down,
-  Speed-up, Steady, Smoothing, Dwell click, Switch, Hold to pause, Press sound.
+  Speed-up, Steady, Smoothing, Dwell click, Switch, Hold to pause, Clutch, Freeze on click, Double-click help, Press sound.
 - **Voice:** the switch's **voice** and speed for typed messages and scanning prompts (natural: Emma, Isabella,
   George, Fable; quick: Cori, Alba, Southern English female, Northern English male). It's stored on the switch, so
   every computer uses the same one. Changing it remakes the prompts, and **Remake in this voice** remakes the typed
@@ -166,15 +166,23 @@ with the same pairing as KEYBOARD (on an iPad, if no pointer shows, turn on Assi
   or Up then get the same range as the other side; without Right or Down it keeps the old calibration and speeds). Each time MOUSE starts after that it only needs *Keep still* (a second), unless it's worn at a
   clearly different angle, when it asks for the whole calibration again.
 - **Screen edges:** the pointer stops at the edge while the head keeps going. That's also how to bring the pointer
-  back in line: push into the edge until the head is comfortable again, or pause, move back, and carry on.
+  back in line: push into the edge until the head is comfortable again, or use the clutch (below).
 - **Clicks:** the big switch is the left (or right, *Switch* setting) button. **Dwell click:** keep the pointer in
   one small area for the *Dwell click* time to click; move away to click again. A green bar on the screen fills up
   before it clicks.
 - **Pause:** hold A, or **hold the switch** for the *Hold to pause* time (2 s): two falling notes = paused, two
   rising = moving. With Hold to pause on, a short press clicks when it's let go; set it Off to drag (the button is
   then held while the switch is).
+- **Clutch** (with Hold to pause on): holding the switch keeps the pointer still. To bring the pointer back in line,
+  hold the switch, turn to look at the pointer (or back to comfortable), and let go: a low note says it won't click.
+  Like lifting a mouse off the desk. Moving less than the *Clutch* amount (10°) while holding is still a click.
+- **Freeze on click:** the pointer keeps still for a moment (0.3 s) when the switch is pressed and let go, so the
+  press doesn't jog it. With Hold to pause on, it also keeps still while the switch is held, so the click lands where
+  it was pressed.
+- **Double-click help** (off at first): after a click the pointer keeps still for a while (0.5–1.5 s), so a second
+  click lands in the same place. It doesn't double-click by itself.
 - It doesn't sleep in MOUSE mode.
-- Coming next: freeze on click, ignore jerks, and a tilt (joystick) style for small movements. The research and
+- Coming next: ignore jerks, and a tilt (joystick) style for small movements. The research and
   step-by-step plan are in [MOUSE-PLAN.md](MOUSE-PLAN.md).
 
 ### Backup mode: a switch for the AAC device, and a talker when it isn't there
@@ -286,6 +294,9 @@ All of these are on the setup page too, on each mode's tab and the Settings tab.
 | MOUSE | Dwell area | Small, **Medium**, Large | How far the pointer may wander and still count as one place |
 | MOUSE | Switch | **Left click**, Right click | The button the big switch presses |
 | MOUSE | Hold to pause | Off, 1 s, **2 s**, 3 s | Holding the switch this long pauses / moves the pointer; short presses click when let go. Off: the button is held while the switch is (drag) |
+| MOUSE | Clutch | Off, 5°, **10°**, 15° | With Hold to pause on: the pointer keeps still while the switch is held; moving more than this while holding re-lines the head, with no click |
+| MOUSE | Freeze on click | Off, 0.2 s, **0.3 s**, 0.5 s | The pointer keeps still this long when the switch is pressed and let go (and while held, with Hold to pause on) |
+| MOUSE | Double-click help | **Off**, 0.5 s, 1 s, 1.5 s | After a click the pointer keeps still this long, so a second click lands in the same place |
 
 ### The screen
 
