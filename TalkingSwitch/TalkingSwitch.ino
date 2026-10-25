@@ -1551,9 +1551,7 @@ String mouseResetStyle() {
     settingChoice[ids[k]] = d;
     prefs.putUChar(st.key, d);
   }
-  return tilt ? "Tilt settings
-reset" : "Follow settings
-reset";
+  return tilt ? "Tilt settings\nreset" : "Follow settings\nreset";
 }
 
 // One gyro (deg/s) and accelerometer (g) sample while calibrating.
