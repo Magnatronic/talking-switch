@@ -183,6 +183,14 @@ turning past the edge and back should no longer leave the user looking sideways.
   zone, those angles leak back to 0 (5 s), so drift settles while resting. This also steadies the live picture in Follow.
 - **Rest** (`mouseRezero()`: angles 0, rest gravity = now): after Keep still, moving again after a pause, and MZERO
   (the page's Centre). So "pause, sit comfortably, move again" sets a new rest.
+- Changing *Pointer style* starts a Keep still (a new rest, not the training): tested Oct 2026, switching
+  Follow → Tilt needed a calibrate, as Follow's angles had drifted from rest. Both styles share the calibration.
+- **Reset settings** (built 25 Oct 2026, FW_API / PAGE_API = 10): a MOUSE settings action after the style's
+  settings (hold A twice, like Forget BT devices) and `MRESET` (the page's button). It resets only the current
+  style's settings: Follow's speeds to what Calibrate last chose (`m_cspdx`, `m_cspdy`), Speed-up, Steady,
+  Smoothing; Tilt speed, Dead zone, Directions (the last two are GAME's too). Click settings are left alone.
+  New defaults then (the old ones weren't great in testing): **Speed-up Off** (Windows adds its own acceleration,
+  and the same movement always going the same distance helps the clutch and re-lining), **Smoothing Medium**.
 - The dead zone is a setting, not sized from the Keep still wobble (simpler; change if testing shows a need).
 - 4 only keeps the curve, not a fixed speed. The page's picture shows the dead zone as a grey square.
 - **To test:** head and wrist; the dead zone and speeds; whether a head turn drifts out of rest during use;

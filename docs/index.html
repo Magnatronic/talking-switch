@@ -790,7 +790,7 @@ function renderEditor(i) {
 
 // ---------------------------------------------------------------- about
 // The firmware's FW_API this page is made for (see TalkingSwitch.ino).
-const PAGE_API = 9;
+const PAGE_API = 10;
 function storageFull() { return info.fsTotal && info.fsUsed / info.fsTotal >= 0.9; }
 
 function renderAbout() {
@@ -1118,7 +1118,7 @@ const TAB_SETTINGS = {  // [setting, shown only when]
   control: [['s_irmode'], ['s_access', irScanning], ['s_scanspd', irScanning],
     ['s_scanrnd', () => irScanning() && pressTwice()], ['s_stop', irScanning], ['s_psound']],
   mouse: [['m_style'], ['m_spdx', follow], ['m_spdy', follow], ['m_accel', follow], ['m_steady', follow], ['m_smooth', follow],
-    ['m_tspeed', tilt], ['m_dead', tilt], ['m_dirs', tilt], ['m_dwell'], ['m_area', () => setCur('m_dwell') > 0],
+    ['m_tspeed', tilt], ['m_dead', tilt], ['m_dirs', tilt], ['m_reset'], ['m_dwell'], ['m_area', () => setCur('m_dwell') > 0],
     ['m_switch'], ['m_hold'], ['m_clutch', () => setCur('m_hold') > 0], ['m_freeze'], ['m_double'], ['s_psound']],
 };
 function visibleSettings(tab) {
@@ -1143,6 +1143,10 @@ function settingRow(name, choices, cur, onPick, help, key = name) {
 
 function switchSetting(k) {
   if (k === 'plays') return settingRow('Plays', PLAYS, playsCur(), setPlays, HELP.plays, k);
+  if (k === 'm_reset') return plainRow('Reset settings',
+    el('button', { onclick: () => act(() => cmd('MRESET'), `${tilt() ? 'Tilt' : 'Follow'} settings reset`) }, `Reset ${tilt() ? 'Tilt' : 'Follow'}`),
+    tilt() ? 'Tilt speed, Dead zone and Directions back to their defaults (Dead zone and Directions are GAME’s too).'
+      : 'The speeds back to what Calibrate chose; Speed-up, Steady and Smoothing back to their defaults.');
   const st = info.settings.find((x) => x.key === k);
   if (!st) return null;
   return settingRow(st.name, st.choices, st.cur, (i) => setSetting(k, i), HELP[k], k);

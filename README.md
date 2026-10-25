@@ -75,7 +75,7 @@ current choices are hidden). Below that is what the mode uses.
   with *Scan*), Press sound.
 - **MOUSE:** **Calibrate** (with what it's doing now), a live **Movement** picture (where the stick is, not the
   pointer, and the comfortable range it learnt; **Centre** puts the dot back in the middle), **Pause / Move**, and the connection; settings: Pointer style, Speed left/right, Speed up/down (Follow),
-  Speed-up, Steady, Smoothing (Follow), Tilt speed, Dead zone, Directions (Tilt), Dwell click, Switch, Hold to pause, Clutch, Freeze on click, Double-click help, Press sound.
+  Speed-up, Steady, Smoothing (Follow), Tilt speed, Dead zone, Directions (Tilt), Reset settings, Dwell click, Switch, Hold to pause, Clutch, Freeze on click, Double-click help, Press sound.
 - **Voice:** the switch's **voice** and speed for typed messages and scanning prompts (natural: Emma, Isabella,
   George, Fable; quick: Cori, Alba, Southern English female, Northern English male). It's stored on the switch, so
   every computer uses the same one. Changing it remakes the prompts, and **Remake in this voice** remakes the typed
@@ -172,7 +172,10 @@ with the same pairing as KEYBOARD (on an iPad, if no pointer shows, turn on Assi
   screen-edge problem. Its settings: *Tilt speed*, *Dead zone* (how close to rest keeps still) and *Directions*
   (*4 only*: straight left, right, up or down, never at an angle). Rest is where you are after *Keep still*, after
   a pause, or after **Centre** on the setup page. Nods and wrist rolls are checked against gravity, so they don't
-  drift; a head turn can drift a little, and while you rest it slowly settles back.
+  drift; a head turn can drift a little, and while you rest it slowly settles back. Changing the style does a
+  *Keep still* (a new rest). **Reset settings** (after the style's settings; the page has a button) puts that
+  style's settings back to the defaults: Follow's speeds to what Calibrate chose, Speed-up Off, Steady Low,
+  Smoothing Medium; Tilt speed 3, Dead zone 4°, Directions Any.
 - **Screen edges** (Follow): the pointer stops at the edge while the head keeps going. That's also how to bring the pointer
   back in line: push into the edge until the head is comfortable again, or use the clutch (below).
 - **Clicks:** the big switch is the left (or right, *Switch* setting) button. **Dwell click:** keep the pointer in
@@ -320,9 +323,10 @@ All of these are on the setup page too, on each mode's tab and the Settings tab.
 | MOUSE (Tilt), GAME | Dead zone | 2°, **4°**, 6°, 9° | This close to rest nothing moves (shared) |
 | MOUSE (Tilt), GAME | Directions | **Any**, 4 only | 4 only moves straight left, right, up or down (shared) |
 | MOUSE | Speed left/right, Speed up/down | 1–8 (**4**, **3**) | How fast the pointer moves each way. Calibrate sets them so a full comfortable movement crosses the screen; change them after if needed. The computer's pointer speed also applies |
-| MOUSE | Speed-up | Off, Low, **Medium**, High | Faster movements go further, so slow ones stay precise |
+| MOUSE | Speed-up | **Off**, Low, Medium, High | Faster movements go further, so slow ones stay precise. Off at first: the computer speeds the pointer up too |
 | MOUSE | Steady | Off, **Low**, Medium, High | Ignores turns slower than this – steadies tremor and drift |
-| MOUSE | Smoothing | Off, **Low**, Medium, High | Smooths out shakes, with a little lag |
+| MOUSE | Smoothing | Off, Low, **Medium**, High | Smooths out shakes, with a little lag |
+| MOUSE | Reset settings | hold A, hold A again | The pointer style's own settings back to the defaults here (Follow's speeds: what Calibrate chose) |
 | MOUSE | Dwell click | **Off**, 0.8, 1, 1.5, 2, 3 s | Time in one place to left-click |
 | MOUSE | Dwell area | Small, **Medium**, Large | How far the pointer may wander and still count as one place |
 | MOUSE | Switch | **Left click**, Right click | The button the big switch presses |

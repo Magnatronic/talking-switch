@@ -140,8 +140,8 @@ static const int SENSE_GRAPH_W = 224;      // Sensor test graph: one reading per
 
 // Firmware version. FW_API goes up whenever the setup page needs to change
 // with it (the page shows a warning if the numbers don't match).
-static const char* FW_VERSION = "1 Oct 2026";
-static const int   FW_API     = 9;
+static const char* FW_VERSION = "25 Oct 2026";
+static const int   FW_API     = 10;
 
 // ---------------------------------------------------------------------
 //  Settings you may want to change
@@ -236,7 +236,7 @@ static const int NUM_KEYS = sizeof(KEYS) / sizeof(KEYS[0]);
 enum SettingId : uint8_t {
   S_VOLUME, S_MODES, S_MOUSE_ON, S_GAME_ON, S_SPEAK_CHOOSE, S_QUICK_HOW, S_GAP, S_PLAY, S_HOLD, S_CHOOSE_FROM, S_OFFER_QUICK, S_OFFER_CONTROL, S_OFFER_DEVICE, S_IR_CHOOSE, S_ACCESS, S_SCAN_SPEED, S_SCAN_ROUNDS, S_STOP,
   S_KEY_ACTION, S_PRESS_SOUND, S_NO_USB,
-  S_M_STYLE, S_M_SPEED, S_M_SPEEDY, S_M_ACCEL, S_M_TSPEED, S_M_DEAD, S_M_DIRS, S_M_STEADY, S_M_SMOOTH, S_M_DWELL, S_M_AREA, S_M_SWITCH, S_M_HOLD, S_M_CLUTCH, S_M_FREEZE, S_M_DOUBLE,
+  S_M_STYLE, S_M_SPEED, S_M_SPEEDY, S_M_ACCEL, S_M_TSPEED, S_M_DEAD, S_M_DIRS, S_M_STEADY, S_M_SMOOTH, S_M_RESET, S_M_DWELL, S_M_AREA, S_M_SWITCH, S_M_HOLD, S_M_CLUTCH, S_M_FREEZE, S_M_DOUBLE,
   S_G_STICK, S_G_BUTTON, S_G_CURVE,
   S_ACCEPT, S_LOCKOUT, S_SENSE_MODE, S_SENSE_LINE, S_SENSE_MOVE, S_SETTLE, S_FOLLOW, S_BEYOND, S_SENSE_TEST, S_BRIGHT, S_WAKE, S_SLEEP, S_AUTOOFF, S_LOUD, S_FORGET, S_ABOUT,
   S_COUNT
@@ -305,7 +305,7 @@ static const Setting SETTINGS[S_COUNT] = {
   {"Speed left/right",    "m_spdx",    8, 3, {8, 12, 18, 25, 35, 50, 70, 100}, {"1", "2", "3", "4", "5", "6", "7", "8"}, G_MOUSE},
   {"Speed up/down",       "m_spdy",    8, 2, {8, 12, 18, 25, 35, 50, 70, 100}, {"1", "2", "3", "4", "5", "6", "7", "8"}, G_MOUSE},
   // faster turns go further: extra speed per 100 deg/s
-  {"Speed-up",            "m_accel",   4, 2, {0, 1, 2, 4}, {"Off", "Low", "Medium", "High"}, G_MOUSE},
+  {"Speed-up",            "m_accel",   4, 0, {0, 1, 2, 4}, {"Off", "Low", "Medium", "High"}, G_MOUSE},
   // Tilt: the top speed (counts/s), reached at MS_TILT_FULL of the comfortable range
   {"Tilt speed",          "m_tspeed",  5, 2, {300, 500, 800, 1200, 1800}, {"1", "2", "3", "4", "5"}, G_MOUSE},
   // Tilt: this close to rest (deg) the pointer doesn't move
@@ -315,7 +315,9 @@ static const Setting SETTINGS[S_COUNT] = {
   // turns slower than this are ignored (tenths of a deg/s): steadies tremor and drift
   {"Steady",              "m_steady",  4, 1, {0, 15, 30, 60}, {"Off", "Low", "Medium", "High"}, G_MOUSE},
   // smooths out shakes (time constant, ms), at the cost of a little lag
-  {"Smoothing",           "m_smooth",  4, 1, {0, 30, 60, 120}, {"Off", "Low", "Medium", "High"}, G_MOUSE},
+  {"Smoothing",           "m_smooth",  4, 2, {0, 30, 60, 120}, {"Off", "Low", "Medium", "High"}, G_MOUSE},
+  // action: the pointer style's own settings back to their defaults (Follow's speeds: what Calibrate chose)
+  {"Reset settings",      nullptr,     1, 0, {0}, {""}, G_MOUSE},
   // keeping the pointer in one small area this long clicks (ms, 0 = off)
   {"Dwell click",         "m_dwell",   6, 0, {0, 800, 1000, 1500, 2000, 3000}, {"Off", "0.8 s", "1 s", "1.5 s", "2 s", "3 s"}, G_MOUSE},
   // ...how far the pointer may wander and still count (pointer counts)
@@ -471,7 +473,7 @@ uint32_t senseStreamUntil = 0;  // the setup page is showing the live graph unti
 bool     backupOn = false;     // in the backup mode because KEYBOARD has no USB
 uint32_t backupSince = 0;      // KEYBOARD without USB since (0 = not counting)
 uint8_t  settingIdx = 0;       // setting shown in SETTINGS mode
-uint32_t forgetConfirmUntil = 0; // "Forget BT devices": waiting for the second B press
+uint32_t forgetConfirmUntil = 0; // "Forget BT devices" / "Reset settings": waiting for the second hold A
 uint32_t recordConfirmUntil = 0; // QUICK: the message has a recording - waiting for a second hold of A to replace it
 
 M5Canvas canvas(&M5.Display);
@@ -1514,21 +1516,44 @@ void mouseFinishCal() {
   mouseSaveAxes();
   mAngX = mAngY = 0;  // back at rest (up/down then follows gravity from Keep still's rest)
   // the speeds that make the whole range cross about the screen (nearest choice)
-  auto fit = [](int id, float want) {
+  auto fit = [](int id, float want, const char* calKey) {
     const Setting& st = SETTINGS[id];
     int best = 0;
     for (int i = 1; i < st.count; i++)
       if (fabsf(logf(st.values[i] / want)) < fabsf(logf(st.values[best] / want))) best = i;
     settingChoice[id] = best;
     prefs.putUChar(st.key, best);
+    prefs.putUChar(calKey, best);  // for Reset settings
   };
-  fit(S_M_SPEED, MS_SPAN_X / (mRange[0] + mRange[1]));
-  fit(S_M_SPEEDY, MS_SPAN_Y / (mRange[2] + mRange[3]));
+  fit(S_M_SPEED, MS_SPAN_X / (mRange[0] + mRange[1]), "m_cspdx");
+  fit(S_M_SPEEDY, MS_SPAN_Y / (mRange[2] + mRange[3]), "m_cspdy");
   String speeds = "Speed " + String(SETTINGS[S_M_SPEED].labels[settingChoice[S_M_SPEED]])
                   + " / " + SETTINGS[S_M_SPEEDY].labels[settingChoice[S_M_SPEEDY]];
   M5.Speaker.tone(2000, 60);
   if (mGot[1] && mGot[3]) mouseCalDone("Ready\n" + speeds, TFT_GREEN);
   else mouseCalDone((mGot[1] ? "No up seen\n" : "No left seen\n") + speeds, TFT_ORANGE);
+}
+
+// Reset settings (MOUSE settings, or MRESET): the pointer style's own settings back to
+// their defaults; Follow's speeds back to what Calibrate last chose. Dead zone and
+// Directions are GAME's too. Returns what to show.
+String mouseResetStyle() {
+  static const uint8_t FOLLOW[] = {S_M_SPEED, S_M_SPEEDY, S_M_ACCEL, S_M_STEADY, S_M_SMOOTH};
+  static const uint8_t TILT[] = {S_M_TSPEED, S_M_DEAD, S_M_DIRS};
+  const bool tilt = setting(S_M_STYLE) == 1;
+  const uint8_t* ids = tilt ? TILT : FOLLOW;
+  const int n = tilt ? sizeof(TILT) : sizeof(FOLLOW);
+  for (int k = 0; k < n; k++) {
+    const Setting& st = SETTINGS[ids[k]];
+    uint8_t d = st.def;
+    if (ids[k] == S_M_SPEED) d = prefs.getUChar("m_cspdx", d);
+    if (ids[k] == S_M_SPEEDY) d = prefs.getUChar("m_cspdy", d);
+    settingChoice[ids[k]] = d;
+    prefs.putUChar(st.key, d);
+  }
+  return tilt ? "Tilt settings
+reset" : "Follow settings
+reset";
 }
 
 // One gyro (deg/s) and accelerometer (g) sample while calibrating.
@@ -2348,8 +2373,10 @@ void drawSettings(lgfx::LovyanGFX& c) {
     line3(c, "Switch does " + String(MODE_NAMES[prevMode]) + " - " + String(pos) + " of " + String(n));
     return;
   }
-  bool confirm = settingIdx == S_FORGET && forgetConfirmUntil;
-  drawFit(c, confirm ? "Hold A again" : settingIdx == S_FORGET ? "Hold A to forget" : st.labels[settingChoice[settingIdx]],
+  bool confirm = (settingIdx == S_FORGET || settingIdx == S_M_RESET) && forgetConfirmUntil;
+  drawFit(c, confirm ? "Hold A again" : settingIdx == S_FORGET ? "Hold A to forget"
+                     : settingIdx == S_M_RESET ? (setting(S_M_STYLE) == 1 ? "Hold A: Tilt" : "Hold A: Follow")
+                     : st.labels[settingChoice[settingIdx]],
           LINE2_Y, confirm ? C_PROBLEM : C_DO);
   line3(c, (inSettings() ? "Switch does " + String(MODE_NAMES[prevMode]) : String(MODE_NAMES[mode]) + " settings")
              + " - " + String(pos) + " of " + String(n));
@@ -2361,6 +2388,7 @@ String buttonGuide() {
   if (aboutOpen) return "A close";
   if (settingsView()) {
     if (settingIdx == S_FORGET) return "B next  hold A forget  A " + String(inSettings() ? "mode" : "close");
+    if (settingIdx == S_M_RESET) return "B next  hold A reset  A close";
     if (settingIdx == S_ABOUT) return "B next  hold A open  A " + String(inSettings() ? "mode" : "close");
     if (settingIdx == S_SENSE_TEST) return "B next  hold A open  A " + String(inSettings() ? "mode" : "close");
     return "B next  hold A/B change  A " + String(inSettings() ? "mode" : "close");
@@ -2921,6 +2949,8 @@ void settingChanged(int i) {
     prefs.putUChar(SETTINGS[S_ACCESS].key, settingChoice[S_ACCESS]);
   }
   if (i == S_M_SWITCH || i == S_M_HOLD) mouseButton(mButtons, false);
+  // Tilt works from rest, and in Follow the angles drift from it: a new rest (Keep still)
+  if (i == S_M_STYLE && mRunning && mHaveAxes) mouseStartCal(false);
   if (i == S_GAME_ON) {  // the gamepad is only in the USB device from the start
     setStatus("Restarting\nfor GAME mode", TFT_ORANGE);
     gameRestartAt = millis() + 1500;
@@ -2956,6 +2986,13 @@ void settingsButtons() {
       forgetConfirmUntil = 0;
       forgetBluetooth();
       setStatus("Forgotten\nAlso remove it on the computer", TFT_GREEN, 5000);
+    } else {
+      forgetConfirmUntil = millis() + 4000;
+    }
+  } else if (M5.BtnA.wasHold() && settingIdx == S_M_RESET) {
+    if (forgetConfirmUntil && millis() < forgetConfirmUntil) {
+      forgetConfirmUntil = 0;
+      setStatus(mouseResetStyle(), TFT_GREEN);
     } else {
       forgetConfirmUntil = millis() + 4000;
     }
@@ -3115,6 +3152,7 @@ void pollStaffButtons() {
 //    MCAL / MPAUSE 1|0    (MOUSE: calibrate / pause or move the pointer)
 //    MSTREAM 1|0          (MOUSE: the live picture, "mou,..." lines, for 10 s)
 //    MZERO                (MOUSE: the live picture's dot back to the middle)
+//    MRESET               (MOUSE: the pointer style's settings back to their defaults)
 //    UP n <samples>       -> @READY, then the samples in 4KB pieces, each
 //                            answered with @A; finally @OK
 //    DOWN n               -> @DATA n <samples>, the samples, then @OK
@@ -3430,6 +3468,9 @@ void handleCommand(String line) {
   } else if (cmd == "MZERO") {
     // MZERO: here is rest, for the live picture (and Tilt)
     mouseRezero();
+    reply();
+  } else if (cmd == "MRESET") {
+    mouseResetStyle();
     reply();
   } else {
     reply("unknown command");
