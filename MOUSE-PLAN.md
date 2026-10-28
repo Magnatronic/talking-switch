@@ -16,7 +16,7 @@ New ideas can be tried in `MouseTest/` first.
 | 3 | Freeze on click, double-click help, clutch | **Built 1 Oct 2026, to test** (ignore jerks and Centre dropped) |
 | 4 | Tilt (joystick) style for very small movements | **Built 1 Oct 2026, to test** |
 | 5 | True screen position (absolute pointer) | Only if 2–4 aren't enough |
-| 6 | GAME mode: movement as a thumbstick, for PC and Xbox | **Built 1 Oct 2026, to test** (straight into ChatterSwitch, no GameTest) |
+| 6 | GAME mode: movement as a thumbstick, for PC and Xbox | **Works on the PC and through the XAC, 28 Oct 2026** (gamepad-only USB, 100 mA, no charging) |
 | – | Head gestures (Quha style) | Idea, see the end |
 
 ## What we found (research, 30 Sep 2026)
@@ -261,7 +261,11 @@ as written (nested collections, an output report), and then sends no HID interfa
 flat (one Application collection, 6 bytes, the same bytes). And USB starts before `setup()` (CDC On Boot, in
 `app_main` before NVS is set up), so the HID objects are made as globals, reading `s_game` straight from NVS.
 Still nothing on the XAC after that (PC fine). Next suspect: the core asks for 500 mA (bMaxPower), the XAC's ports
-give 100 mA without its supply; GAME mode now asks for 100 (`USB.usbPower(100)` in the same early code; INFO `usbmA`).
+give 100 mA without its supply; GAME mode now asks for 100 (`USB.usbPower(100)` in the same early code; INFO `usbmA`). Then also no battery
+charging in GAME (`M5.Power.setBatteryCharge(false)` while GAME is the mode with the gamepad on), and **it worked**
+(28 Oct 2026, XAC on the PC, no XAC power supply). Which of the three (gamepad-only, 100 mA, no charging) was
+needed isn't known; all three match the working XAC projects, so they stay. Still to check: axes and rest on the XAC,
+the switch's button there, Right stick, on an Xbox console, and the battery time in GAME.
 
 Sources: [ESP32 gamepad for XAC (esp32beans)](https://github.com/esp32beans/ESP32_gamepad),
 [M5Stack USB joystick (esp32beans)](https://github.com/esp32beans/M5Stack_Touch_USB_Joystick),

@@ -202,8 +202,10 @@ Over **USB only**, the stick is then also a gamepad:
 - **On a PC:** it shows in *Set up USB game controllers* (joy.cpl) with no driver. Games that only take Xbox
   controllers need Steam Input (or similar) to use it.
 - **On an Xbox:** plug it into a USB port on the **Xbox Adaptive Controller**. Its left stick is the XAC's left
-  stick, its right stick the right one. The XAC's USB ports only give a little power unless the XAC has its own
-  power supply; the stick can run on its battery.
+  stick, its right stick the right one (tested 28 Oct 2026, XAC on the PC with no power supply). The XAC's USB ports
+  only give 100 mA without its own power supply, so in GAME mode the stick asks for 100 mA and **doesn't charge**
+  (it runs on its battery; charging comes back in the other modes). On Windows the XAC is an Xbox controller, so
+  some apps (e.g. Windows Terminal) move between tabs with it; that's Windows.
 
 How it works:
 - **Calibrate** is the same as MOUSE (shared, so calibrating in either does both). Rest is the thumbstick in the
