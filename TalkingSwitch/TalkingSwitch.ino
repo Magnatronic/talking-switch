@@ -115,15 +115,47 @@
 #include <BLESecurity.h>
 #endif
 
+bool gamepadOn = false;  // GAME mode was on at start, so the stick's USB is the gamepad (no keyboard/mouse)
+
 #if ARDUINO_USB_MODE == 0  // "USB Mode: USB-OTG (TinyUSB)" selected
 #include "USB.h"
 #include "USBHIDKeyboard.h"
 #include "USBHIDMouse.h"
-#include "USBHIDGamepad.h"
 #define HAS_USB_HID 1
-USBHIDKeyboard UsbKeyboard;
-USBHIDMouse UsbMouse;
-USBHIDGamepad UsbGamepad;  // only started with GAME mode on (see setup)
+// GAME's gamepad, laid out as the Xbox Adaptive Controller takes it (as the open-source
+// XAC joysticks, e.g. controllercustom/dinput_tinyusb): one report with no report ID,
+// X, Y, Z, Rz 0-255 (128 = middle), a hat, 12 buttons (+16 unused bits).
+static const uint8_t XAC_REPORT_DESC[] = {
+  0x05,0x01,0x09,0x04,0xA1,0x01,0xA1,0x02,0x75,0x08,0x95,0x04,0x15,0x00,0x26,
+  0xFF,0x00,0x35,0x00,0x46,0xFF,0x00,0x09,0x30,0x09,0x31,0x09,0x32,0x09,0x35,
+  0x81,0x02,0x75,0x04,0x95,0x01,0x25,0x07,0x46,0x3B,0x01,0x65,0x14,0x09,0x39,
+  0x81,0x42,0x65,0x00,0x75,0x01,0x95,0x0C,0x25,0x01,0x45,0x01,0x05,0x09,0x19,
+  0x01,0x29,0x0C,0x81,0x02,0x06,0x00,0xFF,0x75,0x01,0x95,0x10,0x25,0x01,0x45,
+  0x01,0x09,0x01,0x81,0x02,0xC0,0xA1,0x02,0x75,0x08,0x95,0x07,0x46,0xFF,0x00,
+  0x26,0xFF,0x00,0x09,0x02,0x91,0x02,0xC0,0xC0
+};
+class XacGamepad : public USBHIDDevice {
+  USBHID hid;
+public:
+  XacGamepad() { hid.addDevice(this, sizeof(XAC_REPORT_DESC)); }
+  uint16_t _onGetDescriptor(uint8_t* dst) override {
+    memcpy(dst, XAC_REPORT_DESC, sizeof(XAC_REPORT_DESC));
+    return sizeof(XAC_REPORT_DESC);
+  }
+  void begin() { hid.begin(); }
+  // sticks -127..127; button bits 0-11; the hat (d-pad) always centred
+  bool send(int8_t lx, int8_t ly, int8_t rx, int8_t ry, uint16_t buttons) {
+    uint8_t r[8] = {(uint8_t)(lx + 128), (uint8_t)(ly + 128), (uint8_t)(rx + 128), (uint8_t)(ry + 128),
+                    (uint8_t)(0x0F | (buttons << 4)), (uint8_t)(buttons >> 4), 0, 0};
+    return hid.SendReport(0, r, sizeof(r));
+  }
+};
+// Made in setup, as the core adds each to the USB device when it's made: the keyboard
+// and mouse, or with GAME mode on only the gamepad (the XAC takes no keyboard in the
+// same device; KEYBOARD and MOUSE then use Bluetooth). The serial port is always there.
+USBHIDKeyboard* UsbKeyboard = nullptr;
+USBHIDMouse* UsbMouse = nullptr;
+XacGamepad* UsbGamepad = nullptr;
 #if !ARDUINO_USB_CDC_ON_BOOT
 #error "Set Tools > USB CDC On Boot: Enabled - the setup page talks to the switch over it"
 #endif
@@ -338,8 +370,9 @@ static const Setting SETTINGS[S_COUNT] = {
   {"Double-click help",   "m_double",  4, 0, {0, 500, 1000, 1500}, {"Off", "0.5 s", "1 s", "1.5 s"}, G_MOUSE},
   // GAME: which thumbstick the movement is (XAC: left = X/Y, right = Z/Rz)
   {"Stick",               "g_stick",   2, 0, {0, 1}, {"Left", "Right"}, G_GAME},
-  // GAME: the gamepad button the big switch is, held while the switch is (core button numbers)
-  {"Switch button",       "g_button",  6, 0, {0, 1, 3, 4, 6, 7}, {"A", "B", "X", "Y", "LB", "RB"}, G_GAME},
+  // GAME: the gamepad button the big switch is (bit number), held while the switch is.
+  // Windows shows it as that button number; the XAC's own mapping sets what it does on an Xbox
+  {"Switch button",       "g_button",  6, 0, {0, 1, 2, 3, 4, 5}, {"1", "2", "3", "4", "5", "6"}, G_GAME},
   // GAME: how the stick follows movement (power x10): Straight, or gentler near the middle
   {"Response",            "g_curve",   3, 1, {10, 15, 22}, {"Straight", "Gentle", "Very gentle"}, G_GAME},
   // press must be held this long to count - filters accidental brushes
@@ -1156,8 +1189,11 @@ void checkVbus(uint32_t now) {
 #endif
 }
 
+// USB can take keys and the mouse (with GAME mode on it's only the gamepad).
+bool usbKeys() { return usbHostActive() && !gamepadOn; }
+
 KbOut kbOutput() {
-  if (usbHostActive()) return OUT_USB;
+  if (usbKeys()) return OUT_USB;
   return bleConnected ? OUT_BLE : OUT_NONE;
 }
 
@@ -1192,7 +1228,7 @@ void setStudentMode(uint8_t m) {
 // KEYBOARD with no USB for BACKUP_MS: change to the backup mode, and back
 // to KEYBOARD when USB returns (not in the middle of a student's choice).
 void manageBackup(uint32_t now) {
-  const bool usb = usbHostActive();
+  const bool usb = usbKeys();
   const uint8_t to = backupMode();
   if (backupOn) {
     if ((usb || to == M_COUNT) && !scanning && !swActive) {
@@ -1244,7 +1280,7 @@ void sendKey(bool down) {
     }
 #if HAS_USB_HID
     if (keyDownOut == OUT_USB) {
-      if (down) UsbMouse.press(MOUSE_LEFT); else UsbMouse.release(MOUSE_LEFT);
+      if (down) UsbMouse->press(MOUSE_LEFT); else UsbMouse->release(MOUSE_LEFT);
     }
 #endif
   } else if (keyDownOut == OUT_BLE && kbInput) {
@@ -1256,11 +1292,11 @@ void sendKey(bool down) {
   if (keyDownOut == OUT_USB && keyDownUsage != USAGE_LCLICK) {
     // modifiers are HID usages 0xE0 + bit number
     if (down) {
-      for (int b = 0; b < 8; b++) if (keyDownMods & (1 << b)) UsbKeyboard.pressRaw(0xE0 + b);
-      UsbKeyboard.pressRaw(keyDownUsage);
+      for (int b = 0; b < 8; b++) if (keyDownMods & (1 << b)) UsbKeyboard->pressRaw(0xE0 + b);
+      UsbKeyboard->pressRaw(keyDownUsage);
     } else {
-      UsbKeyboard.releaseRaw(keyDownUsage);
-      for (int b = 0; b < 8; b++) if (keyDownMods & (1 << b)) UsbKeyboard.releaseRaw(0xE0 + b);
+      UsbKeyboard->releaseRaw(keyDownUsage);
+      for (int b = 0; b < 8; b++) if (keyDownMods & (1 << b)) UsbKeyboard->releaseRaw(0xE0 + b);
     }
   }
 #endif
@@ -1346,7 +1382,6 @@ float    mGrav[3] = {0, 0, 1};    // gravity now (smoothed, g)
 float    mRestG[3] = {0, 0, 1};   // ...where the angles are 0 (unit)
 uint32_t mFreezeUntil = 0;     // Freeze on click / Double-click help: the pointer keeps still until then
 uint32_t mLastClick = 0;       // Double-click help: when the last click was
-bool     gamepadOn = false;    // GAME mode was on at start, so the stick is also a USB gamepad
 uint32_t gameRestartAt = 0;    // GAME mode turned on/off: restart then
 int8_t   gX = 0, gY = 0;       // GAME: the thumbstick (-127..127, right and down +)
 bool     gPressed = false;     // ...the switch's button
@@ -1379,8 +1414,8 @@ void mouseSend(int8_t dx, int8_t dy) {
   }
 #if HAS_USB_HID
   if (o == OUT_USB) {
-    if (dx || dy) UsbMouse.move(dx, dy);
-    else UsbMouse.buttons(mButtons);
+    if (dx || dy) UsbMouse->move(dx, dy);
+    else UsbMouse->buttons(mButtons);
   }
 #endif
 }
@@ -1703,8 +1738,8 @@ void gameSend() {
   if (gX != sx || gY != sy) markActivity();  // moving counts as using it (auto power-off)
   sx = gX; sy = gY; sb = gPressed;
   const bool right = setting(S_G_STICK) == 1;
-  UsbGamepad.send(right ? 0 : gX, right ? 0 : gY, right ? gX : 0, right ? gY : 0, 0, 0, HAT_CENTER,
-                  gPressed ? 1UL << setting(S_G_BUTTON) : 0);
+  UsbGamepad->send(right ? 0 : gX, right ? 0 : gY, right ? gX : 0, right ? gY : 0,
+                   gPressed ? 1 << setting(S_G_BUTTON) : 0);
 #endif
 }
 
@@ -3564,10 +3599,16 @@ void setup() {
 
 #if HAS_USB_HID
   USB.onEvent(onUsbEvent);
-  UsbKeyboard.begin();
-  UsbMouse.begin();
   gamepadOn = setting(S_GAME_ON);  // the gamepad only when GAME is on (games see no idle gamepad otherwise)
-  if (gamepadOn) UsbGamepad.begin();
+  if (gamepadOn) {
+    UsbGamepad = new XacGamepad();
+    UsbGamepad->begin();
+  } else {
+    UsbKeyboard = new USBHIDKeyboard();
+    UsbMouse = new USBHIDMouse();
+    UsbKeyboard->begin();
+    UsbMouse->begin();
+  }
   USB.begin();
 #endif
 

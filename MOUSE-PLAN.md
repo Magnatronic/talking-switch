@@ -249,6 +249,14 @@ Known from open-source ESP32-S3 XAC joysticks (one is for M5Stack):
   XAC firmware. If the XAC wants a joystick-only device, GAME would start USB as a gamepad only (no setup page
   over USB in GAME).
 
+**Tested 28 Oct 2026:** works on the PC (joy.cpl); the **XAC showed nothing**. Cause: the core puts keyboard, mouse
+and gamepad in one HID interface with report IDs (and boot keyboard protocol), made when the objects are, so all
+three were always there. **Changed:** with *GAME mode* on, USB is the CDC serial + one HID gamepad in the XAC
+layout of controllercustom/dinput_tinyusb (no report ID, X/Y/Z/Rz 0–255 with 128 the middle, hat, 12 buttons;
+class `XacGamepad`), and no USB keyboard/mouse (KEYBOARD and MOUSE use Bluetooth, `usbKeys()`). The CDC is kept,
+as gdsports/xac_joystick_tinyusb (joystick + CDC) works on the XAC. *Switch button* is now 1–6 (bit 0–5); the
+XAC's mapping of USB joystick buttons is its own (Xbox Accessories app). **To test** on the XAC.
+
 Sources: [ESP32 gamepad for XAC (esp32beans)](https://github.com/esp32beans/ESP32_gamepad),
 [M5Stack USB joystick (esp32beans)](https://github.com/esp32beans/M5Stack_Touch_USB_Joystick),
 [dinput_tinyusb for XAC](https://github.com/controllercustom/dinput_tinyusb),

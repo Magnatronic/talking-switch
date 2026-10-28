@@ -211,7 +211,10 @@ How it works:
 - Near rest (*Dead zone*) the thumbstick stays in the middle; *Response* makes it finer near the middle.
   *Directions: 4 only* pushes straight left, right, up or down. Nods and wrist rolls don't drift (gravity); a head
   turn settles back to the middle while resting near it.
-- **The switch** is a gamepad button (*Switch button*: A, B, X, Y, LB, RB), held while the switch is.
+- **The switch** is a gamepad button (*Switch button*: 1–6; Windows shows it as that button number, and on an
+  Xbox the XAC's button mapping in the Xbox Accessories app sets what it does), held while the switch is.
+- **USB with GAME mode on is the gamepad only** (and the setup page's serial port), laid out the way the XAC takes
+  it. So KEYBOARD and MOUSE go over Bluetooth while GAME mode is on; turn it off for them over USB.
 - **Pause:** hold A, or **Pause** on the setup page: the thumbstick goes to the middle. Moving again makes where you
   are the new rest.
 - Not over Bluetooth, and it doesn't sleep in GAME mode.
@@ -334,7 +337,7 @@ All of these are on the setup page too, on each mode's tab and the Settings tab.
 | MOUSE | Clutch | Off, 5°, **10°**, 15° | With Hold to pause on: the pointer keeps still while the switch is held; moving more than this while holding re-lines the head, with no click |
 | MOUSE | Freeze on click | Off, 0.2 s, **0.3 s**, 0.5 s | The pointer keeps still this long when the switch is pressed and let go (and while held, with Hold to pause on) |
 | GAME | Stick | **Left**, Right | Which thumbstick the movement is |
-| GAME | Switch button | **A**, B, X, Y, LB, RB | The gamepad button the switch is, held while the switch is |
+| GAME | Switch button | **1**–6 | The gamepad button the switch is, held while the switch is (on an Xbox, map it in the Xbox Accessories app) |
 | GAME | Response | Straight, **Gentle**, Very gentle | Gentle: finer near the middle, full at the comfortable limit |
 | MOUSE | Double-click help | **Off**, 0.5 s, 1 s, 1.5 s | After a click the pointer keeps still this long, so a second click lands in the same place |
 
