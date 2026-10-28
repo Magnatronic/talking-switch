@@ -263,8 +263,12 @@ flat (one Application collection, 6 bytes, the same bytes). And USB starts befor
 Still nothing on the XAC after that (PC fine). Next suspect: the core asks for 500 mA (bMaxPower), the XAC's ports
 give 100 mA without its supply; GAME mode now asks for 100 (`USB.usbPower(100)` in the same early code; INFO `usbmA`). Then also no battery
 charging in GAME (`M5.Power.setBatteryCharge(false)` while GAME is the mode with the gamepad on), and **it worked**
-(28 Oct 2026, XAC on the PC, no XAC power supply). Which of the three (gamepad-only, 100 mA, no charging) was
-needed isn't known; all three match the working XAC projects, so they stay. Still to check: axes and rest on the XAC,
+(28 Oct 2026, XAC on the PC, no XAC power supply). **Tested one at a time** (each turned back on/off with the
+others kept): **charging on → the XAC drops it** ("Plug into USB": charging takes more than its 100 mA ports give);
+**asking for 500 mA → still works** (not needed; 100 kept, as that's what it draws); **keyboard + mouse + the core's
+gamepad → the XAC configures the device ("Gamepad by USB") but ignores the gamepad**. So two problems at once: power
+(charging) and the combined device. Not separated: whether the keyboard/mouse or the old layout (report IDs, signed
+axes) makes it ignore the gamepad; a keyboard-free mouse + XAC-layout gamepad might work. Still to check: axes and rest on the XAC,
 the switch's button there, Right stick, on an Xbox console, and the battery time in GAME.
 
 Sources: [ESP32 gamepad for XAC (esp32beans)](https://github.com/esp32beans/ESP32_gamepad),

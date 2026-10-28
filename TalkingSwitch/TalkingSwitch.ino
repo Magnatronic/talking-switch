@@ -150,8 +150,9 @@ public:
     return hid.SendReport(0, r, sizeof(r));
   }
 };
-// The USB devices: the keyboard and mouse, or with GAME mode on only the gamepad (the
-// XAC takes no keyboard in the same device; KEYBOARD and MOUSE then use Bluetooth). The
+// The USB devices: the keyboard and mouse, or with GAME mode on only the gamepad (the XAC
+// ignores the gamepad when the keyboard and mouse are in the same device, tested 28 Oct 2026;
+// KEYBOARD and MOUSE then use Bluetooth). The
 // serial port is always there. The core adds each device when it's made, and USB starts
 // (CDC On Boot) before setup and before NVS is set up, so they're made here, reading the
 // "GAME mode" setting (s_game) straight from NVS.
@@ -163,8 +164,8 @@ bool gamepadOn = [] {  // GAME mode was on at start, so the stick's USB is the g
     nvs_get_u8(h, "s_game", &v);
     nvs_close(h);
   }
-  // The XAC's USB ports give 100 mA (without its power supply) and turn away a device asking
-  // for more; the core asks for 500 (the XAC joysticks that work ask for 100)
+  // the XAC's USB ports give 100 mA without its power supply (asking for the core's 500 also
+  // worked, tested 28 Oct 2026; 100 is what it draws with no charging)
   if (v == 1) USB.usbPower(100);
   return v == 1;
 }();
@@ -1206,7 +1207,13 @@ void checkVbus(uint32_t now) {
 }
 
 // USB can take keys and the mouse (with GAME mode on it's only the gamepad).
-bool usbKeys() { return usbHostActive() && !gamepadOn; }
+bool usbKeys() {
+#if HAS_USB_HID
+  return usbHostActive() && UsbKeyboard;
+#else
+  return false;
+#endif
+}
 
 KbOut kbOutput() {
   if (usbKeys()) return OUT_USB;
@@ -1920,12 +1927,15 @@ void mouseStream(uint32_t now) {
 
 void updateMouse(uint32_t now) {
   const bool on = motionMode(studentMode());
-  // GAME on the XAC: its USB ports give 100 mA without its power supply, so no charging
-  // from USB in GAME (it runs on the battery); charging again in the other modes
-  static bool chargeOff = false;
-  if ((gamepadOn && studentMode() == M_GAME) != chargeOff) {
-    chargeOff = !chargeOff;
-    M5.Power.setBatteryCharge(!chargeOff);
+  // GAME on the XAC: its USB ports give 100 mA without its power supply, and charging takes
+  // more, so the XAC drops the stick (tested 28 Oct 2026). So no charging in GAME (it runs on
+  // the battery); charging again in the other modes. Set at start too: the power chip keeps
+  // "off" through a restart
+  static int8_t chargeOff = -1;
+  const int8_t off = gamepadOn && studentMode() == M_GAME;
+  if (off != chargeOff) {
+    chargeOff = off;
+    M5.Power.setBatteryCharge(!off);
   }
   if (studentMode() != M_GAME) gameRelease();  // MOUSE <-> GAME without stopping
   if (gameRestartAt && (int32_t)(now - gameRestartAt) >= 0) ESP.restart();
