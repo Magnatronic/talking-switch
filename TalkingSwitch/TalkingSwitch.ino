@@ -163,6 +163,9 @@ bool gamepadOn = [] {  // GAME mode was on at start, so the stick's USB is the g
     nvs_get_u8(h, "s_game", &v);
     nvs_close(h);
   }
+  // The XAC's USB ports give 100 mA (without its power supply) and turn away a device asking
+  // for more; the core asks for 500 (the XAC joysticks that work ask for 100)
+  if (v == 1) USB.usbPower(100);
   return v == 1;
 }();
 USBHIDKeyboard* UsbKeyboard = gamepadOn ? nullptr : new USBHIDKeyboard();
@@ -3228,6 +3231,9 @@ void sendInfo() {
   j += ",\"key\":" + String(keyIdx) + ",\"vol\":" + String(settingChoice[S_VOLUME]) + ",\"vols\":" + String(sizeof(VOLUMES));
   j += ",\"bat\":" + String(batLevel) + ",\"chg\":" + yes(batCharging) + ",\"bt\":" + yes(bleConnected);
   j += ",\"usbhid\":" + yes(HAS_USB_HID) + ",\"gamepad\":" + yes(gamepadOn) + ",\"sensor\":" + yes(sensorOn);
+#if HAS_USB_HID
+  j += ",\"usbmA\":" + String(USB.usbPower());  // the power USB asked for (100 with GAME mode on)
+#endif
   j += ",\"ver\":" + jsonStr(FW_VERSION) + ",\"api\":" + String(FW_API) + ",\"presses\":" + String(pressCount);
   j += ",\"fsUsed\":" + String((unsigned long)fsUsed()) + ",\"fsTotal\":" + String((unsigned long)LittleFS.totalBytes());
   j += ",\"voice\":" + jsonStr(voiceId) + ",\"vspeed\":" + jsonStr(voiceSpeed);

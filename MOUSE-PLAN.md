@@ -260,6 +260,8 @@ Two traps found the same day: the core's report map check (`esp_hid_parse_report
 as written (nested collections, an output report), and then sends no HID interface at all, so the report is written
 flat (one Application collection, 6 bytes, the same bytes). And USB starts before `setup()` (CDC On Boot, in
 `app_main` before NVS is set up), so the HID objects are made as globals, reading `s_game` straight from NVS.
+Still nothing on the XAC after that (PC fine). Next suspect: the core asks for 500 mA (bMaxPower), the XAC's ports
+give 100 mA without its supply; GAME mode now asks for 100 (`USB.usbPower(100)` in the same early code; INFO `usbmA`).
 
 Sources: [ESP32 gamepad for XAC (esp32beans)](https://github.com/esp32beans/ESP32_gamepad),
 [M5Stack USB joystick (esp32beans)](https://github.com/esp32beans/M5Stack_Touch_USB_Joystick),
