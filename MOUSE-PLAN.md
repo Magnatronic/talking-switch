@@ -17,7 +17,7 @@ New ideas can be tried in `MouseTest/` first.
 | 4 | Tilt (joystick) style for very small movements | **Built 1 Oct 2026, to test** |
 | 5 | True screen position (absolute pointer) | Only if 2–4 aren't enough |
 | 6 | GAME mode: movement as a thumbstick, for PC and Xbox | **Works on the PC and through the XAC, 28 Oct 2026** (gamepad-only USB, 100 mA, no charging) |
-| 7 | Wireless GAME: an ESP-NOW dongle (AtomS3U) in the XAC | `GameDongle/` power test built 28 Oct 2026 (gamepad + ESP-NOW listening, its button = button 1); stick side not yet |
+| 7 | Wireless GAME: an ESP-NOW dongle (AtomS3U) in the XAC | `GameDongle/` power test 28 Oct 2026: **needs the XAC on its barrel adapter** (or a Y power cable); stick side not yet |
 | – | Head gestures (Quha style) | Idea, see the end |
 
 ## What we found (research, 30 Sep 2026)
@@ -300,6 +300,14 @@ goes straight into the XAC's port; one is to hand).
   dongle answers with its MAC, both remember it. One stick per dongle; a second pairing replaces the first.
 - ESP-NOW is a direct radio link (Wi-Fi radio, channel 1), not a network or access point, so there's nothing to join.
   Bluetooth (KEYBOARD/MOUSE) and ESP-NOW share the radio; GAME has Bluetooth off.
+
+**Power, tested 28 Oct 2026:** on the XAC's ports with the XAC **on the PC or on a USB-C charger**, the dongle
+resets over and over as Wi-Fi starts (the LED cycles); started without Wi-Fi it runs. Capping the sending power
+before Wi-Fi starts didn't help. With the XAC on a **5 V barrel adapter** it runs. So only the XAC's barrel socket
+(5 V 2 A, centre-positive) lifts its ports' limit. A generic 5 V 10 A adapter worked but made the XAC stop answering
+Windows (joy.cpl hung until it was unplugged): use a good 5 V 2 A one (Microsoft's, or a known brand). Otherwise a USB
+Y power cable (data to the XAC, power from a charger) powers the dongle (or the stick) directly.
+The AtomS3U's LED has red and green swapped (`rgbLedWrite` red shows green): fix in `setLed`.
 
 **To check first:**
 - **The dongle's power on the XAC:** ESP32-S3 receiving draws roughly 80–100 mA (radio on all the time), right at the
