@@ -1920,6 +1920,13 @@ void mouseStream(uint32_t now) {
 
 void updateMouse(uint32_t now) {
   const bool on = motionMode(studentMode());
+  // GAME on the XAC: its USB ports give 100 mA without its power supply, so no charging
+  // from USB in GAME (it runs on the battery); charging again in the other modes
+  static bool chargeOff = false;
+  if ((gamepadOn && studentMode() == M_GAME) != chargeOff) {
+    chargeOff = !chargeOff;
+    M5.Power.setBatteryCharge(!chargeOff);
+  }
   if (studentMode() != M_GAME) gameRelease();  // MOUSE <-> GAME without stopping
   if (gameRestartAt && (int32_t)(now - gameRestartAt) >= 0) ESP.restart();
   if (on != mRunning) {
