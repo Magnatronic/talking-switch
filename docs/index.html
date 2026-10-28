@@ -1068,6 +1068,7 @@ const HELP = {
   m_dirs: 'Tilt and GAME: 4 only goes straight left, right, up or down (whichever is most), never at an angle. Shared by MOUSE and GAME.',
   s_game: 'Adds GAME: the stick, worn on the head or a hand, is a gamepad thumbstick over USB. The switch restarts when this changes.',
   g_stick: 'Which thumbstick the movement is. On the Xbox Adaptive Controller: left or right stick.',
+  g_charge: 'Off: the stick runs on its battery in GAME, as the Xbox Adaptive Controller’s USB ports can’t charge it without the XAC’s own power supply. On: it charges (XAC on its power supply, or a PC).',
   g_button: 'The gamepad button the switch is, held while the switch is. On an Xbox, set what it does in the Xbox Accessories app (the Adaptive Controller’s button mapping).',
   g_curve: 'Straight: the stick follows movement evenly. Gentle: finer near the middle, full at the comfortable limit.',
   m_spdx: 'How fast the pointer moves left and right. Calibrate sets it so a full comfortable movement crosses the screen; turn it down if small targets are hard to hit. The computer’s pointer speed also applies.',
@@ -1108,7 +1109,7 @@ const allTopics = () => setCur('s_topics') === 1;
 const tilt = () => setCur('m_style') === 1, follow = () => !tilt();
 const TILT_DEAD = [2, 4, 6, 9];  // m_dead choices (deg)
 const TAB_SETTINGS = {  // [setting, shown only when]
-  game: [['g_stick'], ['g_button'], ['m_dead'], ['g_curve'], ['m_dirs'], ['s_psound']],
+  game: [['g_stick'], ['g_button'], ['m_dead'], ['g_curve'], ['m_dirs'], ['g_charge'], ['s_psound']],
   quick: [['plays'], ['s_gap', countingPresses],
     ['s_play', () => setCur('s_spkmode') === 0], ['s_hold', () => setCur('s_spkmode') === 0 && setCur('s_play') === 0],
     ['s_scanspd', speakScanning], ['s_scanrnd', () => speakScanning() && setCur('s_qhow') === 0],

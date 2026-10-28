@@ -204,7 +204,8 @@ Over **USB only**, the stick is then also a gamepad:
 - **On an Xbox:** plug it into a USB port on the **Xbox Adaptive Controller**. Its left stick is the XAC's left
   stick, its right stick the right one (tested 28 Oct 2026, XAC on the PC with no power supply). The XAC's USB ports
   only give 100 mA without its own power supply, so in GAME mode the stick asks for 100 mA and **doesn't charge**
-  (it runs on its battery; charging comes back in the other modes). On Windows the XAC is an Xbox controller, so
+  (it runs on its battery; charging comes back in the other modes). With the XAC on its power supply (5 V 2 A,
+  centre-positive barrel), set **Charge in GAME: On**. On Windows the XAC is an Xbox controller, so
   some apps (e.g. Windows Terminal) move between tabs with it; that's Windows.
 
 How it works:
@@ -342,6 +343,7 @@ All of these are on the setup page too, on each mode's tab and the Settings tab.
 | GAME | Stick | **Left**, Right | Which thumbstick the movement is |
 | GAME | Switch button | **1**–6 | The gamepad button the switch is, held while the switch is (on an Xbox, map it in the Xbox Accessories app) |
 | GAME | Response | Straight, **Gentle**, Very gentle | Gentle: finer near the middle, full at the comfortable limit |
+| GAME | Charge in GAME | **Off**, On | Off: runs on the battery (the XAC's USB ports can't charge it without the XAC's power supply). On: charges (XAC on its 5 V 2 A supply, or a PC) |
 | MOUSE | Double-click help | **Off**, 0.5 s, 1 s, 1.5 s | After a click the pointer keeps still this long, so a second click lands in the same place |
 
 ### The screen

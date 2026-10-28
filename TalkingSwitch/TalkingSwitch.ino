@@ -286,7 +286,7 @@ enum SettingId : uint8_t {
   S_VOLUME, S_MODES, S_MOUSE_ON, S_GAME_ON, S_SPEAK_CHOOSE, S_QUICK_HOW, S_GAP, S_PLAY, S_HOLD, S_CHOOSE_FROM, S_OFFER_QUICK, S_OFFER_CONTROL, S_OFFER_DEVICE, S_IR_CHOOSE, S_ACCESS, S_SCAN_SPEED, S_SCAN_ROUNDS, S_STOP,
   S_KEY_ACTION, S_PRESS_SOUND, S_NO_USB,
   S_M_STYLE, S_M_SPEED, S_M_SPEEDY, S_M_ACCEL, S_M_TSPEED, S_M_DEAD, S_M_DIRS, S_M_STEADY, S_M_SMOOTH, S_M_RESET, S_M_DWELL, S_M_AREA, S_M_SWITCH, S_M_HOLD, S_M_CLUTCH, S_M_FREEZE, S_M_DOUBLE,
-  S_G_STICK, S_G_BUTTON, S_G_CURVE,
+  S_G_STICK, S_G_BUTTON, S_G_CURVE, S_G_CHARGE,
   S_ACCEPT, S_LOCKOUT, S_SENSE_MODE, S_SENSE_LINE, S_SENSE_MOVE, S_SETTLE, S_FOLLOW, S_BEYOND, S_SENSE_TEST, S_BRIGHT, S_WAKE, S_SLEEP, S_AUTOOFF, S_LOUD, S_FORGET, S_ABOUT,
   S_COUNT
 };
@@ -392,6 +392,9 @@ static const Setting SETTINGS[S_COUNT] = {
   {"Switch button",       "g_button",  6, 0, {0, 1, 2, 3, 4, 5}, {"1", "2", "3", "4", "5", "6"}, G_GAME},
   // GAME: how the stick follows movement (power x10): Straight, or gentler near the middle
   {"Response",            "g_curve",   3, 1, {10, 15, 22}, {"Straight", "Gentle", "Very gentle"}, G_GAME},
+  // GAME: charge from USB. Off: the XAC's USB ports without its power supply can't feed a
+  // charging stick and drop it; On when the XAC has its power supply (or on a PC)
+  {"Charge in GAME",      "g_charge",  2, 0, {0, 1}, {"Off", "On"}, G_GAME},
   // press must be held this long to count - filters accidental brushes
   {"Press must last",     "s_accept",  5, 0, {0, 100, 250, 500, 1000}, {"Instant", "0.1 s", "0.25 s", "0.5 s", "1 s"}, G_GENERAL},
   // ignore new presses this soon after the last one - filters tremor/repeats
@@ -1929,10 +1932,10 @@ void updateMouse(uint32_t now) {
   const bool on = motionMode(studentMode());
   // GAME on the XAC: its USB ports give 100 mA without its power supply, and charging takes
   // more, so the XAC drops the stick (tested 28 Oct 2026). So no charging in GAME (it runs on
-  // the battery); charging again in the other modes. Set at start too: the power chip keeps
-  // "off" through a restart
+  // the battery) unless "Charge in GAME" is on; charging again in the other modes. Set at
+  // start too: the power chip keeps "off" through a restart
   static int8_t chargeOff = -1;
-  const int8_t off = gamepadOn && studentMode() == M_GAME;
+  const int8_t off = gamepadOn && studentMode() == M_GAME && !setting(S_G_CHARGE);
   if (off != chargeOff) {
     chargeOff = off;
     M5.Power.setBatteryCharge(!off);
