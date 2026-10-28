@@ -2238,7 +2238,7 @@ void drawMain(lgfx::LovyanGFX& c) {
       else if (backupSince) {
         int left = (int)((BACKUP_MS - min(BACKUP_MS, millis() - backupSince) + 999) / 1000);
         line2(c, "No USB - " + String(MODE_NAMES[backupMode()]) + " in " + String(left) + " s", C_PROBLEM);
-      } else if (o == OUT_NONE) line2(c, "Not connected", C_PROBLEM);
+      } else if (o == OUT_NONE) line2(c, gamepadOn ? "USB is GAME's gamepad" : "Not connected", C_PROBLEM);
       else line2(c, o == OUT_USB ? "Sending by USB" : "Sending by Bluetooth", C_READY);
       line3(c, backupMode() != M_COUNT ? String("No USB: ") + MODE_NAMES[backupMode()] : "Bluetooth: " + bleName);
       break;
@@ -2284,7 +2284,8 @@ void drawMain(lgfx::LovyanGFX& c) {
       }
       KbOut o = kbOutput();
       line1(c, mPaused ? "Paused" : "Moving");
-      if (o == OUT_NONE) line2(c, HAS_USB_HID ? "Not connected" : "No USB mouse: set USB Mode TinyUSB", C_PROBLEM);
+      if (o == OUT_NONE) line2(c, !HAS_USB_HID ? "No USB mouse: set USB Mode TinyUSB"
+                                  : gamepadOn ? "USB is GAME's gamepad" : "Not connected", C_PROBLEM);
       else if (mPaused) line2(c, "Hold A to move", C_DO);
       else line2(c, o == OUT_USB ? "Sending by USB" : "Sending by Bluetooth", C_READY);
       float p = mouseDwellProgress();

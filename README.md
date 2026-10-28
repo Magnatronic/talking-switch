@@ -216,7 +216,8 @@ How it works:
 - **The switch** is a gamepad button (*Switch button*: 1–6; Windows shows it as that button number, and on an
   Xbox the XAC's button mapping in the Xbox Accessories app sets what it does), held while the switch is.
 - **USB with GAME mode on is the gamepad only** (and the setup page's serial port), laid out the way the XAC takes
-  it. So KEYBOARD and MOUSE go over Bluetooth while GAME mode is on; turn it off for them over USB.
+  it. So KEYBOARD and MOUSE go over Bluetooth while GAME mode is on (their screens say *USB is GAME's gamepad*
+  when no Bluetooth is connected); turn it off for them over USB.
 - **Pause:** hold A, or **Pause** on the setup page: the thumbstick goes to the middle. Moving again makes where you
   are the new rest.
 - Not over Bluetooth, and it doesn't sleep in GAME mode.

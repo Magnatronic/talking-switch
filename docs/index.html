@@ -579,7 +579,8 @@ function render() {
   $('battery').textContent = info.bat >= 0 ? `Battery ${info.bat}%${info.chg ? ' ⚡' : ''}` : 'Battery –';
   for (const id of ['devName', 'battery', 'pressPill']) $(id).classList.remove('hidden');
   $('btName').textContent = info.name;
-  $('btState').textContent = info.bt ? 'connected now' : 'not connected';
+  $('btState').textContent = (info.bt ? 'connected now' : 'not connected')
+    + (info.gamepad ? '; GAME mode is on, so USB is the gamepad: Bluetooth only' : '');
 
   for (const b of document.querySelectorAll('.tabs button')) {
     b.classList.toggle('inuse', b.dataset.tab === tabOfMode(info.mode));
@@ -1027,7 +1028,7 @@ function renderMotion(tab) {
         ? 'USB only, as a gamepad. On a PC it shows in Set up USB game controllers. For an Xbox, plug it into a USB port on the Xbox Adaptive Controller.'
         : 'Restart the switch to start the gamepad.'),
       'Games that only take Xbox controllers on a PC need Steam Input (or similar) to use it.')
-    : plainRow('Connection', el('div', { class: 'small' }, `USB when plugged in, otherwise Bluetooth as `, el('b', {}, info.name),
+    : plainRow('Connection', el('div', { class: 'small' }, info.gamepad ? 'GAME mode is on, so USB is the gamepad: Bluetooth only, as ' : 'USB when plugged in, otherwise Bluetooth as ', el('b', {}, info.name),
       ` (${info.bt ? 'connected now' : 'not connected'}).`),
       'The same pairing as KEYBOARD. On an iPad, if no pointer shows, turn on AssistiveTouch.'));
 }
