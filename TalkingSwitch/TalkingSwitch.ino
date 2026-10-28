@@ -115,24 +115,24 @@
 #include <BLESecurity.h>
 #endif
 
-bool gamepadOn = false;  // GAME mode was on at start, so the stick's USB is the gamepad (no keyboard/mouse)
-
 #if ARDUINO_USB_MODE == 0  // "USB Mode: USB-OTG (TinyUSB)" selected
 #include "USB.h"
+#include "nvs_flash.h"
 #include "USBHIDKeyboard.h"
 #include "USBHIDMouse.h"
 #define HAS_USB_HID 1
-// GAME's gamepad, laid out as the Xbox Adaptive Controller takes it (as the open-source
-// XAC joysticks, e.g. controllercustom/dinput_tinyusb): one report with no report ID,
-// X, Y, Z, Rz 0-255 (128 = middle), a hat, 12 buttons (+16 unused bits).
+// GAME's gamepad, laid out as the Xbox Adaptive Controller takes it (the report of the
+// open-source XAC joysticks, e.g. controllercustom/dinput_tinyusb): one report with no
+// report ID, X, Y, Z, Rz 0-255 (128 = middle), a hat, 12 buttons = 6 bytes. Written flat
+// (one collection, no output report), as the core's report map check needs.
 static const uint8_t XAC_REPORT_DESC[] = {
-  0x05,0x01,0x09,0x04,0xA1,0x01,0xA1,0x02,0x75,0x08,0x95,0x04,0x15,0x00,0x26,
-  0xFF,0x00,0x35,0x00,0x46,0xFF,0x00,0x09,0x30,0x09,0x31,0x09,0x32,0x09,0x35,
-  0x81,0x02,0x75,0x04,0x95,0x01,0x25,0x07,0x46,0x3B,0x01,0x65,0x14,0x09,0x39,
-  0x81,0x42,0x65,0x00,0x75,0x01,0x95,0x0C,0x25,0x01,0x45,0x01,0x05,0x09,0x19,
-  0x01,0x29,0x0C,0x81,0x02,0x06,0x00,0xFF,0x75,0x01,0x95,0x10,0x25,0x01,0x45,
-  0x01,0x09,0x01,0x81,0x02,0xC0,0xA1,0x02,0x75,0x08,0x95,0x07,0x46,0xFF,0x00,
-  0x26,0xFF,0x00,0x09,0x02,0x91,0x02,0xC0,0xC0
+  0x05, 0x01, 0x09, 0x04, 0xA1, 0x01,              // Generic Desktop, Joystick, Application
+  0x15, 0x00, 0x26, 0xFF, 0x00, 0x35, 0x00, 0x46, 0xFF, 0x00,
+  0x75, 0x08, 0x95, 0x04, 0x09, 0x30, 0x09, 0x31, 0x09, 0x32, 0x09, 0x35, 0x81, 0x02,  // X Y Z Rz
+  0x25, 0x07, 0x46, 0x3B, 0x01, 0x65, 0x14, 0x75, 0x04, 0x95, 0x01, 0x09, 0x39, 0x81, 0x42,  // hat 0-7, null
+  0x65, 0x00, 0x25, 0x01, 0x45, 0x01, 0x75, 0x01, 0x95, 0x0C,
+  0x05, 0x09, 0x19, 0x01, 0x29, 0x0C, 0x81, 0x02,  // buttons 1-12
+  0xC0
 };
 class XacGamepad : public USBHIDDevice {
   USBHID hid;
@@ -145,22 +145,35 @@ public:
   void begin() { hid.begin(); }
   // sticks -127..127; button bits 0-11; the hat (d-pad) always centred
   bool send(int8_t lx, int8_t ly, int8_t rx, int8_t ry, uint16_t buttons) {
-    uint8_t r[8] = {(uint8_t)(lx + 128), (uint8_t)(ly + 128), (uint8_t)(rx + 128), (uint8_t)(ry + 128),
-                    (uint8_t)(0x0F | (buttons << 4)), (uint8_t)(buttons >> 4), 0, 0};
+    uint8_t r[6] = {(uint8_t)(lx + 128), (uint8_t)(ly + 128), (uint8_t)(rx + 128), (uint8_t)(ry + 128),
+                    (uint8_t)(0x0F | (buttons << 4)), (uint8_t)(buttons >> 4)};
     return hid.SendReport(0, r, sizeof(r));
   }
 };
-// Made in setup, as the core adds each to the USB device when it's made: the keyboard
-// and mouse, or with GAME mode on only the gamepad (the XAC takes no keyboard in the
-// same device; KEYBOARD and MOUSE then use Bluetooth). The serial port is always there.
-USBHIDKeyboard* UsbKeyboard = nullptr;
-USBHIDMouse* UsbMouse = nullptr;
-XacGamepad* UsbGamepad = nullptr;
+// The USB devices: the keyboard and mouse, or with GAME mode on only the gamepad (the
+// XAC takes no keyboard in the same device; KEYBOARD and MOUSE then use Bluetooth). The
+// serial port is always there. The core adds each device when it's made, and USB starts
+// (CDC On Boot) before setup and before NVS is set up, so they're made here, reading the
+// "GAME mode" setting (s_game) straight from NVS.
+// (a lambda, not a function: Arduino puts its prototypes before the first function)
+bool gamepadOn = [] {  // GAME mode was on at start, so the stick's USB is the gamepad
+  uint8_t v = 0;
+  nvs_handle_t h;
+  if (nvs_flash_init() == ESP_OK && nvs_open("tswitch", NVS_READONLY, &h) == ESP_OK) {
+    nvs_get_u8(h, "s_game", &v);
+    nvs_close(h);
+  }
+  return v == 1;
+}();
+USBHIDKeyboard* UsbKeyboard = gamepadOn ? nullptr : new USBHIDKeyboard();
+USBHIDMouse* UsbMouse = gamepadOn ? nullptr : new USBHIDMouse();
+XacGamepad* UsbGamepad = gamepadOn ? new XacGamepad() : nullptr;
 #if !ARDUINO_USB_CDC_ON_BOOT
 #error "Set Tools > USB CDC On Boot: Enabled - the setup page talks to the switch over it"
 #endif
 #else
 #define HAS_USB_HID 0
+bool gamepadOn = false;
 #define MOUSE_LEFT  0x01
 #define MOUSE_RIGHT 0x02
 #endif
@@ -3599,16 +3612,8 @@ void setup() {
 
 #if HAS_USB_HID
   USB.onEvent(onUsbEvent);
-  gamepadOn = setting(S_GAME_ON);  // the gamepad only when GAME is on (games see no idle gamepad otherwise)
-  if (gamepadOn) {
-    UsbGamepad = new XacGamepad();
-    UsbGamepad->begin();
-  } else {
-    UsbKeyboard = new USBHIDKeyboard();
-    UsbMouse = new USBHIDMouse();
-    UsbKeyboard->begin();
-    UsbMouse->begin();
-  }
+  if (UsbGamepad) UsbGamepad->begin();  // (made before setup, see the top)
+  if (UsbKeyboard) { UsbKeyboard->begin(); UsbMouse->begin(); }
   USB.begin();
 #endif
 

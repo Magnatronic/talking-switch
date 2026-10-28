@@ -256,6 +256,10 @@ layout of controllercustom/dinput_tinyusb (no report ID, X/Y/Z/Rz 0–255 with 1
 class `XacGamepad`), and no USB keyboard/mouse (KEYBOARD and MOUSE use Bluetooth, `usbKeys()`). The CDC is kept,
 as gdsports/xac_joystick_tinyusb (joystick + CDC) works on the XAC. *Switch button* is now 1–6 (bit 0–5); the
 XAC's mapping of USB joystick buttons is its own (Xbox Accessories app). **To test** on the XAC.
+Two traps found the same day: the core's report map check (`esp_hid_parse_report_map`) rejects the dinput descriptor
+as written (nested collections, an output report), and then sends no HID interface at all, so the report is written
+flat (one Application collection, 6 bytes, the same bytes). And USB starts before `setup()` (CDC On Boot, in
+`app_main` before NVS is set up), so the HID objects are made as globals, reading `s_game` straight from NVS.
 
 Sources: [ESP32 gamepad for XAC (esp32beans)](https://github.com/esp32beans/ESP32_gamepad),
 [M5Stack USB joystick (esp32beans)](https://github.com/esp32beans/M5Stack_Touch_USB_Joystick),
