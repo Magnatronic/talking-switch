@@ -17,6 +17,7 @@ New ideas can be tried in `MouseTest/` first.
 | 4 | Tilt (joystick) style for very small movements | **Built 1 Oct 2026, to test** |
 | 5 | True screen position (absolute pointer) | Only if 2–4 aren't enough |
 | 6 | GAME mode: movement as a thumbstick, for PC and Xbox | **Works on the PC and through the XAC, 28 Oct 2026** (gamepad-only USB, 100 mA, no charging) |
+| 7 | Wireless GAME: an ESP-NOW dongle (AtomS3U) in the XAC | Planned (28 Oct 2026); AtomS3U to hand |
 | – | Head gestures (Quha style) | Idea, see the end |
 
 ## What we found (research, 30 Sep 2026)
@@ -275,6 +276,38 @@ Sources: [ESP32 gamepad for XAC (esp32beans)](https://github.com/esp32beans/ESP3
 [M5Stack USB joystick (esp32beans)](https://github.com/esp32beans/M5Stack_Touch_USB_Joystick),
 [dinput_tinyusb for XAC](https://github.com/controllercustom/dinput_tinyusb),
 [Arduino forum: joystick for XAC](https://forum.arduino.cc/t/joystick-for-xbox-adaptive-controller/1325039).
+
+## Step 7 – wireless GAME: an ESP-NOW dongle in the XAC
+
+**Idea (28 Oct 2026):** a small ESP32 dongle plugged into the XAC is the gamepad there; the stick sends its
+movement and switch to it over ESP-NOW. The dongle is the **M5Stack AtomS3U** (ESP32-S3 with a USB-A plug, so it
+goes straight into the XAC's port; one is to hand).
+
+**Why:**
+- **No cable to the head** (a head-worn stick on a cable tugs and tangles).
+- **Battery:** in GAME on the XAC's USB the stick can't charge (step 6). Wireless, the stick can be on any USB power
+  (charger, power bank in a pocket) with charging on; the XAC's 100 mA limit then only applies to the dongle.
+- **The stick's USB stays normal** (keyboard + mouse + serial), so no gamepad-only trade-off in GAME mode.
+
+**How:**
+- **Dongle sketch** (new, e.g. `GameDongle/`): USB = the XAC gamepad from step 6 (`XacGamepad`, gamepad-only, 100 mA),
+  ESP-NOW receive; each packet = stick X/Y (−127..127), which stick, the buttons. Centre the stick and let go of the
+  buttons if nothing comes for about 0.5 s (the stick out of range or off). The LED shows paired / receiving.
+- **Stick:** in GAME, a setting *Send by: USB / Wireless*. Wireless sends the same values `gameSend()` makes now, on
+  change and every ~100 ms as a keep-alive. The stick's USB is then not the gamepad, so `gamepadOn` (and gamepad-only
+  USB, no charging) only apply to *Send by: USB*.
+- **Pairing:** hold the dongle's button, then *Pair* on the stick (or the setup page): the stick broadcasts, the
+  dongle answers with its MAC, both remember it. One stick per dongle; a second pairing replaces the first.
+- ESP-NOW is a direct radio link (Wi-Fi radio, channel 1), not a network or access point, so there's nothing to join.
+  Bluetooth (KEYBOARD/MOUSE) and ESP-NOW share the radio; GAME has Bluetooth off.
+
+**To check first:**
+- **The dongle's power on the XAC:** ESP32-S3 receiving draws roughly 80–100 mA (radio on all the time), right at the
+  XAC's 100 mA without its supply. Measure on the XAC before anything else (a bare sketch: gamepad + ESP-NOW listening).
+  If it's too much: lower CPU clock, radio power save between packets, or an ESP32-C3/C6 dongle.
+- Delay (ESP-NOW is a few ms; check it feels the same as USB), range across a room, and what happens with
+  other 2.4 GHz traffic.
+- The stick's battery when wireless: ESP-NOW sending costs more than USB; with a charger or power bank that doesn't matter.
 
 ## Idea for later – head gestures (Quha Zono 2)
 
