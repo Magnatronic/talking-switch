@@ -207,6 +207,12 @@ Over **USB only**, the stick is then also a gamepad:
   (it runs on its battery; charging comes back in the other modes). With the XAC on its power supply (5 V 2 A,
   centre-positive barrel), set **Charge in GAME: On**. On Windows the XAC is an Xbox controller, so
   some apps (e.g. Windows Terminal) move between tabs with it; that's Windows.
+- **Wireless** (*Send by: Wireless*): the stick sends to the **GameDongle** (`GameDongle/`, an M5Stack AtomS3U)
+  plugged into the XAC (or a PC), which is the gamepad there. The stick's USB then stays a keyboard and mouse and
+  charges, so it can be on a charger or power bank. **Pair dongle** (GAME settings, or the page): a new dongle
+  pairs by itself; one already paired with another stick: hold its button 3 s first (the light flashes blue). The
+  dongle's light: blue = waiting, green = the stick is sending. The XAC must be on its own power supply (or the
+  dongle on a USB Y power cable): on 100 mA the dongle's radio resets it (red light, again and again).
 
 How it works:
 - **Calibrate** is the same as MOUSE (shared, so calibrating in either does both). Rest is the thumbstick in the
@@ -221,7 +227,8 @@ How it works:
   when no Bluetooth is connected); turn it off for them over USB.
 - **Pause:** hold A, or **Pause** on the setup page: the thumbstick goes to the middle. Moving again makes where you
   are the new rest.
-- Not over Bluetooth, and it doesn't sleep in GAME mode.
+- Not over Bluetooth, and it doesn't sleep in GAME mode. Wireless uses ESP-NOW (a direct link on the Wi-Fi radio,
+  channel 1): no network is joined or made, and the radio is only on in GAME.
 
 ### Backup mode: a switch for the AAC device, and a talker when it isn't there
 
@@ -340,10 +347,12 @@ All of these are on the setup page too, on each mode's tab and the Settings tab.
 | MOUSE | Hold to pause | Off, 1 s, **2 s**, 3 s | Holding the switch this long pauses / moves the pointer; short presses click when let go. Off: the button is held while the switch is (drag) |
 | MOUSE | Clutch | Off, 5°, **10°**, 15° | With Hold to pause on: the pointer keeps still while the switch is held; moving more than this while holding re-lines the head, with no click |
 | MOUSE | Freeze on click | Off, 0.2 s, **0.3 s**, 0.5 s | The pointer keeps still this long when the switch is pressed and let go (and while held, with Hold to pause on) |
+| GAME | Send by | **USB**, Wireless | USB: the stick's USB is the gamepad. Wireless: to the GameDongle in the XAC. The switch restarts when it changes |
+| GAME | Pair dongle | (action) | Wireless: pair with a GameDongle (see above) |
 | GAME | Stick | **Left**, Right | Which thumbstick the movement is |
 | GAME | Switch button | **1**–6 | The gamepad button the switch is, held while the switch is (on an Xbox, map it in the Xbox Accessories app) |
 | GAME | Response | Straight, **Gentle**, Very gentle | Gentle: finer near the middle, full at the comfortable limit |
-| GAME | Charge in GAME | **Off**, On | Off: runs on the battery (the XAC's USB ports can't charge it without the XAC's power supply). On: charges (XAC on its 5 V 2 A supply, or a PC) |
+| GAME (USB) | Charge in GAME | **Off**, On | Off: runs on the battery (the XAC's USB ports can't charge it without the XAC's power supply). On: charges (XAC on its 5 V 2 A supply, or a PC) |
 | MOUSE | Double-click help | **Off**, 0.5 s, 1 s, 1.5 s | After a click the pointer keeps still this long, so a second click lands in the same place |
 
 ### The screen

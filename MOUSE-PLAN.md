@@ -17,7 +17,7 @@ New ideas can be tried in `MouseTest/` first.
 | 4 | Tilt (joystick) style for very small movements | **Built 1 Oct 2026, to test** |
 | 5 | True screen position (absolute pointer) | Only if 2–4 aren't enough |
 | 6 | GAME mode: movement as a thumbstick, for PC and Xbox | **Works on the PC and through the XAC, 28 Oct 2026** (gamepad-only USB, 100 mA, no charging) |
-| 7 | Wireless GAME: an ESP-NOW dongle (AtomS3U) in the XAC | `GameDongle/` power test 28 Oct 2026: **needs the XAC on its barrel adapter** (or a Y power cable); stick side not yet |
+| 7 | Wireless GAME: an ESP-NOW dongle (AtomS3U) in the XAC | `GameDongle/` power test 28 Oct 2026: **needs the XAC on its barrel adapter** (or a Y power cable). Stick side + pairing built 29 Oct 2026, untested |
 | – | Head gestures (Quha style) | Idea, see the end |
 
 ## What we found (research, 30 Sep 2026)
@@ -307,7 +307,17 @@ before Wi-Fi starts didn't help. With the XAC on a **5 V barrel adapter** it run
 (5 V 2 A, centre-positive) lifts its ports' limit. A generic 5 V 10 A adapter worked but made the XAC stop answering
 Windows (joy.cpl hung until it was unplugged): use a good 5 V 2 A one (Microsoft's, or a known brand). Otherwise a USB
 Y power cable (data to the XAC, power from a charger) powers the dongle (or the stick) directly.
-The AtomS3U's LED has red and green swapped (`rgbLedWrite` red shows green): fix in `setLed`.
+The AtomS3U's LED has red and green swapped (`rgbLedWrite` red shows green): fixed in `setLed` (29 Oct).
+
+**Built 29 Oct 2026 (FW_API 11):** *Send by: USB / Wireless* in GAME settings (changing it with GAME mode on
+restarts the switch; Wireless leaves the USB keyboard + mouse and charging as normal, and hides *Charge in GAME*).
+The radio is on only in GAME (and while pairing): raw ESP-IDF Wi-Fi in STA, channel 1, nothing stored. Packets as
+above (`'G'`), sent to the paired dongle on change and every 100 ms; a delivered packet (ESP-NOW's ACK) within 1 s =
+"found" on screen (*Gamepad by wireless* / *Dongle not found* / *Pair dongle in settings*). Pairing: *Pair dongle*
+(hold A) or PAIR from the page; for 15 s the stick broadcasts `'P'`; a dongle that is new, or had its button held
+3 s (30 s window, LED flashing blue), or is already paired with this stick, answers `'A'` (3 times) and both save
+the other's MAC (stick: `g_peer`; dongle: Preferences "dongle"/"stick"). The dongle then takes `'G'` only from its
+stick. INFO: `dongle`, `radio`, `dongleOk`, `pairing`; the dongle's INFO has `stick`, `pairing`; FORGET on the dongle.
 
 **To check first:**
 - **The dongle's power on the XAC:** ESP32-S3 receiving draws roughly 80–100 mA (radio on all the time), right at the

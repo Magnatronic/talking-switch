@@ -312,7 +312,7 @@ const MODE_HELP = {
   'KEYBOARD': 'Each press is a key or a mouse click, over USB or Bluetooth.',
   'CONTROL': 'Each press sends a remote-control code, and says its sound if it has one.',
   'MOUSE': 'Head or hand movement moves the pointer; the switch clicks.',
-  'GAME': 'Head or hand movement is a gamepad thumbstick; the switch is a button. USB: a PC, or an Xbox through the Adaptive Controller.',
+  'GAME': 'Head or hand movement is a gamepad thumbstick; the switch is a button. USB: a PC, or an Xbox through the Adaptive Controller; or wireless to the GameDongle in the Adaptive Controller.',
 };
 const TABS = ['quick', 'topics', 'keyboard', 'control', 'mouse', 'game', 'voice', 'settings'];
 const MOTION_TABS = ['mouse', 'game'];  // they share the motion sensor: calibration, picture, pause
@@ -791,7 +791,7 @@ function renderEditor(i) {
 
 // ---------------------------------------------------------------- about
 // The firmware's FW_API this page is made for (see TalkingSwitch.ino).
-const PAGE_API = 10;
+const PAGE_API = 11;
 function storageFull() { return info.fsTotal && info.fsUsed / info.fsTotal >= 0.9; }
 
 function renderAbout() {
@@ -1024,7 +1024,11 @@ function renderMotion(tab) {
       el('button', { disabled: !inMouse || !m.cal, onclick: () => act(() => cmd(`MPAUSE ${m.paused ? 0 : 1}`)) },
         m.paused ? 'Move' : 'Pause')),
       game ? 'Or hold A on the stick. Paused, the thumbstick is centred.' : 'Or hold A on the stick, or hold the switch (Hold to pause).'),
-    game ? plainRow('Connection', el('div', { class: 'small' }, info.gamepad
+    game ? plainRow('Connection', el('div', { class: 'small' }, wireless()
+        ? (!info.dongle ? 'Wireless, but no dongle paired yet: Pair dongle in GAME settings.'
+          : info.dongleOk ? 'Wireless to the GameDongle (found).'
+          : 'Wireless to the GameDongle – not found now. Is it plugged in (blue light)?')
+        : info.gamepad
         ? 'USB only, as a gamepad. On a PC it shows in Set up USB game controllers. For an Xbox, plug it into a USB port on the Xbox Adaptive Controller.'
         : 'Restart the switch to start the gamepad.'),
       'Games that only take Xbox controllers on a PC need Steam Input (or similar) to use it.')
@@ -1067,6 +1071,7 @@ const HELP = {
   m_dead: 'Tilt and GAME: this close to rest nothing moves. Bigger for shaky movement. Shared by MOUSE and GAME.',
   m_dirs: 'Tilt and GAME: 4 only goes straight left, right, up or down (whichever is most), never at an angle. Shared by MOUSE and GAME.',
   s_game: 'Adds GAME: the stick, worn on the head or a hand, is a gamepad thumbstick over USB. The switch restarts when this changes.',
+  g_send: 'USB: the stick’s USB is the gamepad (plugged into the PC or the Adaptive Controller). Wireless: it sends to the GameDongle in the Adaptive Controller, and its USB stays a keyboard and mouse (and charges). The switch restarts when this changes.',
   g_stick: 'Which thumbstick the movement is. On the Xbox Adaptive Controller: left or right stick.',
   g_charge: 'Off: the stick runs on its battery in GAME, as the Xbox Adaptive Controller’s USB ports can’t charge it without the XAC’s own power supply. On: it charges (XAC on its power supply, or a PC).',
   g_button: 'The gamepad button the switch is, held while the switch is. On an Xbox, set what it does in the Xbox Accessories app (the Adaptive Controller’s button mapping).',
@@ -1107,9 +1112,11 @@ async function setPlays(i) {
 const pressTwice = () => setCur('s_access') === 0;
 const allTopics = () => setCur('s_topics') === 1;
 const tilt = () => setCur('m_style') === 1, follow = () => !tilt();
+const wireless = () => setCur('g_send') === 1;
 const TILT_DEAD = [2, 4, 6, 9];  // m_dead choices (deg)
 const TAB_SETTINGS = {  // [setting, shown only when]
-  game: [['g_stick'], ['g_button'], ['m_dead'], ['g_curve'], ['m_dirs'], ['g_charge'], ['s_psound']],
+  game: [['g_send'], ['g_pair', wireless], ['g_stick'], ['g_button'], ['m_dead'], ['g_curve'], ['m_dirs'],
+    ['g_charge', () => !wireless()], ['s_psound']],
   quick: [['plays'], ['s_gap', countingPresses],
     ['s_play', () => setCur('s_spkmode') === 0], ['s_hold', () => setCur('s_spkmode') === 0 && setCur('s_play') === 0],
     ['s_scanspd', speakScanning], ['s_scanrnd', () => speakScanning() && setCur('s_qhow') === 0],
@@ -1149,9 +1156,29 @@ function switchSetting(k) {
     el('button', { onclick: () => act(() => cmd('MRESET'), `${tilt() ? 'Tilt' : 'Follow'} settings reset`) }, `Reset ${tilt() ? 'Tilt' : 'Follow'}`),
     tilt() ? 'Tilt speed, Dead zone and Directions back to their defaults (Dead zone and Directions are GAME’s too).'
       : 'The speeds back to what Calibrate chose; Speed-up, Steady and Smoothing back to their defaults.');
+  if (k === 'g_pair') return plainRow('Pair dongle',
+    el('button', { disabled: !!info.pairing, onclick: pairDongle }, info.pairing ? 'Looking…' : 'Pair'),
+    (info.dongle ? `Paired with ${info.dongle}. ` : 'Not paired yet. ')
+      + 'A new dongle pairs by itself. To pair one already paired with another stick, hold its button 3 s first (the light flashes blue).');
   const st = info.settings.find((x) => x.key === k);
   if (!st) return null;
   return settingRow(st.name, st.choices, st.cur, (i) => setSetting(k, i), HELP[k], k);
+}
+
+// Pair dongle: the stick looks for 15 s; the page watches until it stops looking.
+async function pairDongle() {
+  let paired = false;
+  await act(async () => {
+    const start = Date.now();
+    await cmd('PAIR');
+    await refresh();
+    while (info.pairing && Date.now() - start < 17000) {
+      await new Promise((r) => setTimeout(r, 1000));
+      await refresh();
+    }
+    paired = !info.pairing && Date.now() - start < 14500;  // it stopped before the 15 s were up: a dongle answered
+  });
+  toast(paired ? 'Paired' : 'No dongle found', !paired);
 }
 
 // A row with its own control and a short note that's always shown

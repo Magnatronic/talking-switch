@@ -107,6 +107,9 @@
 #include <esp_sleep.h>
 #include <driver/gpio.h>
 #include <esp_mac.h>
+#include <WiFi.h>
+#include <esp_wifi.h>
+#include <esp_now.h>
 #include <Wire.h>
 #include <VL53L1X.h>
 #if defined(CONFIG_NIMBLE_ENABLED)
@@ -155,15 +158,17 @@ public:
 // KEYBOARD and MOUSE then use Bluetooth). The
 // serial port is always there. The core adds each device when it's made, and USB starts
 // (CDC On Boot) before setup and before NVS is set up, so they're made here, reading the
-// "GAME mode" setting (s_game) straight from NVS.
+// "GAME mode" and "Send by" settings (s_game, g_send) straight from NVS.
 // (a lambda, not a function: Arduino puts its prototypes before the first function)
-bool gamepadOn = [] {  // GAME mode was on at start, so the stick's USB is the gamepad
-  uint8_t v = 0;
+bool gamepadOn = [] {  // GAME mode by USB was on at start, so the stick's USB is the gamepad
+  uint8_t v = 0, wireless = 0;
   nvs_handle_t h;
   if (nvs_flash_init() == ESP_OK && nvs_open("tswitch", NVS_READONLY, &h) == ESP_OK) {
     nvs_get_u8(h, "s_game", &v);
+    nvs_get_u8(h, "g_send", &wireless);  // Wireless: the dongle is the gamepad, USB stays normal
     nvs_close(h);
   }
+  if (wireless == 1) v = 0;
   // the XAC's USB ports give 100 mA without its power supply (asking for the core's 500 also
   // worked, tested 28 Oct 2026; 100 is what it draws with no charging)
   if (v == 1) USB.usbPower(100);
@@ -189,8 +194,8 @@ static const int SENSE_GRAPH_W = 224;      // Sensor test graph: one reading per
 
 // Firmware version. FW_API goes up whenever the setup page needs to change
 // with it (the page shows a warning if the numbers don't match).
-static const char* FW_VERSION = "25 Oct 2026";
-static const int   FW_API     = 10;
+static const char* FW_VERSION = "29 Oct 2026";
+static const int   FW_API     = 11;
 
 // ---------------------------------------------------------------------
 //  Settings you may want to change
@@ -286,7 +291,7 @@ enum SettingId : uint8_t {
   S_VOLUME, S_MODES, S_MOUSE_ON, S_GAME_ON, S_SPEAK_CHOOSE, S_QUICK_HOW, S_GAP, S_PLAY, S_HOLD, S_CHOOSE_FROM, S_OFFER_QUICK, S_OFFER_CONTROL, S_OFFER_DEVICE, S_IR_CHOOSE, S_ACCESS, S_SCAN_SPEED, S_SCAN_ROUNDS, S_STOP,
   S_KEY_ACTION, S_PRESS_SOUND, S_NO_USB,
   S_M_STYLE, S_M_SPEED, S_M_SPEEDY, S_M_ACCEL, S_M_TSPEED, S_M_DEAD, S_M_DIRS, S_M_STEADY, S_M_SMOOTH, S_M_RESET, S_M_DWELL, S_M_AREA, S_M_SWITCH, S_M_HOLD, S_M_CLUTCH, S_M_FREEZE, S_M_DOUBLE,
-  S_G_STICK, S_G_BUTTON, S_G_CURVE, S_G_CHARGE,
+  S_G_SEND, S_G_PAIR, S_G_STICK, S_G_BUTTON, S_G_CURVE, S_G_CHARGE,
   S_ACCEPT, S_LOCKOUT, S_SENSE_MODE, S_SENSE_LINE, S_SENSE_MOVE, S_SETTLE, S_FOLLOW, S_BEYOND, S_SENSE_TEST, S_BRIGHT, S_WAKE, S_SLEEP, S_AUTOOFF, S_LOUD, S_FORGET, S_ABOUT,
   S_COUNT
 };
@@ -385,6 +390,11 @@ static const Setting SETTINGS[S_COUNT] = {
   // after a click the pointer keeps still this long, so a second click lands in the
   // same place (ms). Not after the second one
   {"Double-click help",   "m_double",  4, 0, {0, 500, 1000, 1500}, {"Off", "0.5 s", "1 s", "1.5 s"}, G_MOUSE},
+  // GAME: the stick's USB is the gamepad, or it sends by radio (ESP-NOW) to the GameDongle
+  // in the XAC. Changing it restarts the switch with GAME mode on, as USB has to start again
+  {"Send by",             "g_send",    2, 0, {0, 1}, {"USB", "Wireless"}, G_GAME},
+  // action: pair with a GameDongle (a new dongle pairs by itself; a paired one: hold its button 3 s first)
+  {"Pair dongle",         nullptr,     1, 0, {0}, {""}, G_GAME},
   // GAME: which thumbstick the movement is (XAC: left = X/Y, right = Z/Rz)
   {"Stick",               "g_stick",   2, 0, {0, 1}, {"Left", "Right"}, G_GAME},
   // GAME: the gamepad button the big switch is (bit number), held while the switch is.
@@ -1751,21 +1761,141 @@ void gameStick() {
   gX = (int8_t)lroundf(x * 127); gY = (int8_t)lroundf(y * 127);
 }
 
-// The gamepad report, when something changed (the button at once, the stick at most every MS_SEND_MS).
+// GAME, Send by: Wireless - ESP-NOW to the GameDongle (GameDongle/, an AtomS3U in the XAC).
+// A direct radio link on Wi-Fi channel 1: no network is joined or made. The radio is on only
+// in GAME (and while pairing). Pairing: the stick asks everyone ('P'); a dongle that is
+// new, or had its button held 3 s, answers ('A') and both remember each other.
+static const uint8_t  RADIO_CHANNEL = 1;       // the dongle uses the same
+static const uint32_t RADIO_KEEP_MS = 100;     // sent this often even when nothing changes (the dongle centres after 0.5 s)
+static const uint32_t RADIO_PAIR_MS = 15000;   // Pair dongle: how long it looks
+static const uint32_t RADIO_SEEN_MS = 1000;    // the dongle took a packet this recently: found
+static const uint8_t  RADIO_ALL[6] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+// a packet, the same as GameDongle.ino's
+struct __attribute__((packed)) GamePacket {
+  uint8_t magic;      // 'G' the gamepad, 'P' pair (stick to everyone), 'A' pair answer (dongle to stick)
+  uint8_t version;    // 1
+  int8_t lx, ly, rx, ry;
+  uint16_t buttons;   // bit 0 = button 1
+};
+bool     radioOn = false;
+bool     havePeer = false;       // paired with a dongle (its MAC saved as g_peer)
+uint8_t  dongleMac[6] = {};
+uint32_t pairUntil = 0;          // Pair dongle: looking until then
+uint8_t  pairMac[6] = {};        // ...the dongle that answered (set in the Wi-Fi task, then pairAnswered)
+volatile bool     pairAnswered = false;
+volatile uint32_t dongleSeenAt = 0;  // the dongle's last delivered packet
+int      radioErr = 0;           // checking: the radio's first start-up error (0 = none), pair asks sent, sends delivered
+uint32_t radioAsks = 0;
+volatile uint32_t radioAcks = 0;
+
+bool gameWireless() { return setting(S_G_SEND) == 1; }
+bool dongleFound() { return radioOn && havePeer && dongleSeenAt && millis() - dongleSeenAt < RADIO_SEEN_MS; }
+
+// (both run in the Wi-Fi task)
+void radioReceived(const esp_now_recv_info_t* info, const uint8_t* data, int len) {
+  if (!pairUntil || len != sizeof(GamePacket) || data[0] != 'A' || data[1] != 1) return;
+  memcpy(pairMac, info->src_addr, 6);
+  pairAnswered = true;
+}
+void radioSent(const esp_now_send_info_t* info, esp_now_send_status_t status) {
+  if (status == ESP_NOW_SEND_SUCCESS && memcmp(info->des_addr, RADIO_ALL, 6)) { dongleSeenAt = millis(); radioAcks++; }
+}
+
+void radioAddPeer(const uint8_t* mac) {
+  if (esp_now_is_peer_exist(mac)) return;
+  esp_now_peer_info_t p = {};
+  memcpy(p.peer_addr, mac, 6);
+  p.channel = RADIO_CHANNEL;
+  p.ifidx = WIFI_IF_STA;
+  esp_now_add_peer(&p);
+}
+
+// Started the usual Arduino way (WiFi.mode), which sets up what Wi-Fi needs around it.
+void radioStart() {
+  WiFi.persistent(false);  // nothing in flash
+  if (!WiFi.mode(WIFI_STA)) { radioErr = 1000; return; }
+  esp_err_t e = esp_wifi_set_channel(RADIO_CHANNEL, WIFI_SECOND_CHAN_NONE);
+  if (e != ESP_OK && !radioErr) radioErr = 3000 + e;
+  if ((e = esp_now_init()) != ESP_OK) { radioErr = 4000 + e; WiFi.mode(WIFI_OFF); return; }
+  esp_now_register_recv_cb(radioReceived);
+  esp_now_register_send_cb(radioSent);
+  radioAddPeer(RADIO_ALL);
+  if (havePeer) radioAddPeer(dongleMac);
+  radioOn = true;
+}
+
+void radioStop() {
+  esp_now_deinit();
+  WiFi.mode(WIFI_OFF);
+  radioOn = false;
+  dongleSeenAt = 0;
+}
+
+// Pair dongle (GAME settings, or PAIR from the setup page)
+void radioPair() {
+  if (!gameWireless()) return;
+  pairUntil = millis() + RADIO_PAIR_MS;
+  pairAnswered = false;
+  setStatus("Looking for\nthe dongle", TFT_YELLOW, RADIO_PAIR_MS);
+}
+
+void radioSend(int8_t lx, int8_t ly, int8_t rx, int8_t ry, uint16_t buttons) {
+  GamePacket p = {'G', 1, lx, ly, rx, ry, buttons};
+  esp_now_send(dongleMac, (const uint8_t*)&p, sizeof(p));
+}
+
+// The radio on in GAME with Send by: Wireless, pairing, and "dongle found" on screen.
+void manageRadio(uint32_t now) {
+  static bool loaded = false;
+  if (!loaded) { loaded = true; havePeer = prefs.getBytes("g_peer", dongleMac, 6) == 6; }
+  if (pairUntil && (int32_t)(now - pairUntil) >= 0) { pairUntil = 0; setStatus("No dongle found", TFT_ORANGE); }
+  const bool want = gameWireless() && (studentMode() == M_GAME || pairUntil);
+  if (want != radioOn) {
+    if (want) radioStart(); else radioStop();
+    needRedraw = true;
+  }
+  if (!radioOn) return;
+  if (pairUntil && pairAnswered) {
+    pairUntil = 0;
+    pairAnswered = false;
+    if (havePeer && memcmp(dongleMac, pairMac, 6)) esp_now_del_peer(dongleMac);
+    memcpy(dongleMac, pairMac, 6);
+    havePeer = true;
+    prefs.putBytes("g_peer", dongleMac, 6);
+    radioAddPeer(dongleMac);
+    setStatus("Paired", TFT_GREEN);
+  } else if (pairUntil) {
+    static uint32_t lastAsk = 0;
+    if (now - lastAsk >= 300) {
+      lastAsk = now;
+      GamePacket p = {'P', 1, 0, 0, 0, 0, 0};
+      if (esp_now_send(RADIO_ALL, (const uint8_t*)&p, sizeof(p)) == ESP_OK) radioAsks++;
+    }
+  }
+  static bool foundWas = false;
+  if (dongleFound() != foundWas) { foundWas = !foundWas; needRedraw = true; }
+}
+
+// The gamepad report, when something changed (the button at once, the stick at most every
+// MS_SEND_MS); by radio also every RADIO_KEEP_MS, so the dongle knows the stick is there.
 void gameSend() {
 #if HAS_USB_HID
   static int8_t sx = 0, sy = 0;
   static bool sb = false;
   static uint32_t last = 0;
-  if (!gamepadOn || !usbHostActive()) return;
-  if (gX == sx && gY == sy && gPressed == sb) return;
-  if (gPressed == sb && millis() - last < MS_SEND_MS) return;
+  const bool radio = gameWireless();
+  if (radio ? !radioOn || !havePeer : !gamepadOn || !usbHostActive()) return;
+  const bool same = gX == sx && gY == sy && gPressed == sb;
+  if (same && !(radio && millis() - last >= RADIO_KEEP_MS)) return;
+  if (!same && gPressed == sb && millis() - last < MS_SEND_MS) return;
   last = millis();
   if (gX != sx || gY != sy) markActivity();  // moving counts as using it (auto power-off)
   sx = gX; sy = gY; sb = gPressed;
   const bool right = setting(S_G_STICK) == 1;
-  UsbGamepad->send(right ? 0 : gX, right ? 0 : gY, right ? gX : 0, right ? gY : 0,
-                   gPressed ? 1 << setting(S_G_BUTTON) : 0);
+  const int8_t lx = right ? 0 : gX, ly = right ? 0 : gY, rx = right ? gX : 0, ry = right ? gY : 0;
+  const uint16_t buttons = gPressed ? 1 << setting(S_G_BUTTON) : 0;
+  if (radio) radioSend(lx, ly, rx, ry, buttons);
+  else if (UsbGamepad) UsbGamepad->send(lx, ly, rx, ry, buttons);
 #endif
 }
 
@@ -2277,7 +2407,13 @@ void drawMain(lgfx::LovyanGFX& c) {
       }
       if (mode == M_GAME) {
         line1(c, mPaused ? "Paused" : "Playing");
-        if (!gamepadOn) line2(c, "Restart to use", C_PROBLEM);
+        if (gameWireless()) {
+          if (!havePeer) line2(c, "Pair dongle in settings", C_PROBLEM);
+          else if (!dongleFound()) line2(c, "Dongle not found", C_PROBLEM);
+          else if (mPaused) line2(c, "Hold A to move", C_DO);
+          else line2(c, "Gamepad by wireless", C_READY);
+        }
+        else if (!gamepadOn) line2(c, "Restart to use", C_PROBLEM);
         else if (!usbHostActive()) line2(c, "Plug into USB", C_PROBLEM);
         else if (mPaused) line2(c, "Hold A to move", C_DO);
         else line2(c, "Gamepad by USB", C_READY);
@@ -2422,6 +2558,8 @@ bool settingShown(int i) {
     case S_M_TSPEED: return setting(S_M_STYLE) == 1;
     case S_M_DEAD: case S_M_DIRS: return mode == M_GAME || setting(S_M_STYLE) == 1;
     case S_GAME_ON: return HAS_USB_HID;  // a USB gamepad needs USB Mode: USB-OTG (TinyUSB)
+    case S_G_PAIR: return gameWireless();
+    case S_G_CHARGE: return !gameWireless();  // wireless, the stick's USB is normal and charges
     case S_M_CLUTCH: return setting(S_M_HOLD) > 0;
     case S_SENSE_MODE: return sensorOn;
     case S_SENSE_LINE: return sensorOn && !senseMove();
@@ -2446,6 +2584,7 @@ void drawSettings(lgfx::LovyanGFX& c) {
   bool confirm = (settingIdx == S_FORGET || settingIdx == S_M_RESET) && forgetConfirmUntil;
   drawFit(c, confirm ? "Hold A again" : settingIdx == S_FORGET ? "Hold A to forget"
                      : settingIdx == S_M_RESET ? (setting(S_M_STYLE) == 1 ? "Hold A: Tilt" : "Hold A: Follow")
+                     : settingIdx == S_G_PAIR ? (pairUntil ? "Looking..." : "Hold A to pair")
                      : st.labels[settingChoice[settingIdx]],
           LINE2_Y, confirm ? C_PROBLEM : C_DO);
   line3(c, (inSettings() ? "Switch does " + String(MODE_NAMES[prevMode]) : String(MODE_NAMES[mode]) + " settings")
@@ -2459,6 +2598,7 @@ String buttonGuide() {
   if (settingsView()) {
     if (settingIdx == S_FORGET) return "B next  hold A forget  A " + String(inSettings() ? "mode" : "close");
     if (settingIdx == S_M_RESET) return "B next  hold A reset  A close";
+    if (settingIdx == S_G_PAIR) return "B next  hold A pair  A close";
     if (settingIdx == S_ABOUT) return "B next  hold A open  A " + String(inSettings() ? "mode" : "close");
     if (settingIdx == S_SENSE_TEST) return "B next  hold A open  A " + String(inSettings() ? "mode" : "close");
     return "B next  hold A/B change  A " + String(inSettings() ? "mode" : "close");
@@ -3021,8 +3161,8 @@ void settingChanged(int i) {
   if (i == S_M_SWITCH || i == S_M_HOLD) mouseButton(mButtons, false);
   // Tilt works from rest, and in Follow the angles drift from it: a new rest (Keep still)
   if (i == S_M_STYLE && mRunning && mHaveAxes) mouseStartCal(false);
-  if (i == S_GAME_ON) {  // the gamepad is only in the USB device from the start
-    setStatus("Restarting\nfor GAME mode", TFT_ORANGE);
+  if (i == S_GAME_ON || (i == S_G_SEND && setting(S_GAME_ON))) {  // the gamepad is only in the USB device from the start
+    setStatus(i == S_GAME_ON ? "Restarting\nfor GAME mode" : "Restarting\nfor Send by", TFT_ORANGE);
     gameRestartAt = millis() + 1500;
   }
   if (i == S_MODES || i == S_MOUSE_ON || i == S_GAME_ON) {
@@ -3066,6 +3206,8 @@ void settingsButtons() {
     } else {
       forgetConfirmUntil = millis() + 4000;
     }
+  } else if (M5.BtnA.wasHold() && settingIdx == S_G_PAIR) {
+    radioPair();
   } else if (M5.BtnA.wasHold() && settingIdx == S_ABOUT) {
     aboutOpen = true;
   } else if (M5.BtnA.wasHold() && settingIdx == S_SENSE_TEST) {
@@ -3223,6 +3365,7 @@ void pollStaffButtons() {
 //    MSTREAM 1|0          (MOUSE: the live picture, "mou,..." lines, for 10 s)
 //    MZERO                (MOUSE: the live picture's dot back to the middle)
 //    MRESET               (MOUSE: the pointer style's settings back to their defaults)
+//    PAIR                 (GAME, Send by: Wireless: look for a GameDongle for 15 s)
 //    UP n <samples>       -> @READY, then the samples in 4KB pieces, each
 //                            answered with @A; finally @OK
 //    DOWN n               -> @DATA n <samples>, the samples, then @OK
@@ -3255,6 +3398,13 @@ void sendInfo() {
 #if HAS_USB_HID
   j += ",\"usbmA\":" + String(USB.usbPower());  // the power USB asked for (100 with GAME mode on)
 #endif
+  // GAME by wireless: the paired dongle's MAC ("" = none), the radio, and whether the dongle answers
+  char mac[18] = "";
+  if (havePeer) snprintf(mac, sizeof(mac), "%02X:%02X:%02X:%02X:%02X:%02X", dongleMac[0], dongleMac[1], dongleMac[2],
+                         dongleMac[3], dongleMac[4], dongleMac[5]);
+  j += ",\"dongle\":" + jsonStr(mac) + ",\"radio\":" + yes(radioOn) + ",\"dongleOk\":" + yes(dongleFound())
+       + ",\"pairing\":" + yes(pairUntil != 0) + ",\"radioErr\":" + String(radioErr) + ",\"asks\":" + String(radioAsks)
+       + ",\"acks\":" + String(radioAcks);
   j += ",\"ver\":" + jsonStr(FW_VERSION) + ",\"api\":" + String(FW_API) + ",\"presses\":" + String(pressCount);
   j += ",\"fsUsed\":" + String((unsigned long)fsUsed()) + ",\"fsTotal\":" + String((unsigned long)LittleFS.totalBytes());
   j += ",\"voice\":" + jsonStr(voiceId) + ",\"vspeed\":" + jsonStr(voiceSpeed);
@@ -3545,6 +3695,10 @@ void handleCommand(String line) {
   } else if (cmd == "MRESET") {
     mouseResetStyle();
     reply();
+  } else if (cmd == "PAIR") {
+    if (!gameWireless()) { reply("Send by is not Wireless"); return; }
+    radioPair();
+    reply();
   } else {
     reply("unknown command");
   }
@@ -3690,6 +3844,7 @@ void loop() {
   }
   manageBackup(now);
   updateMouse(now);
+  manageRadio(now);
   manageBle(now);
   managePower(now);
   if (needRedraw && scr != SCR_OFF) drawScreen();
