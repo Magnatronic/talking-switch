@@ -17,7 +17,7 @@ New ideas can be tried in `MouseTest/` first.
 | 4 | Tilt (joystick) style for very small movements | **Built 1 Oct 2026, to test** |
 | 5 | True screen position (absolute pointer) | Only if 2–4 aren't enough |
 | 6 | GAME mode: movement as a thumbstick, for PC and Xbox | **Works on the PC and through the XAC, 28 Oct 2026** (gamepad-only USB, 100 mA, no charging) |
-| 7 | Wireless GAME: an ESP-NOW dongle (AtomS3U) in the XAC | `GameDongle/` power test 28 Oct 2026: **needs the XAC on its barrel adapter** (or a Y power cable). Stick side + pairing built 29 Oct 2026, untested |
+| 7 | Wireless GAME: an ESP-NOW dongle (AtomS3U) in the XAC | `GameDongle/` power test 28 Oct 2026: **needs the XAC on its barrel adapter** (or a Y power cable). Stick side + pairing built 29 Oct 2026: **works on the PC** (dongle in the PC); XAC and the switch button untested |
 | – | Head gestures (Quha style) | Idea, see the end |
 
 ## What we found (research, 30 Sep 2026)
